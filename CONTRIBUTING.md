@@ -1,24 +1,36 @@
-# NightPatrol 협업 가이드
+# **NightPatrol 협업 가이드**
+
+> 우선 정리해 둔 초안으로, 아직 팀 의견을 반영하지 못했습니다. 불편하거나 바꾸고 싶은 부분이 있다면 자유롭게 의견 주시거나 직접 수정해 주세요.
+> 
+> 
+> 수정하실 때는 **GitHub의 이 파일과 노션 페이지를 함께 업데이트**해 주시면 감사하겠습니다.
+> 
 
 ## 처음 세팅 (한 번만)
 
 1. **Git LFS를 먼저 설치**합니다. clone보다 먼저 해야 텍스처·모델이 깨지지 않습니다.
-   ```
-   git lfs install
-   ```
-   GitHub Desktop을 쓰면 LFS가 포함되어 있어 이 단계는 생략해도 됩니다.
+GitHub Desktop을 쓰면 LFS가 포함되어 있어 이 단계는 생략해도 됩니다.
+    
+    ```
+    git lfs install
+    ```
+    
 2. Unity Hub에서 **6000.4.6f1** 버전을 설치합니다. 다른 버전으로 열면 파일이 대량으로 바뀌므로 반드시 이 버전을 씁니다.
 3. 저장소를 clone합니다.
-   ```
-   git clone https://github.com/wooosungg2/NightPatrol.git
-   ```
+    
+    ```
+    git clone https://github.com/wooosungg2/NightPatrol.git
+    ```
+    
 4. Unity Hub → Add → clone한 폴더를 선택해 엽니다. 처음 열 때는 Library 생성 때문에 몇 분 걸립니다.
 5. 내 브랜치를 만듭니다.
-   ```
-   git switch develop
-   git switch -c A          # A 자리에 본인 이름 (영문)
-   git push -u origin A
-   ```
+    
+    ```
+    git switch develop
+    git switch -c A          # A 자리에 본인 이름 (영문)
+    git push -u origin A
+    ```
+    
 
 ## 브랜치 구조
 
@@ -32,7 +44,7 @@ main      발표·제출용. develop이 안정됐을 때만 합칩니다
 
 - 작업은 **자기 브랜치에서만** 합니다.
 - `develop`, `main`에는 직접 push하지 않고 PR로만 합칩니다.
-- `develop` → `main` 병합은 합류 시점(4주차 빌드, 6주차 영상 등)에 저장소 관리자가 합니다.
+- `develop` → `main` 병합은 합류 시점에 저장소 관리자가 합니다.
 
 ## 매일 작업 흐름
 
@@ -46,11 +58,10 @@ git commit -m "feat: 손전등 on/off 추가"
 git push
 ```
 
-**2~3일에 한 번은 PR을 올려 `develop`에 합칩니다.** 오래 안 합치면 충돌이 한꺼번에 터집니다.
+**자주 PR을 올려 `develop`에 합칩니다.** 오래 안 합치면 충돌이 한꺼번에 터집니다.
 
 1. GitHub → Pull requests → New → `develop ← 내 브랜치`
 2. **merge 전에 에디터에서 Play가 되는지 확인**
-3. 본인이 merge하고 카톡으로 알림 (리뷰 승인은 필수 아님)
 
 ## 유니티 규칙
 
@@ -67,9 +78,9 @@ LFS 용량과 전송량에는 한도가 있어서, 넘으면 팀 전체가 clone
 - **게임에 들어가는 파일만 저장소에** 올립니다. 이미지·모델·사운드는 LFS가 자동으로 처리하므로 평소처럼 커밋하면 됩니다.
 - **에셋 팩은 필요한 것만 골라서 import**합니다. 데모 씬·샘플 폴더는 제외합니다.
 - 아래 파일은 저장소가 아닌 **공유 드라이브**에 둡니다. (링크: 추가 예정)
-  - 원본 작업 파일 (`.blend`, 레이어 있는 `.psd`) — 게임에는 내보낸 `.fbx`, `.png`만 올립니다
-  - 에셋 팩 원본 `.unitypackage`
-  - 발표 영상, 녹화본, 레퍼런스 사진
+    - 원본 작업 파일 (`.blend`, 레이어 있는 `.psd`) — 게임에는 내보낸 `.fbx`, `.png`만 올립니다
+    - 에셋 팩 원본 `.unitypackage`
+    - 발표 영상, 녹화본, 레퍼런스 사진
 
 ## 커밋 메시지
 
