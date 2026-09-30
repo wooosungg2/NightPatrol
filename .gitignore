@@ -20,3 +20,5 @@ UserSettings/
 # OS
 .DS_Store
 Thumbs.db
+# AI agent notes (local only)
+.ai/
