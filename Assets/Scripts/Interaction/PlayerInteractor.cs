@@ -16,6 +16,9 @@ namespace NightPatrol.Interaction
         private InputAction interact;
 
         public IInteractable CurrentTarget { get; private set; }
+        public Camera PlayerCamera => playerCamera;
+        public PlayerSettings Settings => settings;
+        public LayerMask RaycastMask => raycastMask;
         /// <summary>Raised on target changes, including null when focus is lost.</summary>
         public event Action<IInteractable> TargetChanged;
 
