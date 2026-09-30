@@ -22,3 +22,4 @@ UserSettings/
 Thumbs.db
 # AI agent notes (local only)
 .ai/
+*.slnx
