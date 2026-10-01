@@ -4,34 +4,48 @@ namespace NightPatrol.Anomalies
 {
     public class AnomalyManager : MonoBehaviour
     {
-        [SerializeField] private Anomaly[] anomalies;
+        [Header("빨간 모니터 이상현상 후보")]
+        [SerializeField] private Anomaly[] redMonitorAnomalies;
 
-        private Anomaly activeAnomaly;
+        [Header("Glitch 모니터 이상현상 후보")]
+        [SerializeField] private Anomaly[] glitchMonitorAnomalies;
+
+        private Anomaly activeRedMonitor;
+        private Anomaly activeGlitchMonitor;
 
         private void Start()
         {
-            ActivateRandomAnomaly();
+            activeRedMonitor = ActivateRandom(redMonitorAnomalies);
+            activeGlitchMonitor = ActivateRandom(glitchMonitorAnomalies);
         }
 
-        public void ActivateRandomAnomaly()
+        private Anomaly ActivateRandom(Anomaly[] candidates)
         {
-            if (anomalies == null || anomalies.Length == 0)
-                return;
+            if (candidates == null || candidates.Length == 0)
+                return null;
 
-            int index = Random.Range(0, anomalies.Length);
-            activeAnomaly = anomalies[index];
+            int index = Random.Range(0, candidates.Length);
+            Anomaly selected = candidates[index];
 
-            if (activeAnomaly != null)
-                activeAnomaly.Activate();
+            if (selected != null)
+                selected.Activate();
+
+            return selected;
         }
 
-        public void ClearAnomaly()
+        public void ClearAnomalies()
         {
-            if (activeAnomaly == null)
-                return;
+            if (activeRedMonitor != null)
+            {
+                activeRedMonitor.Deactivate();
+                activeRedMonitor = null;
+            }
 
-            activeAnomaly.Deactivate();
-            activeAnomaly = null;
+            if (activeGlitchMonitor != null)
+            {
+                activeGlitchMonitor.Deactivate();
+                activeGlitchMonitor = null;
+            }
         }
     }
 }

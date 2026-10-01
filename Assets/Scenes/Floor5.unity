@@ -39415,6 +39415,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 265931592}
+  - component: {fileID: 265931593}
   m_Layer: 0
   m_Name: Monitor
   m_TagString: Untagged
@@ -39441,6 +39442,20 @@ Transform:
   - {fileID: 1990830129}
   m_Father: {fileID: 1322290167}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &265931593
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 265931591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 472f4616272f25145974812c7c24eeee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NightPatrol.Anomalies.MonitorGlitchAnomaly
+  screenRenderer: {fileID: 1990830130}
+  glitchMaterial: {fileID: 2100000, guid: 45473b1219d9916448b4d24553f10774, type: 2}
 --- !u!1 &266550677
 GameObject:
   m_ObjectHideFlags: 0
@@ -89796,6 +89811,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 640125612}
+  - component: {fileID: 640125613}
   m_Layer: 0
   m_Name: Monitor
   m_TagString: Untagged
@@ -89822,6 +89838,20 @@ Transform:
   - {fileID: 1521378813}
   m_Father: {fileID: 185622923}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &640125613
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 640125611}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 472f4616272f25145974812c7c24eeee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NightPatrol.Anomalies.MonitorGlitchAnomaly
+  screenRenderer: {fileID: 1521378814}
+  glitchMaterial: {fileID: 2100000, guid: 45473b1219d9916448b4d24553f10774, type: 2}
 --- !u!1 &640386833
 GameObject:
   m_ObjectHideFlags: 0
@@ -102846,10 +102876,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fcff54a8d318d4b46bb169d8bca47240, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NightPatrol.Anomalies.AnomalyManager
-  anomalies:
-  - {fileID: 505316841}
+  redMonitorAnomalies:
   - {fileID: 1337825156}
   - {fileID: 1306238979}
+  glitchMonitorAnomalies:
+  - {fileID: 640125613}
+  - {fileID: 265931593}
 --- !u!4 &750986829
 Transform:
   m_ObjectHideFlags: 0
