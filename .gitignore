@@ -13,6 +13,7 @@ UserSettings/
 .vscode/
 *.csproj
 *.sln
+*.slnx
 *.user
 *.suo
 *.tmp
