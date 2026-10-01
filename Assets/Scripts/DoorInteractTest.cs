@@ -5,7 +5,7 @@ namespace NightPatrol
 {
 	/// <summary>
 	/// 문 동작 확인용 임시 스크립트 (상호작용 시스템이 들어오면 지울 것).
-	/// 카메라(또는 플레이어)에 붙이고 Play → 문을 바라보고 E: 열기/닫기, L: 잠금/해제.
+	/// 카메라(또는 플레이어)에 붙이고 Play → 문·창문을 바라보고 E: 열기/닫기, L: 잠금/해제, B: 블라인드(창문만).
 	/// </summary>
 	public class DoorInteractTest : MonoBehaviour
 	{
@@ -36,11 +36,27 @@ namespace NightPatrol
 		{
 			var kb = Keyboard.current;
 			if (kb == null) return;
-			bool use = kb.eKey.wasPressedThisFrame, lockKey = kb.lKey.wasPressedThisFrame;
-			if (!use && !lockKey) return;
+			bool use = kb.eKey.wasPressedThisFrame, lockKey = kb.lKey.wasPressedThisFrame, blindKey = kb.bKey.wasPressedThisFrame;
+			if (!use && !lockKey && !blindKey) return;
 
 			var c = cam != null ? cam : Camera.main;
 			if (c == null) return;
+
+			// 창문 먼저 (바라보는 창 칸)
+			if (Physics.Raycast(c.transform.position, c.transform.forward, out var wh, reach))
+			{
+				var win = wh.collider.GetComponentInParent<WindowUnit>();
+				if (win != null)
+				{
+					if (blindKey) win.ToggleBlind();
+					else if (lockKey) win.SetLocked(!win.IsLocked);
+					else if (!win.Toggle()) { Debug.Log($"[DoorTest] {win.roomLabel} 창문: 잠겨 있어서 안 열림 (L로 해제)", win); return; }
+					Debug.Log($"[DoorTest] {win.roomLabel} {win.name}: {(win.IsLocked ? "잠금" : "잠금 해제")}, " +
+							  $"{(win.IsOpen ? "열림" : "닫힘")}, 블라인드 {(win.IsBlindDown ? "내림" : "올림")}", win);
+					return;
+				}
+			}
+			if (blindKey) return;
 			var door = FindDoor(c.transform);
 			if (door == null) return;
 

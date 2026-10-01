@@ -114,6 +114,27 @@ namespace NightPatrol
 		[Header("강의실 내부 (label이 같은 방에만 배치)")]
 		public List<ClassroomInteriorSettings> classroomInteriors = DefaultInteriors();
 
+		[Header("강의실 창문 (바깥벽에 미서기창 + 블라인드)")]
+		public WindowSettings classroomWindows = new WindowSettings();
+
+		[Header("계단식 강의실 (label이 같은 방에만 배치)")]
+		public List<LectureRoomSettings> tieredRooms = DefaultTiered();
+
+		static List<LectureRoomSettings> DefaultTiered() => new List<LectureRoomSettings>
+		{
+			LectureRoomSettings.Room524(), // 2·2·3열, 10행(복도 쪽은 뒷문 앞까지), 6행부터 단 하나
+		};
+
+		[ContextMenu("Reset Tiered Rooms")]
+		void ResetTiered()
+		{
+#if UNITY_EDITOR
+			Undo.RecordObject(this, "Reset Tiered Rooms");
+#endif
+			tieredRooms = DefaultTiered();
+			MarkDirty();
+		}
+
 		static List<ClassroomInteriorSettings> DefaultInteriors() => new List<ClassroomInteriorSettings>
 		{
 			ClassroomInteriorSettings.Room521(), // 컴퓨터실 3줄 × 12석
@@ -386,7 +407,9 @@ namespace NightPatrol
 			doors.Sort((p, q) => p.x.CompareTo(q.x));
 
 			// 뒷벽, 옆벽
-			if (!stairGen) Box(root, "Wall_Back", new Vector3(0f, ym, D - t * 0.5f), new Vector3(W, h, t), wm); // 계단실은 창 뚫린 뒷벽을 빌더가 만듦
+			bool windowWall = classroom && WindowBuilder.Applies(classroomWindows, slot.label);
+			if (windowWall) WindowBuilder.Build(root, W, D, t, y1, classroomWindows, wm, glassMaterial, slot.label);
+			else if (!stairGen) Box(root, "Wall_Back", new Vector3(0f, ym, D - t * 0.5f), new Vector3(W, h, t), wm); // 계단실은 창 뚫린 뒷벽을 빌더가 만듦
 			Box(root, "Wall_L", new Vector3(-hw + t * 0.5f, ym, D * 0.5f), new Vector3(t, h, D), wm);
 			Box(root, "Wall_R", new Vector3(hw - t * 0.5f, ym, D * 0.5f), new Vector3(t, h, D), wm);
 
@@ -441,6 +464,13 @@ namespace NightPatrol
 					if (ci != null && ci.enabled && ci.label == slot.label)
 					{
 						ClassroomInteriorBuilder.Build(root, W, D, t, doors, ci, ceilingHeight, slot.label, this);
+						break;
+					}
+			if (classroom && tieredRooms != null)
+				foreach (var lr in tieredRooms)
+					if (lr != null && lr.enabled && lr.label == slot.label)
+					{
+						LectureRoomBuilder.Build(root, W, D, t, doors, lr, ceilingHeight, slot.label, this);
 						break;
 					}
 

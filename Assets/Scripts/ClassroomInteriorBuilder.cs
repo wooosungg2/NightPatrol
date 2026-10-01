@@ -65,6 +65,11 @@ namespace NightPatrol
 		public float panelBottom = 0.9f;
 		public float panelTop = 2.5f;
 
+		[Header("올린 바닥 (컴퓨터실 배선용) + 문마다 경사로")]
+		[Tooltip("바닥 높이(m). 0이면 없음")] public float raisedFloor = 0.15f;
+		[Tooltip("문 앞 경사로 길이(m), 앞벽에서 방 안쪽으로")] public float doorRampLength = 1.2f;
+		public Material raisedFloorMaterial;
+
 		[Header("프리팹 (앞면이 +Z. 모니터는 자식에 'Screen'을 둘 것)")]
 		[Tooltip("기준점 = 바닥 가운데, 앉는 사람이 +Z를 봄")] public GameObject chairPrefab;
 		[Tooltip("기준점 = 받침 아랫면 가운데 (책상 윗면에 놓임)")] public GameObject monitorPrefab;
@@ -110,6 +115,15 @@ namespace NightPatrol
 			var root = new GameObject("Interior").transform;
 			root.SetParent(room, false);
 			root.gameObject.isStatic = true;
+
+			// 올린 바닥: 가구 전체를 그만큼 올리고, 문 앞은 경사로
+			float lift = Mathf.Max(0f, s.raisedFloor);
+			if (lift > 0.01f)
+			{
+				RaisedFloor(room, W, D, t, doors, lift, s);
+				root.localPosition = new Vector3(0f, lift, 0f);
+				ceilingHeight -= lift;           // 천장에 붙는 것(프로젝터 등)은 실제 천장 높이 그대로
+			}
 
 			float xin = W * 0.5f - t;                       // 옆벽 안쪽 면 |x|
 			bool back = s.screenWall == ScreenWall.Window;
@@ -272,6 +286,47 @@ namespace NightPatrol
 						Debug.LogWarning($"[Interior] {label}: 교수님 책상이 문 앞을 막음. Lectern X를 바꿀 것", ctx);
 		}
 
+		// 올린 바닥 + 문마다 앞벽에서 방 안쪽으로 곧장 올라가는 경사로 (미끄럼방지 줄 3개)
+		static void RaisedFloor(Transform room, float W, float D, float t, IList<Vector2> doors, float lift,
+								ClassroomInteriorSettings s)
+		{
+			var g = Group(room, "RaisedFloor");
+			float xin = W * 0.5f - t, z0 = t, z1 = D - t;
+			float rl = Mathf.Clamp(s.doorRampLength, 0.3f, z1 - z0 - 0.5f);
+			Color floorCol = new Color(0.45f, 0.46f, 0.48f);
+			void Slab(string n, float xa, float xb, float za, float zb)
+			{
+				if (xb - xa < 0.01f || zb - za < 0.01f) return;
+				var b = Box(g, n, new Vector3((xa + xb) * 0.5f, lift * 0.5f, (za + zb) * 0.5f), new Vector3(xb - xa, lift, zb - za), s.raisedFloorMaterial);
+				if (s.raisedFloorMaterial == null) DoorBuilder.Paint(b.GetComponent<Renderer>(), null, floorCol);
+			}
+			Slab("Floor_Main", -xin, xin, z0 + rl, z1);
+			// 앞벽 쪽 띠: 문 자리는 경사로
+			var ds = new List<Vector2>();
+			if (doors != null) foreach (var d in doors) ds.Add(new Vector2(Mathf.Max(d.x, -xin), Mathf.Min(d.y, xin)));
+			ds.Sort((p, q) => p.x.CompareTo(q.x));
+			float cur = -xin;
+			int i = 0;
+			foreach (var d in ds)
+			{
+				Slab($"Floor_Front_{i}", cur, d.x, z0, z0 + rl);
+				float w = d.y - d.x, slope = Mathf.Sqrt(rl * rl + lift * lift), ang = Mathf.Atan2(lift, rl) * Mathf.Rad2Deg;
+				var r = new GameObject($"Ramp_{i}").transform;           // 윗면 가운데 기준, 기울어짐
+				r.SetParent(g, false);
+				r.localPosition = new Vector3((d.x + d.y) * 0.5f, lift * 0.5f, z0 + rl * 0.5f);
+				r.localRotation = Quaternion.Euler(-ang, 0f, 0f);         // 방 안쪽(+Z)으로 갈수록 높아짐
+				r.gameObject.isStatic = true;
+				var surf = Box(r, "Surface", new Vector3(0f, -0.03f, 0f), new Vector3(w, 0.06f, slope), s.raisedFloorMaterial);
+				if (s.raisedFloorMaterial == null) DoorBuilder.Paint(surf.GetComponent<Renderer>(), null, floorCol);
+				for (int k = -1; k <= 1; k++)
+					DoorBuilder.Paint(Box(r, $"NonSlip_{k + 1}", new Vector3(0f, 0.002f, k * slope * 0.25f), new Vector3(w - 0.1f, 0.004f, 0.04f), null)
+						.GetComponent<Renderer>(), null, new Color(0.25f, 0.30f, 0.26f));
+				cur = d.y;
+				i++;
+			}
+			Slab("Floor_Front_End", cur, xin, z0, z0 + rl);
+		}
+
 		static Transform Group(Transform parent, string name)
 		{
 			var g = new GameObject(name).transform;
@@ -359,7 +414,7 @@ namespace NightPatrol
 			go.transform.localRotation = rot;
 		}
 
-		static void Box(Transform parent, string name, Vector3 localCenter, Vector3 size, Material mat)
+		static GameObject Box(Transform parent, string name, Vector3 localCenter, Vector3 size, Material mat)
 		{
 			var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
 			go.name = name;
@@ -369,6 +424,7 @@ namespace NightPatrol
 			go.transform.localRotation = Quaternion.identity;
 			go.transform.localScale = size;
 			if (mat != null) go.GetComponent<Renderer>().sharedMaterial = mat;
+			return go;
 		}
 	}
 }
