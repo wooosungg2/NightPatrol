@@ -48889,8 +48889,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d0504487e148b8c4a86eef2e0b36310a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NightPatrol.DoorInteractTest
-  cam: {fileID: 0}
-  reach: 3
 --- !u!1 &331916327
 GameObject:
   m_ObjectHideFlags: 0
@@ -72414,6 +72412,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 505316840}
+  - component: {fileID: 505316841}
   m_Layer: 0
   m_Name: Monitor
   m_TagString: Untagged
@@ -72440,6 +72439,20 @@ Transform:
   - {fileID: 1180575543}
   m_Father: {fileID: 924425251}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &505316841
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 505316839}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6ad98a298117454489f89360373d747, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NightPatrol.Anomalies.MonitorAnomaly
+  screenRenderer: {fileID: 1180575544}
+  anomalyMaterial: {fileID: 2100000, guid: 132bd2256fe05e54dbf754bddc5dfad5, type: 2}
 --- !u!1 &505363334
 GameObject:
   m_ObjectHideFlags: 0
@@ -102803,6 +102816,54 @@ Transform:
   - {fileID: 753726038}
   - {fileID: 1440092332}
   m_Father: {fileID: 1735768188}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &750986827
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 750986829}
+  - component: {fileID: 750986828}
+  m_Layer: 0
+  m_Name: AnomalyManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &750986828
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 750986827}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fcff54a8d318d4b46bb169d8bca47240, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NightPatrol.Anomalies.AnomalyManager
+  anomalies:
+  - {fileID: 505316841}
+  - {fileID: 1337825156}
+  - {fileID: 1306238979}
+--- !u!4 &750986829
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 750986827}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 27.21658, y: 1.1503, z: 8.9315}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &752419158
 GameObject:
@@ -182355,6 +182416,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1306238978}
+  - component: {fileID: 1306238979}
   m_Layer: 0
   m_Name: Monitor
   m_TagString: Untagged
@@ -182381,6 +182443,20 @@ Transform:
   - {fileID: 2080280656}
   m_Father: {fileID: 558735711}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1306238979
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1306238977}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6ad98a298117454489f89360373d747, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NightPatrol.Anomalies.MonitorAnomaly
+  screenRenderer: {fileID: 2080280657}
+  anomalyMaterial: {fileID: 2100000, guid: 132bd2256fe05e54dbf754bddc5dfad5, type: 2}
 --- !u!1 &1306650544
 GameObject:
   m_ObjectHideFlags: 0
@@ -186944,6 +187020,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1337825155}
+  - component: {fileID: 1337825156}
   m_Layer: 0
   m_Name: Monitor
   m_TagString: Untagged
@@ -186970,6 +187047,20 @@ Transform:
   - {fileID: 191312172}
   m_Father: {fileID: 1005056482}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1337825156
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1337825154}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6ad98a298117454489f89360373d747, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NightPatrol.Anomalies.MonitorAnomaly
+  screenRenderer: {fileID: 191312173}
+  anomalyMaterial: {fileID: 2100000, guid: 132bd2256fe05e54dbf754bddc5dfad5, type: 2}
 --- !u!1 &1338637768
 GameObject:
   m_ObjectHideFlags: 0
@@ -297427,3 +297518,4 @@ SceneRoots:
   - {fileID: 410087041}
   - {fileID: 832575519}
   - {fileID: 541806428}
+  - {fileID: 750986829}
