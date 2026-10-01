@@ -1,20 +1,23 @@
-﻿using UnityEngine;
+﻿using NightPatrol.Interaction;
+using NightPatrol.Patrol;
+using UnityEngine;
 
 namespace NightPatrol
 {
 	/// <summary>
-	/// 문 하나의 상태 (잠금·열림). 생성기가 DoorSlot 자리에 문을 만들 때 붙인다.
-	///
-	/// ※ 초안: 판정 시스템(양우성 님)과 합의 전. 플레이어 상호작용은 컨트롤러 쪽에서
-	///    TryOpen / Close / SetLocked를 부르고, 판정은 IsLocked·IsInspectionTarget을 읽는 방식을 가정함.
+	/// 문 하나 (점검 대상). 생성기가 DoorSlot 자리에 만들 때 붙이고 Id도 채운다 (예: R21.Door.01).
+	/// 정상 = 닫히고 잠김. E: 잠김 → 열쇠로 열기 / 열림 → 닫기 / 닫힘(안 잠김) → 잠그기
 	/// </summary>
-	public class Door : MonoBehaviour
+	public class Door : PatrolObject
 	{
 		[Tooltip("문이 달린 방 호수 (예: 521)")] public string roomLabel;
 		public DoorStyle style;
-		[Tooltip("근무일지 '모든 출입문 잠금' 점검 대상인지")] public bool isInspectionTarget = true;
 
-		[Header("상태")]
+		[Header("처음 상태 (ResetToDefault)")]
+		public bool defaultLocked = true;
+		public bool defaultOpen;
+
+		[Header("지금 상태")]
 		[SerializeField] bool locked = true;
 		[SerializeField] bool open;
 
@@ -24,12 +27,28 @@ namespace NightPatrol
 		[Tooltip("문짝 (경첩 위치가 기준점). 생성기가 채움")] public Transform[] leaves;
 		[Tooltip("문짝마다 여는 방향 (+1 / -1). 생성기가 채움")] public float[] swingSigns;
 
-		/// <summary>잠금·열림이 바뀔 때마다 (판정·소리·UI 연결용)</summary>
+		/// <summary>잠금·열림이 바뀔 때마다 (판정·소리 연결용)</summary>
 		public event System.Action<Door> StateChanged;
 
 		public bool IsLocked => locked;
 		public bool IsOpen => open;
 
+		// ── PatrolObject ──
+		public override bool IsNormal => locked && !open;
+		public override string Prompt => open ? "E - 문 닫기" : locked ? "E - 문 열기" : "E - 문 잠그기";
+
+		public override void Interact(PlayerInteractor who)
+		{
+			if (open) Close();
+			else if (locked) { SetLocked(false); TryOpen(); }
+			else SetLocked(true);
+		}
+
+		public override void ResetToDefault() => SetStateImmediate(defaultLocked, defaultOpen);
+
+		void Awake() => ResetToDefault();
+
+		// ── 직접 조작 ──
 		/// <summary>잠겨 있으면 false (열리지 않음)</summary>
 		public bool TryOpen()
 		{
@@ -40,14 +59,10 @@ namespace NightPatrol
 
 		public void Close() => SetOpen(false);
 
-		/// <summary>열려 있으면 닫고, 닫혀 있으면 열기 시도</summary>
-		public bool Toggle() => open ? CloseAndReturnTrue() : TryOpen();
-
 		/// <summary>잠금. 열린 문은 먼저 닫힘</summary>
 		public void SetLocked(bool value)
 		{
-			if (value && open) open = false;
-			if (locked == value) { StateChanged?.Invoke(this); return; }
+			if (value) open = false;
 			locked = value;
 			StateChanged?.Invoke(this);
 		}
@@ -61,8 +76,6 @@ namespace NightPatrol
 				if (leaves[i] != null) leaves[i].localRotation = Quaternion.Euler(0f, TargetAngle(i), 0f);
 			StateChanged?.Invoke(this);
 		}
-
-		bool CloseAndReturnTrue() { SetOpen(false); return true; }
 
 		void SetOpen(bool value)
 		{

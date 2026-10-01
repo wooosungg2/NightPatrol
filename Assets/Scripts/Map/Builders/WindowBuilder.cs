@@ -34,7 +34,7 @@ namespace NightPatrol
 
 	/// <summary>
 	/// 방 로컬(X = 폭, Z = 앞벽 0 → 뒷벽 D)의 뒷벽을 창 구멍을 뚫어 만들고,
-	/// 칸마다 바깥 창틀 + 고정 창짝(왼쪽) + 여닫는 창짝(오른쪽, 왼쪽으로 미끄러짐) + 롤 블라인드를 단다.
+	/// 칸마다 바깥 창틀 + 고정 창짝(왼쪽) + 여닫는 창짝(오른쪽, 왼쪽으로 미끄러짐, WindowUnit) + 롤 블라인드(WindowBlind)를 단다.
 	/// FloorGenerator는 이 방의 뒷벽을 따로 만들지 않는다.
 	/// </summary>
 	public static class WindowBuilder
@@ -133,12 +133,14 @@ namespace NightPatrol
 				pivot.SetParent(unit, false);
 				pivot.localPosition = new Vector3(0f, y1 + 0.02f, bz);
 				Box(pivot, "Cloth", new Vector3(0f, -0.5f, 0f), new Vector3(w - 0.04f, 1f, 0.01f), s.blindMaterial, BlindColor, false);
-				wu.blind = pivot;
-				wu.blindUpHeight = 0.04f;
-				wu.blindDownHeight = y1 - ty + 0.02f;   // 가로대까지
-				pivot.localScale = new Vector3(1f, s.blindsStartDown ? wu.blindDownHeight : wu.blindUpHeight, 1f);
-				wu.SetStateImmediate(true, false, s.blindsStartDown);
+				var wb = pivot.gameObject.AddComponent<WindowBlind>();
+				wb.roomLabel = label;
+				wb.upHeight = 0.04f;
+				wb.downHeight = y1 - ty + 0.02f;   // 가로대까지
+				wb.defaultDown = s.blindsStartDown;
+				wb.SetStateImmediate(s.blindsStartDown);
 			}
+			wu.SetStateImmediate(true, false);
 		}
 
 		// 창짝 하나: 테두리 + 유리. isStatic = 고정 창짝 여부

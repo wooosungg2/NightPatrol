@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -191,8 +191,30 @@ namespace NightPatrol
 			foreach (var so in layout.solids)
 				MakeSolid(so);
 
+			AssignPatrolIds();
 			LogDoorPairs();
 			MarkDirty();
+		}
+
+		// 생성된 문·창문·블라인드에 Id를 붙인다 (구역.종류.번호, 예: R21.Door.01). 번호는 생성 순서
+		void AssignPatrolIds()
+		{
+			var counts = new Dictionary<string, int>();
+			int total = 0;
+			foreach (var po in GetComponentsInChildren<NightPatrol.Patrol.PatrolObject>(true))
+			{
+				string label, kind;
+				if (po is Door d) { label = d.roomLabel; kind = "Door"; }
+				else if (po is WindowUnit w) { label = w.roomLabel; kind = "Window"; }
+				else if (po is WindowBlind b) { label = b.roomLabel; kind = "Blind"; }
+				else continue;
+				string key = PatrolIds.Zone(label) + "." + kind;
+				counts.TryGetValue(key, out int n);
+				counts[key] = ++n;
+				po.Id = PatrolIds.Make(label, kind, n);
+				total++;
+			}
+			Debug.Log($"[FloorGenerator] 점검 대상 {total}개에 Id 부여", this);
 		}
 
 		// 북쪽 줄 강의실 문마다 가장 가까운 남쪽 문과의 X 차이를 콘솔에 한 번에 출력
