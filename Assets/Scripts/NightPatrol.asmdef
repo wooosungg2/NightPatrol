@@ -2,7 +2,8 @@
     "name": "NightPatrol",
     "rootNamespace": "NightPatrol",
     "references": [
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
