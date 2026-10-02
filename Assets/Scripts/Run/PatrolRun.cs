@@ -65,6 +65,21 @@ namespace NightPatrol.Run
             FloorStarted?.Invoke(startFloor);
         }
 
+        public void JumpToFloor(int floor)
+        {
+            floor = Mathf.Clamp(floor, lastFloor, startFloor);
+            CurrentFloor = floor;
+            IsCleared = floor == lastFloor;
+            Debug.Log(IsCleared ? $"[Run] 개발자 이동 → {floor}층 — 클리어" : $"[Run] 개발자 이동 → {floor}층", this);
+            if (IsCleared)
+            {
+                Cleared?.Invoke();
+                return;
+            }
+            ResetAllObjects();
+            FloorStarted?.Invoke(floor);
+        }
+
         public void ResetAllObjects()
         {
             foreach (var obj in UnityEngine.Object.FindObjectsByType<PatrolObject>(
