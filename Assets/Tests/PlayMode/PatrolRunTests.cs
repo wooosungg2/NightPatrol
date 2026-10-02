@@ -162,6 +162,50 @@ namespace NightPatrol.Tests
         }
 
         [Test]
+        public void JumpToFloor_MovesFloor_ResetsObjects_KeepsAttempt()
+        {
+            var obj = MakeObject(normal: false);
+            run.JumpToFloor(3);
+            Assert.AreEqual(3, run.CurrentFloor);
+            Assert.AreEqual(1, run.Attempt);
+            Assert.IsTrue(obj.normal);
+            CollectionAssert.AreEqual(new[] { 3 }, floorsStarted);
+        }
+
+        [Test]
+        public void JumpToFloor_ClampsToValidRange()
+        {
+            run.JumpToFloor(9);
+            Assert.AreEqual(5, run.CurrentFloor);
+            run.JumpToFloor(-3);
+            Assert.AreEqual(1, run.CurrentFloor);
+            Assert.IsTrue(run.IsCleared);
+        }
+
+        [Test]
+        public void JumpToFloor1_Clears()
+        {
+            run.JumpToFloor(1);
+            Assert.IsTrue(run.IsCleared);
+            Assert.AreEqual(1, clearedCount);
+            Assert.IsEmpty(floorsStarted);
+        }
+
+        [Test]
+        public void JumpToFloor_AfterClear_ResumesPlay()
+        {
+            for (int i = 0; i < 4; i++) run.Descend(true);
+            Assert.IsTrue(run.IsCleared);
+
+            run.JumpToFloor(4);
+            Assert.IsFalse(run.IsCleared);
+            Assert.AreEqual(4, run.CurrentFloor);
+
+            run.Descend(true);
+            Assert.AreEqual(3, run.CurrentFloor);
+        }
+
+        [Test]
         public void Elevator_Interact_Descends_AndPromptEmptiesAfterClear()
         {
             var elevator = New("Elevator").AddComponent<Elevator>();
