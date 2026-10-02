@@ -18,6 +18,9 @@ namespace NightPatrol.Patrol
         }
 
         public abstract bool IsNormal { get; }
+        // 점검 항목 후보가 되려면 TrySetAbnormal을 override
+        public virtual bool TrySetAbnormal() => false;
+        public virtual string TaskLabel => Id;
         public abstract void ResetToDefault();
         public abstract string Prompt { get; }
         public abstract void Interact(PlayerInteractor who);

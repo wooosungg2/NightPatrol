@@ -12,6 +12,14 @@ namespace NightPatrol.Patrol
         [SerializeField] private bool startsOn;
 
         public override bool IsNormal => targetLight != null && !targetLight.enabled;
+        public override string TaskLabel => $"전등 소등 ({Id})";
+
+        public override bool TrySetAbnormal()
+        {
+            if (targetLight == null) return false;
+            targetLight.enabled = true;
+            return true;
+        }
         public override string Prompt => targetLight == null
             ? string.Empty : targetLight.enabled ? "E - 전등 끄기" : "E - 전등 켜기";
 
