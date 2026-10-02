@@ -19,8 +19,13 @@ namespace NightPatrol.Debugging
         private string inspectionText = "";
         private double nextInspectionTime;
         private PatrolRun run;
+        private FloorTasks floorTasks;
 
-        private void Awake() => run = UnityEngine.Object.FindFirstObjectByType<PatrolRun>();
+        private void Awake()
+        {
+            run = UnityEngine.Object.FindFirstObjectByType<PatrolRun>();
+            floorTasks = UnityEngine.Object.FindFirstObjectByType<FloorTasks>();
+        }
 
         private void Update()
         {
@@ -65,13 +70,15 @@ namespace NightPatrol.Debugging
         {
             if (!visible) return;
             GUI.DrawTexture(new Rect(Screen.width * 0.5f - 2f, Screen.height * 0.5f - 2f, 4f, 4f), Texture2D.whiteTexture);
-            GUILayout.BeginArea(new Rect(12f, 12f, Mathf.Max(100f, Screen.width - 24f), 170f));
+            GUILayout.BeginArea(new Rect(12f, 12f, Mathf.Max(100f, Screen.width - 24f), 200f));
             GUILayout.BeginVertical(GUI.skin.box);
             GUILayout.Label(targetText);
             if (interactor != null)
                 GUILayout.Label($"CurrentTarget: {(interactor.CurrentTarget == null ? "없음 (null)" : "있음 (non-null)")}");
             GUILayout.Label(inspectionText);
             if (run != null) GUILayout.Label($"층 {run.CurrentFloor} / 회차 {run.Attempt}");
+            if (floorTasks != null)
+                GUILayout.Label($"점검 항목: {string.Join(", ", floorTasks.CurrentTasks.Where(o => o != null).Select(o => o.TaskLabel))}");
             GUILayout.EndVertical();
             GUILayout.EndArea();
         }
