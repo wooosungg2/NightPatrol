@@ -3,6 +3,7 @@ using UnityEngine;
 using System.Linq;
 using NightPatrol.Interaction;
 using NightPatrol.Patrol;
+using NightPatrol.Run;
 using UnityEngine.InputSystem;
 #endif
 
@@ -17,6 +18,9 @@ namespace NightPatrol.Debugging
         private string targetText = "없음";
         private string inspectionText = "";
         private double nextInspectionTime;
+        private PatrolRun run;
+
+        private void Awake() => run = UnityEngine.Object.FindFirstObjectByType<PatrolRun>();
 
         private void Update()
         {
@@ -61,12 +65,13 @@ namespace NightPatrol.Debugging
         {
             if (!visible) return;
             GUI.DrawTexture(new Rect(Screen.width * 0.5f - 2f, Screen.height * 0.5f - 2f, 4f, 4f), Texture2D.whiteTexture);
-            GUILayout.BeginArea(new Rect(12f, 12f, Mathf.Max(100f, Screen.width - 24f), 140f));
+            GUILayout.BeginArea(new Rect(12f, 12f, Mathf.Max(100f, Screen.width - 24f), 170f));
             GUILayout.BeginVertical(GUI.skin.box);
             GUILayout.Label(targetText);
             if (interactor != null)
                 GUILayout.Label($"CurrentTarget: {(interactor.CurrentTarget == null ? "없음 (null)" : "있음 (non-null)")}");
             GUILayout.Label(inspectionText);
+            if (run != null) GUILayout.Label($"층 {run.CurrentFloor} / 회차 {run.Attempt}");
             GUILayout.EndVertical();
             GUILayout.EndArea();
         }
