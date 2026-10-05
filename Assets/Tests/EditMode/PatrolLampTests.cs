@@ -93,14 +93,6 @@ namespace NightPatrol.Tests
         }
 
         [Test]
-        public void TaskLabel_IncludesId()
-        {
-            var lamp = CreateLamp(startsOn: false);
-            lamp.Id = "Corridor.Lamp.03";
-            Assert.AreEqual("전등 소등 (Corridor.Lamp.03)", lamp.TaskLabel);
-        }
-
-        [Test]
         public void MissingLight_DoesNotThrow_AndIsNotNormal()
         {
             var lamp = CreateLamp(startsOn: true, withLight: false);

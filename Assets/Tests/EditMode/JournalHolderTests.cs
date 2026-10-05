@@ -70,10 +70,23 @@ namespace NightPatrol.Tests
         {
             holder.SetRaised(true);
             Assert.IsTrue(holder.IsRaised);
-            Assert.IsTrue(interactor.InteractionBlocked);
+            Assert.IsTrue(interactor.IsBlocked);
 
             holder.SetRaised(false);
-            Assert.IsFalse(interactor.InteractionBlocked);
+            Assert.IsFalse(interactor.IsBlocked);
+        }
+
+        [Test]
+        public void Lower_KeepsAnotherOwnersBlock()
+        {
+            var cutscene = new object();
+            interactor.SetBlocked(cutscene, true);
+            holder.SetRaised(true);
+            holder.SetRaised(false);
+            Assert.IsTrue(interactor.IsBlocked);
+
+            interactor.SetBlocked(cutscene, false);
+            Assert.IsFalse(interactor.IsBlocked);
         }
 
         [Test]
@@ -82,7 +95,7 @@ namespace NightPatrol.Tests
             Set("blockInteractionWhileRaised", false);
             holder.SetRaised(true);
             Assert.IsTrue(holder.IsRaised);
-            Assert.IsFalse(interactor.InteractionBlocked);
+            Assert.IsFalse(interactor.IsBlocked);
         }
 
         [Test]

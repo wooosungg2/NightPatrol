@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using NightPatrol.Interaction;
 using NightPatrol.Patrol;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace NightPatrol.Tests
 {
@@ -117,6 +119,50 @@ namespace NightPatrol.Tests
             var abnormal = Make("A.Lamp.01", normal: false);
             CollectionAssert.AreEqual(new[] { "A.Lamp.01" },
                 Ids(PatrolInspection.FindAbnormal(new PatrolObject[] { null, abnormal })));
+        }
+
+        // ── MapById / FindById ──
+        [Test]
+        public void MapById_HasEnabledObjectsOnly_UnlessIncludeInactive()
+        {
+            var active = Make("A.Lamp.01");
+            Make("A.Lamp.02").gameObject.SetActive(false);
+            Make("A.Lamp.03").enabled = false;
+
+            var map = PatrolInspection.MapById();
+
+            CollectionAssert.AreEquivalent(new[] { "A.Lamp.01" }, map.Keys);
+            Assert.AreSame(active, map["A.Lamp.01"]);
+            CollectionAssert.AreEquivalent(new[] { "A.Lamp.01", "A.Lamp.02", "A.Lamp.03" },
+                PatrolInspection.MapById(true).Keys);
+        }
+
+        [Test]
+        public void MapById_SkipsEmptyIds()
+        {
+            Make("");
+            Make("NoId").Id = null;
+            Assert.IsEmpty(PatrolInspection.MapById());
+        }
+
+        [Test]
+        public void MapById_DuplicateId_WarnsAndKeepsOne()
+        {
+            Make("A.Lamp.01");
+            Make("A.Lamp.01");
+            LogAssert.Expect(LogType.Warning, new Regex(@"중복 Id: A\.Lamp\.01"));
+            Assert.AreEqual(1, PatrolInspection.MapById().Count);
+        }
+
+        [Test]
+        public void FindById_FindsInactive_AndReturnsNullWhenMissing()
+        {
+            var hidden = Make("R21.Monitor.03");
+            hidden.gameObject.SetActive(false);
+            Assert.AreSame(hidden, PatrolInspection.FindById("R21.Monitor.03"));
+            Assert.IsNull(PatrolInspection.FindById("R21.Monitor.99"));
+            Assert.IsNull(PatrolInspection.FindById(""));
+            Assert.IsNull(PatrolInspection.FindById(null));
         }
     }
 }

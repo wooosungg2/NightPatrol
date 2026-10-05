@@ -33,7 +33,7 @@ namespace NightPatrol.Tests
         public void FindsInteractorInParent()
         {
             holder.SetRaised(true);
-            Assert.IsTrue(interactor.InteractionBlocked);
+            Assert.IsTrue(interactor.IsBlocked);
         }
 
         [UnityTest]
@@ -41,7 +41,7 @@ namespace NightPatrol.Tests
         {
             yield return null;   // Start
             Assert.IsFalse(holder.IsRaised);
-            Assert.IsFalse(interactor.InteractionBlocked);
+            Assert.IsFalse(interactor.IsBlocked);
             Assert.That(Vector3.Distance(holder.transform.localPosition, new Vector3(-0.16f, -0.30f, 0.30f)), Is.LessThan(0.001f));
         }
 
@@ -58,9 +58,9 @@ namespace NightPatrol.Tests
         public void Disable_WhileRaised_Unblocks()
         {
             holder.SetRaised(true);
-            Assert.IsTrue(interactor.InteractionBlocked);
+            Assert.IsTrue(interactor.IsBlocked);
             holder.enabled = false;
-            Assert.IsFalse(interactor.InteractionBlocked);
+            Assert.IsFalse(interactor.IsBlocked);
         }
     }
 }

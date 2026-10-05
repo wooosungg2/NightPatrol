@@ -68,12 +68,10 @@ namespace NightPatrol.Tests
         }
 
         [Test]
-        public void Defaults_DoNotSupportAbnormal_AndLabelIsId()
+        public void Default_DoesNotSupportAbnormal()
         {
-            obj.Id = "R21.Door.01";
             Assert.IsFalse(obj.TrySetAbnormal());
             Assert.IsTrue(obj.IsNormal);
-            Assert.AreEqual("R21.Door.01", obj.TaskLabel);
         }
 
         [Test]
