@@ -4,7 +4,6 @@ using NightPatrol.Patrol;
 using NightPatrol.Run;
 using TMPro;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace NightPatrol.Journal
 {
@@ -51,11 +50,6 @@ namespace NightPatrol.Journal
             Refresh();
             IsOpen = startOpen;
             if (panel != null) panel.SetActive(startOpen);
-        }
-        private void Update() => HandleInput();
-        private void HandleInput()
-        {
-            if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame) Toggle();
         }
         private void OnTasksChanged(IReadOnlyList<PatrolObject> _) => Refresh();
         public void Toggle() => SetOpen(!IsOpen);
