@@ -1,21 +1,19 @@
 using System.Collections.Generic;
 using System.Linq;
-using NightPatrol.Patrol;
 using NightPatrol.Run;
 using TMPro;
 using UnityEngine;
 
 namespace NightPatrol.Journal
 {
+    // 일지 내용 (제목·규정·이번 층 점검 항목). 손에 들고 올리고 내리는 것은 JournalHolder가 맡는다
     [DisallowMultipleComponent]
     public sealed class JournalView : MonoBehaviour
     {
         [SerializeField] private PatrolRun run;
         [SerializeField] private FloorTasks tasks;
-        [SerializeField] private GameObject panel;
         [SerializeField] private TMP_Text titleText;
         [SerializeField] private TMP_Text bodyText;
-        [SerializeField] private bool startOpen = false;
         [SerializeField] private string[] rules =
         {
             "제1조. 건물 내 인원이 없을 것",
@@ -25,12 +23,11 @@ namespace NightPatrol.Journal
         };
         private PatrolRun subscribedRun;
         private FloorTasks subscribedTasks;
-        public bool IsOpen { get; private set; }
 
         private void OnEnable()
         {
-            if (run == null) run = UnityEngine.Object.FindFirstObjectByType<PatrolRun>();
-            if (tasks == null) tasks = UnityEngine.Object.FindFirstObjectByType<FloorTasks>();
+            if (run == null) run = UnityEngine.Object.FindAnyObjectByType<PatrolRun>();
+            if (tasks == null) tasks = UnityEngine.Object.FindAnyObjectByType<FloorTasks>();
             subscribedRun = run;
             subscribedTasks = tasks;
             if (subscribedRun != null) subscribedRun.Cleared += Refresh;
@@ -45,20 +42,8 @@ namespace NightPatrol.Journal
             subscribedTasks = null;
         }
 
-        private void Start()
-        {
-            Refresh();
-            IsOpen = startOpen;
-            if (panel != null) panel.SetActive(startOpen);
-        }
-        private void OnTasksChanged(IReadOnlyList<PatrolObject> _) => Refresh();
-        public void Toggle() => SetOpen(!IsOpen);
-        public void SetOpen(bool open)
-        {
-            IsOpen = open;
-            if (open) Refresh();
-            if (panel != null) panel.SetActive(open);
-        }
+        private void Start() => Refresh();
+        private void OnTasksChanged(IReadOnlyList<PatrolTask> _) => Refresh();
 
         public void Refresh()
         {
@@ -66,7 +51,7 @@ namespace NightPatrol.Journal
             if (bodyText != null)
                 bodyText.text = run != null && run.IsCleared ? JournalText.ClearedBody()
                     : JournalText.Body(rules, tasks != null
-                        ? tasks.CurrentTasks?.Where(o => o != null).Select(o => o.TaskLabel) : null);
+                        ? tasks.CurrentTasks?.Where(t => t != null).Select(t => t.Label) : null);
         }
     }
 }

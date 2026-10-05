@@ -14,7 +14,7 @@ namespace NightPatrol.Run
             return (int)(min + (long)(rng.NextDouble() * ((long)max - min + 1)));
         }
 
-        public static List<T> Pick<T>(IList<T> candidates, int count, Func<T, bool> tryTake, Random rng)
+        public static List<T> Pick<T>(IEnumerable<T> candidates, int count, Func<T, bool> tryTake, Random rng)
         {
             if (candidates == null) throw new ArgumentNullException(nameof(candidates));
             if (tryTake == null) throw new ArgumentNullException(nameof(tryTake));

@@ -23,8 +23,8 @@ namespace NightPatrol.Debugging
 
         private void Awake()
         {
-            run = UnityEngine.Object.FindFirstObjectByType<PatrolRun>();
-            floorTasks = UnityEngine.Object.FindFirstObjectByType<FloorTasks>();
+            run = UnityEngine.Object.FindAnyObjectByType<PatrolRun>();
+            floorTasks = UnityEngine.Object.FindAnyObjectByType<FloorTasks>();
         }
 
         private void Update()
@@ -78,7 +78,7 @@ namespace NightPatrol.Debugging
             GUILayout.Label(inspectionText);
             if (run != null) GUILayout.Label($"층 {run.CurrentFloor} / 회차 {run.Attempt}");
             if (floorTasks != null)
-                GUILayout.Label($"점검 항목: {string.Join(", ", floorTasks.CurrentTasks.Where(o => o != null).Select(o => o.TaskLabel))}");
+                GUILayout.Label($"점검 항목: {string.Join(", ", floorTasks.CurrentTasks.Where(t => t != null && t.Target != null).Select(t => $"{t.Label}({t.Target.Id})"))}");
             GUILayout.EndVertical();
             GUILayout.EndArea();
         }

@@ -13,7 +13,7 @@ namespace NightPatrol.Debugging
         private PatrolRun run;
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        private void Awake() => run = UnityEngine.Object.FindFirstObjectByType<PatrolRun>();
+        private void Awake() => run = UnityEngine.Object.FindAnyObjectByType<PatrolRun>();
 
         private void Update()
         {
@@ -31,26 +31,25 @@ namespace NightPatrol.Debugging
             }
             if (keyboard.f4Key.wasPressedThisFrame)
             {
-                Debug.Log("[Dev] 현재 층 사물 초기화", this);
-                run.ResetAllObjects();
+                Debug.Log("[Dev] 현재 층 다시 시작", this);
+                run.RestartFloor();
             }
-            if (keyboard.pageUpKey.wasPressedThisFrame)
-            {
-                run.JumpToFloor(run.CurrentFloor + 1);
-                Debug.Log($"[Dev] 층 이동 → {run.CurrentFloor}층", this);
-            }
-            if (keyboard.pageDownKey.wasPressedThisFrame)
-            {
-                run.JumpToFloor(run.CurrentFloor - 1);
-                Debug.Log($"[Dev] 층 이동 → {run.CurrentFloor}층", this);
-            }
+            if (keyboard.pageUpKey.wasPressedThisFrame) Jump(-1);
+            if (keyboard.pageDownKey.wasPressedThisFrame) Jump(1);
+        }
+
+        private void Jump(int steps)
+        {
+            int before = run.CurrentFloor;
+            run.JumpBy(steps);
+            if (run.CurrentFloor != before) Debug.Log($"[Dev] 층 이동 → {run.CurrentFloor}층", this);
         }
 
         private void OnGUI()
         {
             if (!showHelp) return;
             string help = run == null ? "[DEV] PatrolRun 없음"
-                : "[DEV] F2 하행  F3 실패  F4 초기화  PgUp/PgDn 층 이동";
+                : "[DEV] F2 하행  F3 실패  F4 층 재시작  PgUp/PgDn 층 이동";
             GUI.Label(new Rect(12f, Screen.height - 30f, Mathf.Max(100f, Screen.width - 24f), 24f), help);
         }
 #endif
