@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using NightPatrol.Player;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -13,10 +14,12 @@ namespace NightPatrol.Interaction
         [SerializeField] private InputActionReference interactAction;
         [Tooltip("Include walls and other blockers as well as interactable objects. Exclude the player layer.")]
         [SerializeField] private LayerMask raycastMask = Physics.DefaultRaycastLayers;
+        private readonly HashSet<object> blockers = new HashSet<object>();
         private InputAction interact;
 
         public IInteractable CurrentTarget { get; private set; }
-        public bool InteractionBlocked { get; set; }
+        /// <summary>True while any owner blocks interaction (raised journal, cutscene, ...).</summary>
+        public bool IsBlocked => blockers.Count > 0;
         public Camera PlayerCamera => playerCamera;
         public PlayerSettings Settings => settings;
         public LayerMask RaycastMask => raycastMask;
@@ -42,9 +45,17 @@ namespace NightPatrol.Interaction
         }
         private void OnDestroy() => interact?.Dispose();
 
+        /// <summary>Blocks per owner, so one owner releasing does not clear another owner's block.</summary>
+        public void SetBlocked(object owner, bool blocked)
+        {
+            if (owner == null) return;
+            if (blocked) blockers.Add(owner);
+            else blockers.Remove(owner);
+        }
+
         private void LateUpdate()
         {
-            if (InteractionBlocked)
+            if (IsBlocked)
             {
                 SetTarget(null);
                 return;

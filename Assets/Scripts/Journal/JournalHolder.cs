@@ -28,7 +28,7 @@ namespace NightPatrol.Journal
         private void OnEnable() => SetRaised(IsRaised);
         private void OnDisable()
         {
-            if (interactor != null) interactor.InteractionBlocked = false;
+            if (interactor != null) interactor.SetBlocked(this, false);
         }
         private void Start()
         {
@@ -49,7 +49,7 @@ namespace NightPatrol.Journal
         public void Toggle() => SetRaised(!IsRaised);
         public void SetRaised(bool raised)
         {
-            if (interactor != null) interactor.InteractionBlocked = raised && blockInteractionWhileRaised;
+            if (interactor != null) interactor.SetBlocked(this, raised && blockInteractionWhileRaised);
             if (IsRaised == raised) return;
             IsRaised = raised;
             RaisedChanged?.Invoke(raised);
