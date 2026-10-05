@@ -16,6 +16,7 @@ namespace NightPatrol.Interaction
         private InputAction interact;
 
         public IInteractable CurrentTarget { get; private set; }
+        public bool InteractionBlocked { get; set; }
         public Camera PlayerCamera => playerCamera;
         public PlayerSettings Settings => settings;
         public LayerMask RaycastMask => raycastMask;
@@ -43,6 +44,12 @@ namespace NightPatrol.Interaction
 
         private void LateUpdate()
         {
+            if (InteractionBlocked)
+            {
+                SetTarget(null);
+                return;
+            }
+
             if (Cursor.lockState != CursorLockMode.Locked || !Application.isFocused ||
                 Time.timeScale == 0f || playerCamera == null || !playerCamera.isActiveAndEnabled)
             {
