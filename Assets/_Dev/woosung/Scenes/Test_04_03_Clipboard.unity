@@ -241,11 +241,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: a86a7679b519720459ab7434080191ff, type: 3}
---- !u!143 &410691063 stripped
-CharacterController:
-  m_CorrespondingSourceObject: {fileID: 7157408756152630695, guid: a86a7679b519720459ab7434080191ff, type: 3}
+--- !u!114 &410691063 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5731401744826051114, guid: a86a7679b519720459ab7434080191ff, type: 3}
   m_PrefabInstance: {fileID: 410691062}
   m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 90df53892e0be3c488ad8268a2357bdf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NightPatrol.Player.PlayerMovement
 --- !u!1 &474347125
 GameObject:
   m_ObjectHideFlags: 0
@@ -877,10 +883,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b87608b5d54d0424fae4214f4b8d0465, type: 3}
   m_Name: 
   m_EditorClassIdentifier: NightPatrol::NightPatrol.Run.PatrolRun
-  startFloor: 5
-  lastFloor: 1
+  floors: 0500000004000000030000000200000001000000
   startPoint: {fileID: 1169945677}
   player: {fileID: 410691063}
+  tasks: {fileID: 2026623926}
 --- !u!114 &2026623926
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -893,7 +899,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6c1c9ebfdf5d42f44801e5ff22a97132, type: 3}
   m_Name: 
   m_EditorClassIdentifier: NightPatrol::NightPatrol.Run.FloorTasks
-  run: {fileID: 2026623925}
+  table: {fileID: 11400000, guid: 7e7c6853e955638448d6df9b55c65f5f, type: 2}
   minTasks: 2
   maxTasks: 3
   seed: 0
