@@ -1,6 +1,8 @@
 using UnityEngine;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
+using System.Linq;
 using NightPatrol.Interaction;
+using NightPatrol.Patrol;
 using UnityEngine.InputSystem;
 #endif
 
@@ -13,6 +15,8 @@ namespace NightPatrol.Debugging
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private PlayerInteractor interactor;
         private string targetText = "없음";
+        private string inspectionText = "";
+        private double nextInspectionTime;
 
         private void Update()
         {
@@ -22,7 +26,13 @@ namespace NightPatrol.Debugging
 
         private void LateUpdate()
         {
-            if (visible) targetText = GetTargetText();
+            if (!visible) return;
+            targetText = GetTargetText();
+            if (Time.unscaledTimeAsDouble < nextInspectionTime) return;
+            nextInspectionTime = Time.unscaledTimeAsDouble + 0.5;
+            var abnormal = PatrolInspection.FindAbnormal();
+            inspectionText = $"비정상 {abnormal.Count}개: {string.Join(", ", abnormal.Take(5).Select(obj => obj.Id))}";
+            if (abnormal.Count > 5) inspectionText += $" 외 {abnormal.Count - 5}개";
         }
 
         public string GetTargetText()
@@ -56,6 +66,7 @@ namespace NightPatrol.Debugging
             GUILayout.Label(targetText);
             if (interactor != null)
                 GUILayout.Label($"CurrentTarget: {(interactor.CurrentTarget == null ? "없음 (null)" : "있음 (non-null)")}");
+            GUILayout.Label(inspectionText);
             GUILayout.EndVertical();
             GUILayout.EndArea();
         }
