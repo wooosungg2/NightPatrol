@@ -41,8 +41,6 @@ namespace NightPatrol
 		public float ceilingHeight = 3f;
 		[Tooltip("켜면 Play 시작할 때마다 새로 생성")]
 		public bool generateOnStart = false;
-		[Tooltip("켜면 건물 남북 깊이를 위성 실측(18.5m)에 맞춤 (방이 약 1.9m 얕아짐). 끄면 521호 실측(방 안 14장) 기준")]
-		public bool fitSatelliteDepth = false;
 
 		[Header("강의실 프리팹 (방 폭에 가장 가까운 것을 골라 씀)")]
 		public GameObject largeRoomPrefab;
@@ -107,6 +105,8 @@ namespace NightPatrol
 
 		[Header("계단실 내부 (켜면 Stairwell Prefab 대신 코드로 생성)")]
 		public StairwellSettings stairwell = new StairwellSettings();
+		[Tooltip("동쪽 계단(Stair-E)만 따로 (사진: 5층이 맨 위, 큰 창, 게시판). 끄면 위 설정을 같이 씀")]
+		public StairwellSettings stairwellEast = StairwellSettings.East();
 
 		[Header("화장실 집기 (도면 데이터의 개수대로 자동 배치)")]
 		public BathroomFixtureSettings bathroomFixtures = new BathroomFixtureSettings();
@@ -150,6 +150,20 @@ namespace NightPatrol
 			MarkDirty();
 		}
 
+		[Header("복도 디테일: 천장 조명·걸레받이·표찰·소화기·유도등 (사진 기준)")]
+		public FloorDetailSettings details = new FloorDetailSettings();
+
+		[ContextMenu("Reset Fire Equipment")]
+		void ResetFire()
+		{
+#if UNITY_EDITOR
+			Undo.RecordObject(this, "Reset Fire Equipment");
+#endif
+			if (details == null) details = new FloorDetailSettings();
+			details.fireItems = FloorDetailSettings.DefaultFireItems();
+			MarkDirty();
+		}
+
 		[Header("오목한 문 (RoomSlot.recess > 0 인 방)")]
 		[Tooltip("비워두면 복도 벽/바닥/천장 재질을 씀")]
 		public Material recessWallMaterial;
@@ -164,13 +178,15 @@ namespace NightPatrol
 		// 메인 복도 문 위치 기록 (생성 후 남북 비교용)
 		readonly List<KeyValuePair<float, string>> doorLogN = new List<KeyValuePair<float, string>>();
 		readonly List<KeyValuePair<float, string>> doorLogS = new List<KeyValuePair<float, string>>();
+		// 복도 벽선 위 문 구멍 (생성기 로컬 양 끝점). 걸레받이가 문을 피하도록
+		readonly List<Vector3[]> openings = new List<Vector3[]>();
 
 		[ContextMenu("Generate Floor")]
 		public void Generate()
 		{
 			Clear();
-			doorLogN.Clear(); doorLogS.Clear();
-			var layout = FloorLayoutData.GetLayout(floorNumber, fitSatelliteDepth);
+			doorLogN.Clear(); doorLogS.Clear(); openings.Clear();
+			var layout = FloorLayoutData.GetLayout(floorNumber);
 
 			foreach (var row in layout.rows)
 				foreach (var slot in row.slots)
@@ -179,8 +195,12 @@ namespace NightPatrol
 			for (int i = 0; i < layout.corridors.Count; i++)
 			{
 				Rect r = layout.corridors[i];
-				MakeSlab($"Corridor_Floor_{i}", r, -0.05f, corridorFloorMaterial);
-				MakeSlab($"Corridor_Ceiling_{i}", r, ceilingHeight + 0.05f, corridorCeilingMaterial);
+				// 천장: 유리 지붕 자리는 뚫음
+				var pieces = SubtractRects(r, layout.skylights);
+				for (int k = 0; k < pieces.Count; k++)
+					MakeSlab(pieces.Count == 1 ? $"Corridor_Ceiling_{i}" : $"Corridor_Ceiling_{i}_{k}", pieces[k], ceilingHeight + 0.05f, corridorCeilingMaterial);
+				var fl = MakeSlab($"Corridor_Floor_{i}", r, -0.05f, corridorFloorMaterial);
+				if (corridorFloorMaterial == null) DoorBuilder.Paint(fl.GetComponent<Renderer>(), null, new Color(0.68f, 0.68f, 0.66f)); // 회색 화강석
 			}
 			for (int i = 0; i < layout.walls.Count; i++)
 				MakeWall($"Corridor_Wall_{i}", layout.walls[i]);
@@ -190,6 +210,20 @@ namespace NightPatrol
 				MakeWindowWall(ww);
 			foreach (var so in layout.solids)
 				MakeSolid(so);
+
+			foreach (var sk in layout.skylights)
+				FloorDetailBuilder.Skylight(transform, sk, ceilingHeight, glassMaterial, windowFrameMaterial, corridorWallMaterial);
+
+			// 복도 디테일 (사진 기준)
+			if (details != null && details.enabled)
+			{
+				var det = new GameObject("Corridor_Details").transform;
+				det.SetParent(transform, false);
+				det.gameObject.isStatic = true;
+				var zones = FloorDetailBuilder.CeilingLights(det, layout.corridors, ceilingHeight, details, layout.skylights);
+				FloorDetailBuilder.Baseboards(det, layout.corridors, openings, details);
+				FloorDetailBuilder.LightSwitches(det, layout.corridors, openings, zones, details);
+			}
 
 			AssignPatrolIds();
 			LogDoorPairs();
@@ -307,6 +341,11 @@ namespace NightPatrol
 			GetFrame(slot, row, layout, out Vector3 pos, out Quaternion rot);
 			room.transform.localPosition = pos;
 			room.transform.localRotation = rot;
+			if (slot.type == RoomType.Elevator) // 엘리베이터 앞은 걸레받이 없이
+			{
+				float zl = -(slot.setback + slot.recess);
+				openings.Add(new[] { pos + rot * new Vector3(-slot.width * 0.5f, 0f, zl), pos + rot * new Vector3(slot.width * 0.5f, 0f, zl) });
+			}
 
 			// 물린 띠를 벽으로 채우고 문 자리만 비움 (방 위치·스케일이 확정된 뒤에 호출해야 함)
 			if (slot.recess > 0f)
@@ -348,7 +387,9 @@ namespace NightPatrol
 					D = need + 2f * t;
 				}
 			}
-			float y0 = stair ? stairWallBottom : 0f;
+			// 계단실 설정: 동쪽 계단은 따로
+			StairwellSettings ss = slot.label == "Stair-E" && stairwellEast != null && stairwellEast.enabled ? stairwellEast : stairwell;
+			float y0 = stair ? (ss != null && ss.enabled && ss.topFloor ? -stairWallTop : stairWallBottom) : 0f; // 맨 위 층은 아래층까지 보이게
 			float y1 = stair ? stairWallTop : ceilingHeight;
 			// 도면에 문을 직접 지정한 작은 방(501, 505~508, 518, 519)은 외문 높이
 			float dh = stair ? stairDoorHeight
@@ -365,7 +406,7 @@ namespace NightPatrol
 			// 강의실이라도 데이터에 문이 지정돼 있으면(좁은 방 등) 프리팹 없이 껍데기만
 			bool dataDoor = slot.doorWidth > 0.01f;
 			GameObject prefab = null;
-			bool stairGen = stair && stairwell != null && stairwell.enabled; // 계단 내부를 코드로 생성
+			bool stairGen = stair && ss != null && ss.enabled; // 계단 내부를 코드로 생성
 			if (!(classroom && dataDoor) && !stairGen) prefab = PickContents(slot, out refW);
 			if (prefab != null)
 			{
@@ -450,6 +491,26 @@ namespace NightPatrol
 				foreach (var kv in styleAt)
 					if (Mathf.Abs(kv.Key - (a + b) * 0.5f) < 0.5f) { st = kv.Value; break; }
 				DoorBuilder.Build(ds, b - a, dh, t, st, doorSettings, slot.label);
+				// 복도 벽선(앞벽에서 setback + recess만큼 복도 쪽)의 문 구멍
+				float zl = -(slot.setback + slot.recess);
+				openings.Add(new[] { pos + rot * new Vector3(a, 0f, zl), pos + rot * new Vector3(b, 0f, zl) });
+				if (details != null && details.enabled)
+				{
+					if (classroom)
+					{
+						// 표찰: 문 오른쪽(+X) 벽, 자리가 없으면 왼쪽
+						float px = b + 0.3f;
+						bool clash = px + 0.15f > hw - 0.05f;
+						foreach (var o in doors) if (o != doors[i] && px + 0.15f > o.x && px - 0.15f < o.y) clash = true;
+						if (clash) px = a - 0.3f;
+						FloorDetailBuilder.Nameplate(root, slot.label, px, zl, st == DoorStyle.WoodSingle, details);
+					}
+					if (stair && i == 0 && stairGen && ss.bulletinBoard)       // 문 오른쪽(+X) 게시판
+						FloorDetailBuilder.BulletinBoard(root, Mathf.Min(b + 0.25f + 0.6f, hw - 0.65f), zl, 1.2f);
+					if (stair && details.exitSigns && i == 0)
+						FloorDetailBuilder.ExitSign(root, new Vector3((a + b) * 0.5f, Mathf.Min(dh + 0.2f, ceilingHeight - 0.12f), zl - 0.01f),
+							Quaternion.Euler(0f, 180f, 0f));
+				}
 				if (classroom && (row.side == RowSide.MainNorth || row.side == RowSide.MainSouth))
 				{
 					float wx = transform.InverseTransformPoint(ds.position).x;
@@ -459,6 +520,7 @@ namespace NightPatrol
 				cursor = Mathf.Max(cursor, b);
 			}
 			BoxX(root, "Wall_Front_End", cursor, hw, y0, y1, zf, t, wm);
+			PlaceFireEquipment(root, slot, row, rot, doors, hw, t);
 
 			// 바닥·천장 (계단실 바닥은 내용물 + 층계참)
 			if (!stair) Box(root, "Floor", new Vector3(0f, -0.05f, D * 0.5f), new Vector3(W, 0.1f, D), fm);
@@ -500,7 +562,7 @@ namespace NightPatrol
 
 			// 계단실: U자 계단·참·창
 			if (stairGen)
-				StairwellBuilder.Build(root, W, D, t, y0, y1, stairwell, wm, glassMaterial, slot.label, this);
+				StairwellBuilder.Build(root, W, D, t, y0, y1, ss, wm, glassMaterial, slot.label, this);
 
 			if (c == null)
 			{
@@ -644,7 +706,31 @@ namespace NightPatrol
 			return new Vector2(b.size.x, b.size.z);
 		}
 
-		void MakeSlab(string objName, Rect r, float y, Material mat)
+		// r에서 holes를 뺀 나머지 사각형들
+		static List<Rect> SubtractRects(Rect r, IList<Rect> holes)
+		{
+			var list = new List<Rect> { r };
+			if (holes == null) return list;
+			foreach (var h in holes)
+			{
+				var next = new List<Rect>();
+				foreach (var a in list)
+				{
+					if (!a.Overlaps(h)) { next.Add(a); continue; }
+					float x0 = Mathf.Max(a.xMin, h.xMin), x1 = Mathf.Min(a.xMax, h.xMax);
+					float z0 = Mathf.Max(a.yMin, h.yMin), z1 = Mathf.Min(a.yMax, h.yMax);
+					void Add(float ax, float az, float bx, float bz) { if (bx - ax > 0.01f && bz - az > 0.01f) next.Add(Rect.MinMaxRect(ax, az, bx, bz)); }
+					Add(a.xMin, a.yMin, x0, a.yMax);   // 왼쪽
+					Add(x1, a.yMin, a.xMax, a.yMax);   // 오른쪽
+					Add(x0, a.yMin, x1, z0);           // 아래
+					Add(x0, z1, x1, a.yMax);           // 위
+				}
+				list = next;
+			}
+			return list;
+		}
+
+		GameObject MakeSlab(string objName, Rect r, float y, Material mat)
 		{
 			GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
 			go.name = objName;
@@ -653,6 +739,7 @@ namespace NightPatrol
 			go.transform.localScale = new Vector3(r.width, 0.1f, r.height);
 			if (mat != null) go.GetComponent<Renderer>().sharedMaterial = mat;
 			go.isStatic = true;
+			return go;
 		}
 
 		void MakeWall(string objName, FloorLayoutData.WallSeg w)
@@ -701,6 +788,43 @@ namespace NightPatrol
 				default: m = concreteMaterial; c = new Color(0.80f, 0.79f, 0.75f); break;
 			}
 			DoorBuilder.Paint(go.GetComponent<Renderer>(), m, c);
+		}
+
+		// 피난 안내도의 소화기·소화전 (방 호수 + 문 기준 거리)
+		void PlaceFireEquipment(Transform root, RoomSlot slot, FloorLayoutData.Row row, Quaternion rot, List<Vector2> doors, float hw, float t)
+		{
+			if (details == null || !details.enabled || !details.fireEquipment || details.fireItems == null) return;
+			bool main = row.side == RowSide.MainNorth || row.side == RowSide.MainSouth;
+			Vector3 axis = main ? Vector3.right : Vector3.forward;          // 동쪽 / 북쪽
+			float sx = Mathf.Sign((Quaternion.Inverse(rot) * axis).x);       // 방 로컬 X에서 그 방향
+			float zl = -(slot.setback + slot.recess);                        // 복도 벽선
+			int k = 0;
+			foreach (var fe in details.fireItems)
+			{
+				if (fe == null || fe.label != slot.label) continue;
+				Vector3 p; Quaternion q;
+				float off = fe.item == FireItem.Extinguisher ? 0.12f : 0f;   // 소화기는 벽에서 띄워 바닥에 세움
+				if (fe.anchor == FireAnchor.LeftWallOutside || fe.anchor == FireAnchor.RightWallOutside)
+				{
+					float side = fe.anchor == FireAnchor.LeftWallOutside ? -1f : 1f;
+					p = new Vector3(side * (hw + off), 0f, fe.along);
+					q = Quaternion.Euler(0f, side * 90f, 0f);
+				}
+				else
+				{
+					if (doors.Count == 0) continue;
+					bool first = fe.anchor == FireAnchor.FirstDoor;
+					Vector2 d = (first == (sx > 0f)) ? doors[0] : doors[doors.Count - 1];
+					float edge = (fe.along >= 0f) == (sx > 0f) ? d.y : d.x;
+					float x = Mathf.Clamp(edge + sx * fe.along, -hw + t + 0.15f, hw - t - 0.15f);
+					if (fe.inside) { p = new Vector3(x, 0f, t + off); q = Quaternion.identity; }
+					else { p = new Vector3(x, 0f, zl - off); q = Quaternion.Euler(0f, 180f, 0f); }
+				}
+				var holder = new GameObject($"Fire_{++k}").transform;
+				holder.SetParent(root, false);
+				if (fe.item == FireItem.Hydrant) FloorDetailBuilder.Hydrant(holder, p, q);
+				else FloorDetailBuilder.Extinguisher(holder, p, q);
+			}
 		}
 
 		DoorStyle ResolveDoorStyle(RoomSlot slot)
@@ -806,6 +930,7 @@ namespace NightPatrol
 
 			MakeWallPiece("Wall_A", root, a, d0, 0f, ceilingHeight);
 			MakeWallPiece("Wall_B", root, d1, b, 0f, ceilingHeight);
+			openings.Add(new[] { d0, d1 });
 			float hh = dw.height > 0.01f ? dw.height : doorHeight;
 			if (dw.lintel) MakeWallPiece("Lintel", root, d0, d1, hh, ceilingHeight);
 

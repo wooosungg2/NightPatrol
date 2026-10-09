@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace NightPatrol
@@ -71,10 +71,8 @@ namespace NightPatrol
 		const float STAIR_W = 5.9f * K;      // 서쪽 계단 폭 (복도 폭을 바꿔도 유지)
 											 // 메인 북쪽 방 깊이 (오목한 문이 있는 방 기준, 앞뒤 벽 포함)
 											 // 521호 실측: 벽 안쪽 바닥 타일 14장 + 앞뒤 벽 0.2m씩
-											 // FitSatelliteDepth = true면 건물 깊이를 위성 실측(18.5m)에 맞춤: 방 안쪽 약 6.0m (타일 약 10.7장)
-											 // false면 521호 실측 기준 → 건물 깊이 약 22.2m로 위성보다 약 3.7m 깊음
-		public static bool FitSatelliteDepth;
-		static float DEPTH_N => FitSatelliteDepth ? (BLDG_DEPTH - C) * 0.5f - RECESS : 14f * TILE + 2f * 0.2f;
+											 // → 건물 깊이 약 22.2m로 위성(18.5m)보다 약 3.7m 깊지만, 실내 실측을 따름
+		const float DEPTH_N = 14f * TILE + 2f * 0.2f;
 		// 메인 남쪽 방 깊이 = 북쪽과 같음
 		static float DEPTH_S => DEPTH_N;
 		const float DEPTH_WING = (WING_W - C) * 0.5f - RECESS;           // 세로 복도 방 깊이: 날개 폭을 양쪽 절반씩 (약 6.4m)
@@ -124,6 +122,11 @@ namespace NightPatrol
 		static readonly float[] WIN_TRANSOMS = { 1.15f, 2.2f }; // 가로 창살 높이 (아래 칸은 여닫이 창)
 		const float WIN_RAIL = 1.1f;         // 난간 높이
 		const float WIN_MARGIN = 0.2f;       // 창 양 끝 막힌 벽 길이
+		// 메인 복도 동쪽 끝 (512·513호 사이, 2026-10 파노라마 사진): 끝벽 통창 + 그 앞 천장 유리 지붕
+		const float END_WIN_HEAD = 2.7f;     // 끝 창 윗선 (위는 흰 보)
+		const float END_WIN_MULLION = 1.2f;  // 2열
+		static readonly float[] END_WIN_TRANSOMS = { 1.1f, 2.0f };
+		const float SKY_L = 6f * TILE;       // 유리 지붕 길이 (끝벽에서 서쪽으로, 추정)
 
 		public class Row
 		{
@@ -203,6 +206,7 @@ namespace NightPatrol
 			public List<DoorWall> doorWalls = new List<DoorWall>(); // 문 구멍이 있는 벽
 			public List<WindowWall> windowWalls = new List<WindowWall>(); // 창문이 있는 바깥벽
 			public List<Solid> solids = new List<Solid>();                // 그 밖의 상자 (발코니 난간벽·바닥 등)
+			public List<Rect> skylights = new List<Rect>();               // 천장이 뚫리고 유리 지붕이 있는 곳 (x, z, 폭, 깊이)
 		}
 
 		/// <summary>
@@ -325,9 +329,8 @@ namespace NightPatrol
 			Add("Balcony_Post_N", xo - 0.1f, PARAPET_H + RAIL_H * 0.5f, z1 - PARAPET_T * 0.5f, 0.04f, RAIL_H, 0.04f, SolidKind.Railing);
 		}
 
-		public static FloorLayout GetLayout(int floorNumber, bool fitSatelliteDepth = false)
+		public static FloorLayout GetLayout(int floorNumber)
 		{
-			FitSatelliteDepth = fitSatelliteDepth;
 			switch (floorNumber)
 			{
 				case 5:
@@ -461,7 +464,9 @@ namespace NightPatrol
 			Wall(f, vestWallL, 0f, vestWallR, 0f, Sd);                              // 화장실 앞 공간 복도 쪽 벽
 			Wall(f, menDoorE, -VEST_W, menDoorE, 0f, E);                            // 두 문 사이 블록 서쪽 면
 			Wall(f, womenDoorW, -VEST_W, womenDoorW, 0f, W);                        // 두 문 사이 블록 동쪽 면
-			Wall(f, end, 0f, end, C, E);                                            // 메인 복도 동쪽 끝
+			f.windowWalls.Add(new WindowWall("Window_E_End", end, 0f, end, C, E,          // 메인 복도 동쪽 끝 통창 + 난간
+				WIN_SILL, END_WIN_HEAD, WIN_MARGIN).Frame(END_WIN_MULLION, END_WIN_TRANSOMS, WIN_RAIL));
+			f.skylights.Add(new Rect(end - SKY_L, 0f, SKY_L, C));                    // 그 앞 천장 유리 지붕
 			Wall(f, f.wingX, C + wingLength, wingEastX, C + wingLength, N);         // 세로 복도 북쪽 끝
 																					// 서쪽 계단실 ~ 528호 사이: 계단실 동쪽 벽과 일직선인 바깥벽, 창문 (그 서쪽은 건물 바깥)
 			float loungeZ0 = C + BACK_N;                                             // 계단실·522호 뒷벽
