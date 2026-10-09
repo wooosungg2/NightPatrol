@@ -1,6 +1,9 @@
 using UnityEngine;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
+using System.Linq;
 using NightPatrol.Interaction;
+using NightPatrol.Patrol;
+using NightPatrol.Run;
 using UnityEngine.InputSystem;
 #endif
 
@@ -13,6 +16,16 @@ namespace NightPatrol.Debugging
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private PlayerInteractor interactor;
         private string targetText = "없음";
+        private string inspectionText = "";
+        private double nextInspectionTime;
+        private PatrolRun run;
+        private FloorTasks floorTasks;
+
+        private void Awake()
+        {
+            run = UnityEngine.Object.FindAnyObjectByType<PatrolRun>();
+            floorTasks = UnityEngine.Object.FindAnyObjectByType<FloorTasks>();
+        }
 
         private void Update()
         {
@@ -22,7 +35,13 @@ namespace NightPatrol.Debugging
 
         private void LateUpdate()
         {
-            if (visible) targetText = GetTargetText();
+            if (!visible) return;
+            targetText = GetTargetText();
+            if (Time.unscaledTimeAsDouble < nextInspectionTime) return;
+            nextInspectionTime = Time.unscaledTimeAsDouble + 0.5;
+            var abnormal = PatrolInspection.FindAbnormal();
+            inspectionText = $"비정상 {abnormal.Count}개: {string.Join(", ", abnormal.Take(5).Select(obj => obj.Id))}";
+            if (abnormal.Count > 5) inspectionText += $" 외 {abnormal.Count - 5}개";
         }
 
         public string GetTargetText()
@@ -51,11 +70,15 @@ namespace NightPatrol.Debugging
         {
             if (!visible) return;
             GUI.DrawTexture(new Rect(Screen.width * 0.5f - 2f, Screen.height * 0.5f - 2f, 4f, 4f), Texture2D.whiteTexture);
-            GUILayout.BeginArea(new Rect(12f, 12f, Mathf.Max(100f, Screen.width - 24f), 140f));
+            GUILayout.BeginArea(new Rect(12f, 12f, Mathf.Max(100f, Screen.width - 24f), 200f));
             GUILayout.BeginVertical(GUI.skin.box);
             GUILayout.Label(targetText);
             if (interactor != null)
                 GUILayout.Label($"CurrentTarget: {(interactor.CurrentTarget == null ? "없음 (null)" : "있음 (non-null)")}");
+            GUILayout.Label(inspectionText);
+            if (run != null) GUILayout.Label($"층 {run.CurrentFloor} / 회차 {run.Attempt}");
+            if (floorTasks != null)
+                GUILayout.Label($"점검 항목: {string.Join(", ", floorTasks.CurrentTasks.Where(t => t != null && t.Target != null).Select(t => $"{t.Label}({t.Target.Id})"))}");
             GUILayout.EndVertical();
             GUILayout.EndArea();
         }
