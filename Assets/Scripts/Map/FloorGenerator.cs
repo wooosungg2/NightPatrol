@@ -485,14 +485,16 @@ namespace NightPatrol
 				foreach (var ci in classroomInteriors)
 					if (ci != null && ci.enabled && ci.label == slot.label)
 					{
-						ClassroomInteriorBuilder.Build(root, W, D, t, doors, ci, ceilingHeight, slot.label, this);
+						ClassroomInteriorBuilder.Build(root, W, D, t, doors, ci, ceilingHeight, slot.label, this,
+							windowWall ? WindowBuilder.Inset(classroomWindows, slot.label) : 0f);
 						break;
 					}
 			if (classroom && tieredRooms != null)
 				foreach (var lr in tieredRooms)
 					if (lr != null && lr.enabled && lr.label == slot.label)
 					{
-						LectureRoomBuilder.Build(root, W, D, t, doors, lr, ceilingHeight, slot.label, this);
+						LectureRoomBuilder.Build(root, W, D, t, doors, lr, ceilingHeight, slot.label, this,
+							windowWall ? WindowBuilder.Inset(classroomWindows, slot.label) : 0f);
 						break;
 					}
 

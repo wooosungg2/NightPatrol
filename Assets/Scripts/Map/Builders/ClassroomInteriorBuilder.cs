@@ -24,22 +24,23 @@ namespace NightPatrol
 
 		[Header("학생 좌석 (1열 = 스크린에 가장 가까운 줄)")]
 		[Min(1)] public int rows = 3;
-		[Min(1)] public int seatsPerRow = 12;
+		[Min(1)] public int seatsPerRow = 13;
 		[Tooltip("책상 하나에 몇 자리")][Min(1)] public int seatsPerBlock = 2;
 		[Tooltip("한 자리 폭(m)")] public float seatPitch = 0.7f;
 		[Tooltip("책상 사이 틈(m). 0이면 책상이 붙어서 한 줄로 이어짐")] public float aisleWidth = 0f;
-		[Tooltip("줄 간격(m), 책상 앞 모서리 ~ 다음 줄 책상 앞 모서리")] public float rowPitch = 1.7f;
+		[Tooltip("줄 간격(m), 책상 앞 모서리 ~ 다음 줄 책상 앞 모서리")] public float rowPitch = 1.8f;
 		public float deskDepth = 0.7f;
 		public float deskHeight = 0.72f;
 		[Tooltip("책상 가운데선 ~ 의자 가운데 거리(m)")] public float chairOffset = 0.45f;
-		[Tooltip("스크린 벽 ~ 1열 책상 앞 모서리(m)")] public float lecternZone = 2.0f;
+		[Tooltip("스크린 벽 ~ 1열 책상 앞 모서리(m)")] public float lecternZone = 1.8f;
 		[Tooltip("좌석 전체를 좌우로 옮김(m). 0이면 방 가운데")] public float offsetX = 0f;
 		[Tooltip("끄면 책상·의자만 (일반 강의실)")] public bool computers = true;
 
 		[Header("교수님 책상 (학생 쪽을 봄)")]
 		[Tooltip("InFirstRow = 1열의 lecternSeat번째 자리, Front = 스크린 앞 lecternX 위치")]
 		public LecternPlacement lecternPlacement = LecternPlacement.InFirstRow;
-		[Tooltip("1열 몇 번째 자리가 교수님 자리인지 (복도에서 봤을 때 왼쪽부터 1)")][Min(1)] public int lecternSeat = 6;
+		[Tooltip("1열 몇 번째 자리가 교수님 자리인지 (복도에서 봤을 때 왼쪽부터 1)")][Min(1)] public int lecternSeat = 7;
+		[Tooltip("InFirstRow일 때 교수님 자리 뒤(2열부터)는 컴퓨터 없는 일반 책상 한 칸")] public bool plainDesksBehindLectern = true;
 		[Tooltip("Front일 때 책상 폭(m)")] public float lecternWidth = 1.2f;
 		[Tooltip("Front일 때 책상 가운데 X(m)")] public float lecternX = 0f;
 
@@ -97,7 +98,7 @@ namespace NightPatrol
 	///   창문 ┌──────────────────────────┐
 	///        │   ▭▭▭▭▭▭▭▭▭▭▭▭     │   3열  (학생은 복도 쪽을 봄,
 	///   칠판 │   ▭▭▭▭▭▭▭▭▭▭▭▭     │   2열   모니터 화면은 창문 쪽을 봄)
-	///        │   ▭▭▭▭▭[교]▭▭▭▭▭▭     │   1열: 6번째 자리가 교수님 책상 (학생을 봄)
+	///        │   ▭▭▭▭▭▭[교]▭▭▭▭▭▭    │   1열: 7번째 자리가 교수님 책상 (학생을 봄), 2·3열 같은 칸은 일반 책상
 	///        │                          │
 	///   복도 └─┐문┌분전반 [스크린][스크린] ┘   스크린은 벽 가운데
 	///
@@ -107,9 +108,12 @@ namespace NightPatrol
 	public static class ClassroomInteriorBuilder
 	{
 		/// <param name="doors">앞벽 문 구멍 (방 로컬 X 구간, x 오름차순)</param>
+		/// <param name="backInset">창문 벽(뒷벽)에서 방 안으로 튀어나온 깊이 (창턱·창 사이 벽). 좌석은 그만큼 덜 씀</param>
 		public static void Build(Transform room, float W, float D, float t, IList<Vector2> doors,
-								 ClassroomInteriorSettings s, float ceilingHeight, string label, Object ctx)
+								 ClassroomInteriorSettings s, float ceilingHeight, string label, Object ctx,
+								 float backInset = 0f)
 		{
+			float Db = D - Mathf.Max(0f, backInset);        // 실제로 쓸 수 있는 깊이 (뒷벽 안쪽 면 = Db - t)
 			if (s == null || !s.enabled) return;
 
 			var root = new GameObject("Interior").transform;
@@ -127,7 +131,7 @@ namespace NightPatrol
 
 			float xin = W * 0.5f - t;                       // 옆벽 안쪽 면 |x|
 			bool back = s.screenWall == ScreenWall.Window;
-			float zs = back ? D - t : t;                    // 스크린 벽 안쪽 면
+			float zs = back ? Db - t : t;                    // 스크린 벽 안쪽 면
 			float u = back ? -1f : 1f;                      // 스크린 벽 → 학생 쪽 방향
 			var faceScreen = Quaternion.Euler(0f, back ? 0f : 180f, 0f);   // 학생이 스크린을 봄
 			var faceStudents = Quaternion.Euler(0f, back ? 180f : 0f, 0f); // 교수님이 학생을 봄
@@ -135,7 +139,7 @@ namespace NightPatrol
 
 			// 방이 얕아서 안 들어가면 스크린 쪽 공간(최소 1.3m) → 줄 간격(최소 1.45m) 순서로 줄임
 			float zoneL = s.lecternZone, rp = s.rowPitch;
-			float avail = D - 2f * t - 0.9f - (dd * 0.5f + s.chairOffset + 0.25f); // 뒤쪽 통로 0.9m 남김
+			float avail = Db - 2f * t - 0.9f - (dd * 0.5f + s.chairOffset + 0.25f); // 뒤쪽 통로 0.9m 남김
 			if (zoneL + (s.rows - 1) * rp > avail)
 			{
 				zoneL = Mathf.Max(1.3f, avail - (s.rows - 1) * rp);
@@ -146,45 +150,45 @@ namespace NightPatrol
 			}
 
 			// ── 학생 좌석 ──
+			// 1열 안의 교수님 자리 (없으면 -1). 이 칸은 모든 줄에서 따로 떨어진 책상 하나가 됨
+			//   1열: 교수님 책상 / 2열부터: 일반 책상(plainDesksBehindLectern) 또는 보통 자리
 			int n = Mathf.Max(1, s.seatsPerRow), pb = Mathf.Max(1, s.seatsPerBlock);
-			int blocks = (n + pb - 1) / pb;
-			float total = n * s.seatPitch + (blocks - 1) * s.aisleWidth;
-			float x0 = s.offsetX - total * 0.5f;
-			float SeatX(int i) => x0 + (i + 0.5f) * s.seatPitch + (i / pb) * s.aisleWidth;
-			float RowZ(int r) => zs + u * (zoneL + dd * 0.5f + r * rp);
-
-			// 1열 안의 교수님 자리 (없으면 -1). 이 자리는 학생 자리·책상에서 빠짐
 			bool inRow = s.lecternPlacement == LecternPlacement.InFirstRow;
 			int lec = inRow ? Mathf.Clamp(s.lecternSeat, 1, n) - 1 : -1;
+			int leftBlocks = lec < 0 ? 0 : (lec + pb - 1) / pb;
+			// 책상 묶음 번호: 교수님 칸 왼쪽은 왼쪽부터, 오른쪽은 그 칸 다음부터 pb자리씩
+			int Block(int i) => lec < 0 || i < lec ? i / pb : i == lec ? leftBlocks : leftBlocks + 1 + (i - lec - 1) / pb;
+			int blocks = Block(n - 1) + 1;
+			float total = n * s.seatPitch + (blocks - 1) * s.aisleWidth;
+			float x0 = s.offsetX - total * 0.5f;
+			float SeatX(int i) => x0 + (i + 0.5f) * s.seatPitch + Block(i) * s.aisleWidth;
+			float RowZ(int r) => zs + u * (zoneL + dd * 0.5f + r * rp);
 
 			var seatsRoot = Group(root, "Seats");
 			for (int r = 0; r < s.rows; r++)
 			{
 				float zc = RowZ(r);
 				var row = Group(seatsRoot, $"Row_{r + 1}");
-				int skip = r == 0 ? lec : -1;
+				int skip = r == 0 ? lec : -1;                                   // 1열 교수님 칸은 아래에서 따로
+				int plain = r > 0 && s.plainDesksBehindLectern ? lec : -1;     // 컴퓨터 없는 칸
 				int di = 0;
-				for (int b = 0; b < blocks; b++)
+				for (int i0 = 0; i0 < n;)
 				{
-					int i0 = b * pb, i1 = Mathf.Min(n, i0 + pb) - 1;
-					// 교수님 자리가 이 책상 안에 있으면 그 앞뒤로 나눔
-					var segs = new List<Vector2Int>();
-					if (skip >= i0 && skip <= i1)
+					int i1 = i0;
+					while (i1 + 1 < n && Block(i1 + 1) == Block(i0)) i1++;
+					if (i0 != skip)
 					{
-						if (skip > i0) segs.Add(new Vector2Int(i0, skip - 1));
-						if (skip < i1) segs.Add(new Vector2Int(skip + 1, i1));
+						float xa = SeatX(i0) - s.seatPitch * 0.5f, xb = SeatX(i1) + s.seatPitch * 0.5f;
+						Desk(row, i0 == plain ? "Desk_Plain" : $"Desk_{di++}", (xa + xb) * 0.5f, zc, xb - xa, dd, H, -u, s,
+							panel: i0 != plain);
 					}
-					else segs.Add(new Vector2Int(i0, i1));
-					foreach (var sg in segs)
-					{
-						float xa = SeatX(sg.x) - s.seatPitch * 0.5f, xb = SeatX(sg.y) + s.seatPitch * 0.5f;
-						Desk(row, $"Desk_{di++}", (xa + xb) * 0.5f, zc, xb - xa, dd, H, -u, s);
-					}
+					i0 = i1 + 1;
 				}
 				// 이름은 실제 위치 번호 (1열 교수님 자리 번호는 비어 있음)
 				for (int i = 0; i < n; i++)
 					if (i != skip)
-						Seat(row, $"Seat_{r + 1}_{i + 1:00}", new Vector3(SeatX(i), 0f, zc), faceScreen, s);
+						Seat(row, i == plain ? $"Seat_{r + 1}_{i + 1:00}_Plain" : $"Seat_{r + 1}_{i + 1:00}",
+							new Vector3(SeatX(i), 0f, zc), faceScreen, s, computers: i == plain ? false : s.computers);
 			}
 
 			// ── 교수님 책상 (학생을 봄, 의자는 스크린 쪽) ──
@@ -210,28 +214,54 @@ namespace NightPatrol
 					? dr.x - 0.15f - s.panelWidth * 0.5f   // 문이 오른쪽이면 문 왼쪽에
 					: dr.y + 0.15f + s.panelWidth * 0.5f;  // 문이 왼쪽이면 문 오른쪽에
 			}
+			// 복도 벽의 문·분전반을 피해서 빈 구간에 스크린을 놓음. 구간이 모자라면 스크린 폭을 줄임
+			float sw = s.screenWidth;
 			float scx = s.screenCenterX;
-			if (hasPanel && !back && sc > 0)
+			if (!back && sc > 0)
 			{
-				float pa = px - s.panelWidth * 0.5f, pb2 = px + s.panelWidth * 0.5f;
-				if (pb2 + s.screenGap > scx - spanS * 0.5f && pa - s.screenGap < scx + spanS * 0.5f)
+				const float mg = 0.15f;                   // 문틀·분전반과 띄우는 거리
+				var blocked = new List<Vector2>();
+				if (doors != null) foreach (var dr in doors) blocked.Add(new Vector2(dr.x - mg, dr.y + mg));
+				if (hasPanel) blocked.Add(new Vector2(px - s.panelWidth * 0.5f - mg, px + s.panelWidth * 0.5f + mg));
+				blocked.Sort((q1, q2) => q1.x.CompareTo(q2.x));
+				float bestLo = 0f, bestHi = 0f, bestScore = float.MinValue;
+				void Consider(float ca, float cb)
 				{
-					float away = px < scx ? 1f : -1f; // 분전반 반대쪽
-					scx = away > 0f ? pb2 + s.screenGap + spanS * 0.5f : pa - s.screenGap - spanS * 0.5f;
-					Debug.Log($"[Interior] {label}: 분전반과 겹치지 않게 스크린 가운데를 X {s.screenCenterX:0.##} → {scx:0.##}로 옮김", ctx);
+					if (cb - ca < 0.5f) return;
+					float fit = Mathf.Min(cb - ca, spanS);
+					float near = Mathf.Abs(Mathf.Clamp(scx, ca + fit * 0.5f, cb - fit * 0.5f) - scx);
+					float score = fit * 10f - near;      // 스크린이 넓게 들어가는 구간 우선, 비슷하면 원래 위치에 가까운 곳
+					if (score > bestScore) { bestScore = score; bestLo = ca; bestHi = cb; }
+				}
+				float lo = -xin + mg;
+				foreach (var bl in blocked) { Consider(lo, bl.x); lo = Mathf.Max(lo, bl.y); }
+				Consider(lo, xin - mg);
+				if (bestScore > float.MinValue)
+				{
+					float free = bestHi - bestLo;
+					if (spanS > free)
+					{
+						sw = (free - (sc - 1) * s.screenGap) / sc;
+						spanS = free;
+						Debug.Log($"[Interior] {label}: 문·분전반 사이에 맞게 스크린 폭을 {s.screenWidth:0.##} → {sw:0.##}m로 줄임", ctx);
+					}
+					float nx = Mathf.Clamp(scx, bestLo + spanS * 0.5f, bestHi - spanS * 0.5f);
+					if (Mathf.Abs(nx - scx) > 0.01f)
+						Debug.Log($"[Interior] {label}: 문·분전반을 피해 스크린 가운데를 X {s.screenCenterX:0.##} → {nx:0.##}로 옮김", ctx);
+					scx = nx;
 				}
 			}
 			var screens = Group(root, "Screens");
 			for (int i = 0; i < sc; i++)
 			{
-				float cx = scx - spanS * 0.5f + s.screenWidth * 0.5f + i * (s.screenWidth + s.screenGap);
+				float cx = scx - spanS * 0.5f + sw * 0.5f + i * (sw + s.screenGap);
 				var g = Group(screens, $"Screen_{i}");
 				Box(g, "Cloth", new Vector3(cx, (sb + st) * 0.5f, zs + u * 0.06f),
-					new Vector3(s.screenWidth, st - sb, 0.01f), s.projectionScreenMaterial);
+					new Vector3(sw, st - sb, 0.01f), s.projectionScreenMaterial);
 				Box(g, "Case", new Vector3(cx, st + 0.05f, zs + u * 0.06f),
-					new Vector3(s.screenWidth + 0.2f, 0.1f, 0.1f), s.metalMaterial);
+					new Vector3(sw + 0.2f, 0.1f, 0.1f), s.metalMaterial);
 				Box(g, "BottomBar", new Vector3(cx, sb - 0.01f, zs + u * 0.06f),
-					new Vector3(s.screenWidth, 0.03f, 0.03f), s.metalMaterial);
+					new Vector3(sw, 0.03f, 0.03f), s.metalMaterial);
 				if (s.projector)
 				{
 					var pj = new GameObject("Projector").transform;
@@ -245,11 +275,6 @@ namespace NightPatrol
 			}
 			if (sc > 0 && Mathf.Abs(scx) + spanS * 0.5f > xin)
 				Debug.LogWarning($"[Interior] {label}: 스크린이 벽 밖으로 나감. Screen Width나 Screen Gap을 줄일 것", ctx);
-			if (sc > 0 && !back && doors != null)
-				foreach (var d in doors)
-					if (d.y > scx - spanS * 0.5f && d.x < scx + spanS * 0.5f)
-						Debug.LogWarning($"[Interior] {label}: 스크린이 문(X {d.x:0.##} ~ {d.y:0.##})을 가림. " +
-										 $"스크린 범위 X {scx - spanS * 0.5f:0.##} ~ {scx + spanS * 0.5f:0.##}. Screen Center X나 Screen Width를 조정할 것", ctx);
 
 			// ── 칠판 (옆벽) ──
 			if (s.chalkboardSide != SideWall.None)
@@ -274,11 +299,11 @@ namespace NightPatrol
 			if (aisleL < 0.6f || aisleR < 0.6f)
 				Debug.LogWarning($"[Interior] {label}: 옆 통로가 좁음 (왼쪽 {aisleL:0.##}m, 오른쪽 {aisleR:0.##}m). Offset X나 Seat Pitch를 조정할 것", ctx);
 			float lastChair = zoneL + dd * 0.5f + (s.rows - 1) * rp + s.chairOffset + 0.25f;
-			float frontAisle = (D - 2f * t) - lastChair;
+			float frontAisle = (Db - 2f * t) - lastChair;
 			if (frontAisle < 0.9f)
 				Debug.LogWarning($"[Interior] {label}: 마지막 줄 뒤 통로가 {frontAisle:0.##}m로 좁음. 줄 수나 Row Pitch를 줄일 것", ctx);
 			float between = rp - dd * 0.5f - (s.chairOffset + 0.25f);
-			if (s.rows > 1 && between < 0.55f)
+			if (s.rows > 1 && between < 0.65f)
 				Debug.LogWarning($"[Interior] {label}: 줄 사이(의자 등받이 ~ 뒷줄 책상)가 {between:0.##}m라 플레이어가 못 지나갈 수 있음", ctx);
 			if (!back && !inRow && doors != null)
 				foreach (var d in doors)
@@ -354,7 +379,7 @@ namespace NightPatrol
 
 		// 한 자리: 기준점 = 책상 가운데 바닥, +Z = 앉은 사람이 보는 방향
 		static void Seat(Transform parent, string name, Vector3 pos, Quaternion rot, ClassroomInteriorSettings s,
-						 float deskTop = -1f)
+						 float deskTop = -1f, bool? computers = null)
 		{
 			float H = deskTop > 0f ? deskTop : s.deskHeight;
 			var seat = new GameObject(name).transform;
@@ -363,7 +388,7 @@ namespace NightPatrol
 			seat.localRotation = rot;
 
 			var flip = Quaternion.Euler(0f, 180f, 0f); // 앞면이 앉은 사람을 봄
-			if (s.computers)
+			if (computers ?? s.computers)
 			{
 				Place(seat, s.monitorPrefab, "Monitor", new Vector3(0f, H, 0.12f), flip, go => MonitorPH(go, s));
 				Place(seat, s.keyboardPrefab, "Keyboard", new Vector3(0f, H, -0.15f), flip,

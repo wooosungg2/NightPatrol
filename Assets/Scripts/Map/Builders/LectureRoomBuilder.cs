@@ -7,7 +7,7 @@ using UnityEditor;
 namespace NightPatrol
 {
 	/// <summary>
-	/// 계단식(단이 있는) 일반 강의실 설정. 앞(교탁·칠판)이 방의 짧은 옆벽 쪽에 있고,
+	/// 일반 강의실 설정 (단은 선택). 앞(교탁·칠판)이 방의 짧은 옆벽 쪽에 있고,
 	/// 좌석 줄은 방 길이 방향으로 뒤로 늘어서며 복도 쪽·가운데·창가 쪽 세 열로 나뉜다. (524호 사진 기준)
 	/// </summary>
 	[System.Serializable]
@@ -30,7 +30,7 @@ namespace NightPatrol
 		[Tooltip("줄 간격 최대값(m). 방 길이에 맞춰 이보다 작아질 수 있음")] public float maxRowPitch = 0.9f;
 
 		[Header("단 (계단식 바닥)")]
-		[Tooltip("이 행부터 한 단씩 올라감 (1부터). 524호: 가운데(6행)에 한 번")] public int[] stepRows = { 6 };
+		[Tooltip("이 행부터 한 단씩 올라감 (1부터). 비우면 평평한 바닥 (2026-10 사진 기준 524호는 평평함)")] public int[] stepRows = { };
 		[Tooltip("한 단 높이(m)")] public float stepRise = 0.3f;
 		[Tooltip("뒷문으로 들어가면 바로 창가 쪽으로 올라가는 경사로 (단을 파고 들어감) + 양옆 난간")] public bool ramp = true;
 		[Tooltip("경사로 기울기 (높이 / 길이)")] public float rampSlope = 0.14f;
@@ -41,7 +41,10 @@ namespace NightPatrol
 		[Tooltip("앞벽 화이트보드 + 스크린 두 개")] public bool boards = true;
 		[Tooltip("앞쪽 이동식 화이트보드")] public bool mobileWhiteboard = false;
 		[Tooltip("방 가운데 천장에 창가 쪽·복도 쪽 위로 TV 한 대씩 (뒷줄 학생 쪽을 봄)")] public bool ceilingTVs = true;
-		[Tooltip("뒷벽 짙은 회색 흡음판")] public bool acousticBackWall = true;
+		[Tooltip("뒷벽 짙은 회색 흡음판 (예전 버전)")] public bool darkBackWall = false;
+		[Tooltip("뒷벽 흰 패널 + 학과 배너 + 게시물 (사진)")] public bool backWallPosters = true;
+		[Tooltip("천장 가운데 알루미늄 루버 띠 + 시스템 에어컨")] public bool slatCeiling = true;
+		[Tooltip("천장 프로젝터 두 대")] public bool projectors = true;
 
 		[Header("프리팹·재질 (비워두면 자리 표시 상자 + 색)")]
 		[Tooltip("기준점 = 바닥 가운데, 앉는 사람이 +Z를 봄")] public GameObject chairPrefab;
@@ -62,21 +65,27 @@ namespace NightPatrol
 	///        │음│  … ▭▭  ▭▭  ▭▭  (10행) │판│
 	///        │판│ ↑경사│ ▭▭  ▭▭  (9행)  │  │   복도 쪽 열: 벽에 붙음
 	///   복도 └──┐뒷문┌───────────────┐앞문┌┘
-	///   1-5행 바닥, 6행부터 뒷벽까지 +30cm 한 단. 뒷문으로 들어가면 창가 쪽으로 곧장 올라가는 경사로
+	///   바닥은 평평 (Step Rows를 채우면 그 행부터 단 + 뒷문 경사로)
 	/// </summary>
 	public static class LectureRoomBuilder
 	{
-		static readonly Color WoodTop = new Color(0.78f, 0.66f, 0.50f);
-		static readonly Color GreyBody = new Color(0.72f, 0.73f, 0.75f);
-		static readonly Color NavyChair = new Color(0.22f, 0.27f, 0.42f);
+		static readonly Color DeskTop = new Color(0.90f, 0.90f, 0.88f);      // 흰 상판
+		static readonly Color GreyBody = new Color(0.78f, 0.79f, 0.80f);     // 연회색 책꽂이·다리
+		static readonly Color MeshGrey = new Color(0.58f, 0.59f, 0.61f);     // 의자 등받이 (회색 메시)
+		static readonly Color SeatBlack = new Color(0.13f, 0.13f, 0.14f);    // 의자 방석
+		static readonly Color SlatSilver = new Color(0.80f, 0.81f, 0.82f);
+		static readonly Color PosterBlue = new Color(0.28f, 0.30f, 0.52f);
+		static readonly Color PosterGreen = new Color(0.86f, 0.90f, 0.84f);
 		static readonly Color PlatformWood = new Color(0.66f, 0.52f, 0.36f);
 		static readonly Color RailBlack = new Color(0.12f, 0.12f, 0.13f);
 		static readonly Color BoardWhite = new Color(0.93f, 0.94f, 0.94f);
 		static readonly Color Acoustic = new Color(0.30f, 0.31f, 0.32f);
 		static readonly Color LecternGrey = new Color(0.62f, 0.63f, 0.65f);
 
+		/// <param name="backInset">창문 벽에서 방 안으로 튀어나온 깊이 (창턱·기둥). 창가 쪽 열은 그만큼 띄움</param>
 		public static void Build(Transform room, float W, float D, float t, IList<Vector2> doors,
-								 LectureRoomSettings s, float ceilingHeight, string label, Object ctx)
+								 LectureRoomSettings s, float ceilingHeight, string label, Object ctx,
+								 float backInset = 0f)
 		{
 			if (s == null || !s.enabled) return;
 			var root = new GameObject("Interior").transform;
@@ -87,7 +96,7 @@ namespace NightPatrol
 			float f = s.frontOnLeft ? -1f : 1f;                   // 앞벽이 있는 X 방향
 			float X(float sDist) => f * (xin - sDist);            // 앞벽에서 거리 → 로컬 X
 			var faceFront = Quaternion.Euler(0f, f < 0f ? -90f : 90f, 0f);
-			float zc0 = t, zc1 = D - t;
+			float zc0 = t, zc1 = D - t - Mathf.Max(0f, backInset);
 
 			// ── 열 (Z) ──
 			int nc = Mathf.Max(1, s.columns != null ? s.columns.Length : 1);
@@ -276,10 +285,46 @@ namespace NightPatrol
 				Box(lec, "Mic", new Vector3(X(1.1f), 1.3f, lz - 0.2f), new Vector3(0.02f, 0.35f, 0.02f), null, RailBlack);
 			}
 
-			// ── 뒷벽 흡음판 ──
-			if (s.acousticBackWall)
-				Box(root, "AcousticPanel", new Vector3(-f * xin + f * 0.015f, ceilingHeight * 0.5f, zMid),
+			// ── 뒷벽 ──
+			float xb = -f * xin;                     // 뒷벽 안쪽 면
+			if (s.darkBackWall)
+				Box(root, "AcousticPanel", new Vector3(xb + f * 0.015f, ceilingHeight * 0.5f, zMid),
 					new Vector3(0.03f, ceilingHeight - 0.05f, zc1 - zc0), null, Acoustic);
+			else if (s.backWallPosters)
+			{
+				// 사진: 흰 패널 벽 가운데 학과 배너, 양옆 게시물 액자
+				var back = Group(root, "BackWall");
+				Box(back, "Banner", new Vector3(xb + f * 0.01f, 1.7f, zMid), new Vector3(0.01f, 1.6f, 0.75f), null, BoardWhite);
+				Box(back, "Banner_Logo", new Vector3(xb + f * 0.016f, 1.9f, zMid), new Vector3(0.004f, 0.55f, 0.5f), null, PosterBlue);
+				Box(back, "Poster_A", new Vector3(xb + f * 0.012f, 1.6f, zMid - 1.4f), new Vector3(0.012f, 0.85f, 0.6f), null, PosterBlue);
+				Box(back, "Poster_B", new Vector3(xb + f * 0.012f, 1.6f, zMid + 1.3f), new Vector3(0.012f, 0.7f, 0.5f), null, PosterGreen);
+			}
+
+			// ── 천장: 가운데 알루미늄 루버 띠 + 시스템 에어컨, 프로젝터 ──
+			if (s.slatCeiling)
+			{
+				var ceil = Group(root, "SlatCeiling");
+				float bandW = Mathf.Min(3.2f, (zc1 - zc0) * 0.5f), bandL = L - 1.2f;
+				int slats = Mathf.Max(2, Mathf.RoundToInt(bandW / 0.14f));
+				for (int i = 0; i < slats; i++)
+				{
+					float z = zMid - bandW * 0.5f + (i + 0.5f) * bandW / slats;
+					var sl = Box(ceil, "Slat", new Vector3(0f, ceilingHeight - 0.3f, z), new Vector3(bandL, 0.08f, 0.025f), null, SlatSilver);
+					Object.DestroyImmediate(sl.GetComponent<Collider>());
+				}
+				var ac = Box(ceil, "AirCon", new Vector3(X(L * 0.45f), ceilingHeight - 0.3f, zMid), new Vector3(0.85f, 0.06f, 0.85f), null, BoardWhite);
+				Object.DestroyImmediate(ac.GetComponent<Collider>());
+			}
+			if (s.projectors)
+			{
+				var pj = Group(root, "Projectors");
+				for (int k = -1; k <= 1; k += 2)
+				{
+					float z = zMid + k * Mathf.Min(1.2f, (zc1 - zc0) * 0.2f);
+					Box(pj, "Projector_Mount", new Vector3(X(L * 0.4f), ceilingHeight - 0.15f, z), new Vector3(0.05f, 0.3f, 0.05f), null, RailBlack);
+					Box(pj, "Projector", new Vector3(X(L * 0.4f), ceilingHeight - 0.36f, z), new Vector3(0.35f, 0.12f, 0.4f), null, BoardWhite);
+				}
+			}
 
 		}
 
@@ -305,20 +350,28 @@ namespace NightPatrol
 			else
 			{
 				var desk = Group(seat, "Desk");
-				Box(desk, "Top", new Vector3(0f, H - 0.015f, 0f), new Vector3(w, 0.03f, d), s.deskMaterial, WoodTop);
+				Box(desk, "Top", new Vector3(0f, H - 0.015f, 0f), new Vector3(w, 0.03f, d), s.deskMaterial, DeskTop);
 				// 책꽂이 겸 앞 가림판 (사진의 슬롯 난 회색 통)
 				Box(desk, "Rack", new Vector3(0f, H - 0.17f, d * 0.12f), new Vector3(w - 0.02f, 0.26f, d * 0.72f), null, GreyBody);
 				Box(desk, "Leg_L", new Vector3(-w * 0.5f + 0.03f, (H - 0.3f) * 0.5f, d * 0.3f), new Vector3(0.035f, H - 0.3f, 0.035f), null, GreyBody);
 				Box(desk, "Leg_R", new Vector3(w * 0.5f - 0.03f, (H - 0.3f) * 0.5f, d * 0.3f), new Vector3(0.035f, H - 0.3f, 0.035f), null, GreyBody);
+				// 바퀴 달린 다리 받침 (사진)
+				Box(desk, "Foot_L", new Vector3(-w * 0.5f + 0.03f, 0.04f, 0f), new Vector3(0.04f, 0.04f, d * 0.9f), null, GreyBody);
+				Box(desk, "Foot_R", new Vector3(w * 0.5f - 0.03f, 0.04f, 0f), new Vector3(0.04f, 0.04f, d * 0.9f), null, GreyBody);
 			}
 			if (s.chairPrefab != null) Spawn(s.chairPrefab, seat, "Chair", new Vector3(0f, 0f, -s.chairOffset));
 			else
 			{
 				var ch = Group(seat, "Chair");
 				ch.localPosition = new Vector3(0f, 0f, -s.chairOffset);
-				Box(ch, "Seat", new Vector3(0f, 0.45f, 0f), new Vector3(0.44f, 0.05f, 0.42f), null, NavyChair);
-				Box(ch, "Back", new Vector3(0f, 0.72f, -0.2f), new Vector3(0.44f, 0.42f, 0.03f), null, NavyChair);
-				Box(ch, "Stem", new Vector3(0f, 0.21f, 0f), new Vector3(0.05f, 0.42f, 0.05f), null, GreyBody);
+				// 사진: 회색 메시 등받이 + 검은 방석, 팔걸이, 바퀴 다리
+				Box(ch, "Seat", new Vector3(0f, 0.45f, 0f), new Vector3(0.46f, 0.06f, 0.44f), null, SeatBlack);
+				Box(ch, "Back", new Vector3(0f, 0.75f, -0.21f), new Vector3(0.44f, 0.48f, 0.03f), null, MeshGrey);
+				Box(ch, "Arm_L", new Vector3(-0.24f, 0.62f, -0.02f), new Vector3(0.03f, 0.03f, 0.32f), null, GreyBody);
+				Box(ch, "Arm_R", new Vector3(0.24f, 0.62f, -0.02f), new Vector3(0.03f, 0.03f, 0.32f), null, GreyBody);
+				Box(ch, "Stem", new Vector3(0f, 0.23f, 0f), new Vector3(0.05f, 0.4f, 0.05f), null, GreyBody);
+				Box(ch, "Base_A", new Vector3(0f, 0.04f, 0f), new Vector3(0.55f, 0.04f, 0.05f), null, GreyBody);
+				Box(ch, "Base_B", new Vector3(0f, 0.04f, 0f), new Vector3(0.05f, 0.04f, 0.55f), null, GreyBody);
 			}
 		}
 
