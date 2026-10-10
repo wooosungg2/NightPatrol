@@ -223,14 +223,19 @@ namespace NightPatrol
 				var zones = FloorDetailBuilder.CeilingLights(det, layout.corridors, ceilingHeight, details, layout.skylights);
 				FloorDetailBuilder.Baseboards(det, layout.corridors, openings, details);
 				FloorDetailBuilder.LightSwitches(det, layout.corridors, openings, zones, details);
+				FloorDetailBuilder.HallProps(det, layout.hallNorth, layout.hallSouth, details);
 			}
 
 			AssignPatrolIds();
+			// 텍스처가 늘어나 보이지 않게 크기에 맞춰 반복 (재질 Tiling = 1m당 반복)
+			var tiler = GetComponent<TextureTiler>();
+			if (tiler == null) tiler = gameObject.AddComponent<TextureTiler>();
+			tiler.Apply();
 			LogDoorPairs();
 			MarkDirty();
 		}
 
-		// 생성된 문·창문·블라인드에 Id를 붙인다 (구역.종류.번호, 예: R21.Door.01). 번호는 생성 순서
+		// 생성된 문·창문·블라인드·모니터·TV에 Id를 붙인다 (구역.종류.번호, 예: R21.Door.01, R21.Monitor.03). 번호는 생성 순서
 		void AssignPatrolIds()
 		{
 			var counts = new Dictionary<string, int>();
@@ -241,6 +246,7 @@ namespace NightPatrol
 				if (po is Door d) { label = d.roomLabel; kind = "Door"; }
 				else if (po is WindowUnit w) { label = w.roomLabel; kind = "Window"; }
 				else if (po is WindowBlind b) { label = b.roomLabel; kind = "Blind"; }
+				else if (po is MonitorDevice m) { label = m.roomLabel; kind = string.IsNullOrEmpty(m.kind) ? "Monitor" : m.kind; }
 				else continue;
 				string key = PatrolIds.Zone(label) + "." + kind;
 				counts.TryGetValue(key, out int n);
@@ -490,10 +496,14 @@ namespace NightPatrol
 				DoorStyle st = ResolveDoorStyle(slot);
 				foreach (var kv in styleAt)
 					if (Mathf.Abs(kv.Key - (a + b) * 0.5f) < 0.5f) { st = kv.Value; break; }
-				DoorBuilder.Build(ds, b - a, dh, t, st, doorSettings, slot.label);
+				DoorBuilder.Build(ds, b - a, dh, t, st, doorSettings, slot.label,
+					stair && doorSettings != null && doorSettings.stairDoorsInward ? true : (bool?)null);
 				// 복도 벽선(앞벽에서 setback + recess만큼 복도 쪽)의 문 구멍
 				float zl = -(slot.setback + slot.recess);
 				openings.Add(new[] { pos + rot * new Vector3(a, 0f, zl), pos + rot * new Vector3(b, 0f, zl) });
+				// 방 앞벽 자리에도 (화장실처럼 앞 공간 안쪽으로 들어간 방은 문이 복도선이 아니라 여기 있음)
+				if (Mathf.Abs(zl) > 0.01f)
+					openings.Add(new[] { pos + rot * new Vector3(a, 0f, 0f), pos + rot * new Vector3(b, 0f, 0f) });
 				if (details != null && details.enabled)
 				{
 					if (classroom)
@@ -559,6 +569,11 @@ namespace NightPatrol
 							windowWall ? WindowBuilder.Inset(classroomWindows, slot.label) : 0f);
 						break;
 					}
+
+			// 강의실 천장 조명 + 앞문 옆 스위치
+			if (classroom && FloorDetailBuilder.WantsRoomLights(details, slot.label))
+				FloorDetailBuilder.RoomLights(root, slot.label, W, D, t, ceilingHeight,
+					windowWall ? WindowBuilder.Inset(classroomWindows, slot.label) : 0f, doors, details);
 
 			// 계단실: U자 계단·참·창
 			if (stairGen)
@@ -823,6 +838,7 @@ namespace NightPatrol
 				var holder = new GameObject($"Fire_{++k}").transform;
 				holder.SetParent(root, false);
 				if (fe.item == FireItem.Hydrant) FloorDetailBuilder.Hydrant(holder, p, q);
+				else if (fe.item == FireItem.HoseBox) FloorDetailBuilder.HoseBox(holder, p, q);
 				else FloorDetailBuilder.Extinguisher(holder, p, q);
 			}
 		}

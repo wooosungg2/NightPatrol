@@ -17,6 +17,9 @@ namespace NightPatrol
 	{
 		public bool enabled = true;
 		[Tooltip("문을 방 안쪽으로 여는지 (끄면 복도 쪽)")] public bool swingInward = true;
+		[Tooltip("불투명유리 양문(522 서쪽·523·524호)은 복도 쪽 오목한 칸으로 열림. 안으로 열면 문짝이 책상 쪽 통로를 막음")]
+		public bool glassDoubleOutward = true;
+		[Tooltip("계단실 문은 Swing Inward와 상관없이 계단실 안쪽으로 열림")] public bool stairDoorsInward = true;
 
 		[Header("치수")]
 		[Tooltip("문틀 폭(m)")] public float frameWidth = 0.05f;
@@ -53,8 +56,9 @@ namespace NightPatrol
 		static readonly Color TransomColor = new Color(0.42f, 0.46f, 0.50f);
 		static readonly Color KnobColor = new Color(0.78f, 0.78f, 0.80f);
 
+		/// <param name="inwardOverride">null이면 설정대로, 값이 있으면 그 방향 (계단실 등)</param>
 		public static Door Build(Transform slot, float w, float h, float t, DoorStyle style,
-								 DoorSettings s, string label)
+								 DoorSettings s, string label, bool? inwardOverride = null)
 		{
 			if (s == null || !s.enabled || style == DoorStyle.None || style == DoorStyle.Auto) return null;
 
@@ -95,7 +99,8 @@ namespace NightPatrol
 
 			// ── 문짝 ──
 			// 안쪽으로 열면 경첩이 방 쪽 면에, 바깥으로 열면 복도 쪽 면에
-			float zl = s.swingInward ? t - lt * 0.5f - 0.005f : lt * 0.5f + 0.005f;
+			bool inward = inwardOverride ?? (s.swingInward && !(style == DoorStyle.GlassDouble && s.glassDoubleOutward));
+			float zl = inward ? t - lt * 0.5f - 0.005f : lt * 0.5f + 0.005f;
 			float inner = w - 2f * fw;               // 문틀 안쪽 폭
 			var leaves = new List<Transform>();
 			var signs = new List<float>();
@@ -109,7 +114,7 @@ namespace NightPatrol
 				hinge.SetParent(root, false);
 				hinge.localPosition = new Vector3(-dir * (hw - fw), 0f, zl);
 				// 안쪽(+Z)으로 열리려면: 왼쪽 문짝은 음의 각도, 오른쪽은 양의 각도
-				signs.Add((s.swingInward ? -1f : 1f) * dir);
+				signs.Add((inward ? -1f : 1f) * dir);
 				leaves.Add(hinge);
 				BuildLeaf(hinge, style, dir, lw, leafH, lt, s);
 			}

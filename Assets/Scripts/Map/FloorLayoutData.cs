@@ -123,6 +123,7 @@ namespace NightPatrol
 		const float WIN_RAIL = 1.1f;         // 난간 높이
 		const float WIN_MARGIN = 0.2f;       // 창 양 끝 막힌 벽 길이
 		// 메인 복도 동쪽 끝 (512·513호 사이, 2026-10 파노라마 사진): 끝벽 통창 + 그 앞 천장 유리 지붕
+		const float HALL_WIN_MULLION = 1.1f; // 동쪽 홀 통창 세로 창살 간격
 		const float END_WIN_HEAD = 2.7f;     // 끝 창 윗선 (위는 흰 보)
 		const float END_WIN_MULLION = 1.2f;  // 2열
 		static readonly float[] END_WIN_TRANSOMS = { 1.1f, 2.0f };
@@ -207,6 +208,7 @@ namespace NightPatrol
 			public List<WindowWall> windowWalls = new List<WindowWall>(); // 창문이 있는 바깥벽
 			public List<Solid> solids = new List<Solid>();                // 그 밖의 상자 (발코니 난간벽·바닥 등)
 			public List<Rect> skylights = new List<Rect>();               // 천장이 뚫리고 유리 지붕이 있는 곳 (x, z, 폭, 깊이)
+			public Rect hallNorth, hallSouth;                             // 동쪽 홀 (자판기 쪽 / 학습공간 쪽). 크기 0이면 없음
 		}
 
 		/// <summary>
@@ -479,8 +481,13 @@ namespace NightPatrol
 			// 창문 북쪽 ~ 528호·523호: 막힌 벽. 서쪽은 528호 앞 회색 벽과 이어지는 두꺼운 벽(세로 복도 벽선까지)
 			Wall(f, f.wingX, loungeZ1, f.wingX, C + WING_ROOMS, W, RECESS);
 			Wall(f, wingEastX, loungeZ1, wingEastX, C + WING_ROOMS, E);
-			Wall(f, hallN, C + HALL_N_DEPTH, hallN + HALL, C + HALL_N_DEPTH, N);     // 홀 북쪽
-			Wall(f, hallS, -HALL_S_DEPTH, core0, -HALL_S_DEPTH, Sd);                 // 홀 남쪽
+			// 동쪽 홀 (2026-10 사진): 북쪽(518호~동쪽 계단) = 자판기·분리수거, 남쪽(508호~동쪽 여자화장실) = 학습공간. 바깥쪽은 통창 + 난간
+			f.windowWalls.Add(new WindowWall("Window_Hall_N", hallN, C + HALL_N_DEPTH, hallN + HALL, C + HALL_N_DEPTH, N,
+				WIN_SILL, WIN_HEAD, WIN_MARGIN).Frame(HALL_WIN_MULLION, WIN_TRANSOMS, WIN_RAIL));
+			f.windowWalls.Add(new WindowWall("Window_Hall_S", hallS, -HALL_S_DEPTH, core0, -HALL_S_DEPTH, Sd,
+				WIN_SILL, WIN_HEAD, WIN_MARGIN).Frame(HALL_WIN_MULLION, WIN_TRANSOMS, WIN_RAIL));
+			f.hallNorth = new Rect(hallN, C, HALL, HALL_N_DEPTH);
+			f.hallSouth = new Rect(hallS, -HALL_S_DEPTH, core0 - hallS, HALL_S_DEPTH);
 																					 // 동쪽 코어: 엘리베이터 서쪽은 막힌 블록(PS 등), 남자화장실 앞 공간은 509호 쪽 끝으로만 드나듦
 			Wall(f, core0, -CORE_DEPTH, core0, 0f, E, F_WALL_E);                    // 홀과 여자 통로·화장실 사이 두꺼운 벽 (복도선 ~ 뒷벽)
 			Wall(f, blockL, 0f, elevStart, 0f, Sd);                                  // 엘리베이터 옆 블록 앞면 (EQ)

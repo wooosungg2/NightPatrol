@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace NightPatrol
 {
-	public enum FireItem { Extinguisher, Hydrant }
+	public enum FireItem { Extinguisher, Hydrant, HoseBox }
 
 	/// <summary>문 기준 위치 (복도 방향 축: 메인 복도 = 동쪽 +, 날개 복도 = 북쪽 +)</summary>
 	public enum FireAnchor { FirstDoor, LastDoor, LeftWallOutside, RightWallOutside }
@@ -44,6 +44,13 @@ namespace NightPatrol
 		[Tooltip("복도 구간마다 벽 스위치 (E로 그 구간 등을 끄고 켬)")] public bool lightSwitches = true;
 		[Tooltip("스위치 높이(m)")] public float switchHeight = 1.2f;
 
+		[Header("강의실 천장 조명 + 앞문 옆 안쪽 스위치")]
+		public bool roomLights = true;
+		[Tooltip("조명을 다는 방 (호수). 비우거나 All Classrooms를 켜면 모든 강의실·연구실")]
+		public string[] roomLightRooms = { "521", "524" };
+		[Tooltip("모든 강의실·연구실에 조명 (Light가 많아져서 무거울 수 있음)")] public bool allClassrooms = false;
+		[Tooltip("방 안 등 간격(m)")] public float roomLightSpacing = 3.0f;
+
 		[Header("걸레받이 (복도 벽 아래 검은 띠)")]
 		public bool baseboards = true;
 		public float baseboardHeight = 0.1f;
@@ -61,6 +68,9 @@ namespace NightPatrol
 		[Header("비상구 유도등 (계단실 문 위)")]
 		public bool exitSigns = true;
 
+		[Header("동쪽 홀 (사진): 북쪽 자판기·분리수거, 남쪽 학습공간")]
+		public bool hallProps = true;
+
 		public static List<FireEquipment> DefaultFireItems() => new List<FireEquipment>
 		{
 			// 메인 복도 북쪽 (방 안 문 옆)
@@ -71,9 +81,10 @@ namespace NightPatrol
 			new FireEquipment("502", FireItem.Hydrant, FireAnchor.FirstDoor, 2.3f, false),       // 복도 소화전
 			new FireEquipment("502", FireItem.Extinguisher, FireAnchor.FirstDoor, 3.2f, false),
 			new FireEquipment("504", FireItem.Extinguisher, FireAnchor.LastDoor, -0.3f, true),
-			// 동쪽 계단실 서쪽 벽 (홀 쪽)
-			new FireEquipment("Stair-E", FireItem.Extinguisher, FireAnchor.LeftWallOutside, 0.4f, false),
-			new FireEquipment("Stair-E", FireItem.Hydrant, FireAnchor.LeftWallOutside, 1.4f, false),
+			// 동쪽 계단실 서쪽 벽 (홀 쪽, 사진): 복도 쪽부터 소화전 · 방수용기구함 · 소화기
+			new FireEquipment("Stair-E", FireItem.Hydrant, FireAnchor.LeftWallOutside, 0.7f, false),
+			new FireEquipment("Stair-E", FireItem.HoseBox, FireAnchor.LeftWallOutside, 1.6f, false),
+			new FireEquipment("Stair-E", FireItem.Extinguisher, FireAnchor.LeftWallOutside, 2.3f, false),
 			// 날개 복도 (북쪽 +)
 			new FireEquipment("525", FireItem.Extinguisher, FireAnchor.FirstDoor, -0.3f, true),
 			new FireEquipment("524", FireItem.Extinguisher, FireAnchor.LastDoor, -0.3f, true),
@@ -163,6 +174,53 @@ namespace NightPatrol
 				l.color = s.lightColor;
 				l.shadows = LightShadows.None;
 			}
+		}
+
+		public static bool WantsRoomLights(FloorDetailSettings s, string label)
+		{
+			if (s == null || !s.enabled || !s.roomLights) return false;
+			if (s.allClassrooms || s.roomLightRooms == null || s.roomLightRooms.Length == 0) return true;
+			foreach (var r in s.roomLightRooms) if (r == label) return true;
+			return false;
+		}
+
+		// ── 강의실 천장 조명: 방 로컬 (X = 폭, Z = 앞벽 0 → 창문 D). 방 전체가 LightZone 하나, 앞문 옆 안쪽 벽에 스위치 ──
+		/// <param name="backInset">창문 벽에서 튀어나온 깊이 (그만큼 등 배치에서 뺌)</param>
+		public static Lighting.LightZone RoomLights(Transform room, string label, float W, float D, float t, float ceilingH,
+													float backInset, IList<Vector2> doors, FloorDetailSettings s)
+		{
+			var g = Group(room, "RoomLights");
+			float xin = W * 0.5f - t, z0 = t, z1 = D - t - Mathf.Max(0f, backInset);
+			float sp = Mathf.Max(1.5f, s.roomLightSpacing);
+			int nx = Mathf.Max(1, Mathf.RoundToInt(2f * xin / sp)), nz = Mathf.Max(1, Mathf.RoundToInt((z1 - z0) / sp));
+			float dx = 2f * xin / nx, dz = (z1 - z0) / nz;
+			for (int i = 0; i < nx; i++)
+				for (int k = 0; k < nz; k++)
+					Fixture(g, $"Light_{i + 1}_{k + 1}", new Vector3(-xin + (i + 0.5f) * dx, ceilingH, z0 + (k + 0.5f) * dz), true, s);
+			var zone = g.gameObject.AddComponent<Lighting.LightZone>();
+			zone.Collect();
+
+			// 스위치: 첫 문(앞문) 옆, 방 가운데 반대쪽(옆벽 쪽) 안쪽 면. 분전반은 방 가운데 쪽에 있어서 안 겹침
+			if (s.lightSwitches && doors != null && doors.Count > 0)
+			{
+				var d = doors[0];
+				bool rightDoor = d.x + d.y > 0f;
+				float sx = rightDoor ? d.y + 0.2f : d.x - 0.2f;
+				if (sx > xin - 0.1f || sx < -xin + 0.1f) sx = rightDoor ? d.x - 0.2f : d.y + 0.2f;   // 옆벽에 붙어 자리가 없으면 반대쪽
+				var sw = new GameObject($"Switch_{label}").transform;
+				sw.SetParent(g, false);
+				sw.localPosition = new Vector3(sx, s.switchHeight + 0.1f, t + 0.006f);   // 앞벽 안쪽 면, 방 안을 봄 (+Z)
+				var plate = Box(sw, "Plate", new Vector3(0f, 0f, 0.006f), new Vector3(0.09f, 0.13f, 0.012f), null, PlateWhite);
+				plate.isStatic = false;
+				var rocker = new GameObject("Rocker").transform;
+				rocker.SetParent(sw, false);
+				rocker.localPosition = new Vector3(0f, 0f, 0.014f);
+				var key = Box(rocker, "Key", Vector3.zero, new Vector3(0.04f, 0.07f, 0.01f), null, new Color(0.88f, 0.88f, 0.86f));
+				key.isStatic = false;
+				NoCol(key);
+				sw.gameObject.AddComponent<Lighting.LightSwitch>().Setup(zone, rocker);
+			}
+			return zone;
 		}
 
 		// ── 복도 벽 구간: 복도 사각형 가장자리 중 다른 복도와 맞닿지 않고 문 구멍도 아닌 곳 ──
@@ -358,6 +416,120 @@ namespace NightPatrol
 				st.transform.localRotation = Quaternion.Euler(0f, 45f, 0f);
 				NoCol(st);
 			}
+		}
+
+		// ── 방수용기구함 (스테인리스 함, 비상벨 없음). 앞 = 로컬 +Z ──
+		public static void HoseBox(Transform parent, Vector3 pos, Quaternion rot)
+		{
+			var g = Group(parent, "HoseBox");
+			g.localPosition = pos; g.localRotation = rot;
+			Box(g, "Cabinet", new Vector3(0f, 0.95f, 0.05f), new Vector3(0.6f, 1.2f, 0.1f), null, Stainless);
+			NoCol(Box(g, "Handle", new Vector3(-0.2f, 0.95f, 0.103f), new Vector3(0.02f, 0.12f, 0.006f), null, BaseBlack));
+			NoCol(Box(g, "Hazard", new Vector3(0f, 0.002f, 0.5f), new Vector3(0.7f, 0.004f, 0.7f), null, HazardYellow));
+		}
+
+		// ── 동쪽 홀 소품 (2026-10 사진) ──
+		/// <param name="north">518호 ~ 동쪽 계단 사이 (x = 서쪽 518호 벽 → 동쪽 계단실 벽, z = 복도선 → 북쪽 통창)</param>
+		/// <param name="south">508호 ~ 동쪽 여자화장실 사이 (z = 남쪽 통창 → 복도선)</param>
+		public static void HallProps(Transform parent, Rect north, Rect south, FloorDetailSettings s)
+		{
+			if (s == null || !s.enabled || !s.hallProps) return;
+			var root = Group(parent, "HallProps");
+			if (north.width > 0.5f && north.height > 0.5f) HallNorth(root, north);
+			if (south.width > 0.5f && south.height > 0.5f) HallSouth(root, south);
+		}
+
+		static Transform Item(Transform parent, string name, Vector3 pos, float yaw)
+		{
+			var g = Group(parent, name);
+			g.localPosition = pos;
+			g.localRotation = Quaternion.Euler(0f, yaw, 0f);   // 로컬 +Z = 앞면
+			return g;
+		}
+
+		static void HallNorth(Transform root, Rect r)
+		{
+			var g = Group(root, "Hall_North");
+			Color green = new Color(0.10f, 0.45f, 0.22f), wood = new Color(0.45f, 0.26f, 0.14f), white = new Color(0.93f, 0.93f, 0.92f);
+			// 서쪽 벽(518호 쪽)을 따라 복도 쪽부터: 자판기 · 나무 캐비닛 · 휴지통 · 정수기 (앞 = 동쪽)
+			var vm = Item(g, "VendingMachine", new Vector3(r.xMin + 0.4f, 0f, r.yMin + 1.3f), 90f);
+			Box(vm, "Body", new Vector3(0f, 0.92f, 0f), new Vector3(0.95f, 1.83f, 0.75f), null, green);
+			NoCol(Box(vm, "Display", new Vector3(-0.05f, 1.35f, 0.376f), new Vector3(0.7f, 0.75f, 0.004f), null, new Color(0.92f, 0.95f, 0.97f)));
+			NoCol(Box(vm, "Ad", new Vector3(-0.15f, 0.75f, 0.376f), new Vector3(0.4f, 0.3f, 0.004f), null, new Color(0.25f, 0.70f, 0.30f)));
+			NoCol(Box(vm, "Slot", new Vector3(-0.05f, 0.25f, 0.376f), new Vector3(0.55f, 0.18f, 0.004f), null, BaseBlack));
+			NoCol(Box(vm, "Side", new Vector3(-0.476f, 0.92f, 0f), new Vector3(0.004f, 1.8f, 0.7f), null, new Color(0.12f, 0.20f, 0.45f)));
+			var glow = new GameObject("Glow").AddComponent<Light>();          // 어두워도 자판기 불빛은 남음
+			glow.transform.SetParent(vm, false);
+			glow.transform.localPosition = new Vector3(0f, 1.3f, 0.7f);
+			glow.type = LightType.Point; glow.range = 2.5f; glow.intensity = 0.6f; glow.color = new Color(0.85f, 0.95f, 1f);
+			glow.shadows = LightShadows.None;
+
+			var cab = Item(g, "Cabinet", new Vector3(r.xMin + 0.25f, 0f, r.yMin + 2.3f), 90f);
+			Box(cab, "Body", new Vector3(0f, 0.9f, 0f), new Vector3(0.9f, 1.8f, 0.45f), null, wood);
+			NoCol(Box(cab, "Seam", new Vector3(0f, 0.9f, 0.226f), new Vector3(0.01f, 1.7f, 0.004f), null, BaseBlack));
+			NoCol(Box(cab, "Handles", new Vector3(0f, 1.0f, 0.235f), new Vector3(0.08f, 0.14f, 0.02f), null, Stainless));
+
+			var bin = Item(g, "TrashBin", new Vector3(r.xMin + 0.2f, 0f, r.yMax - 1.0f), 90f);
+			Box(bin, "Body", new Vector3(0f, 0.2f, 0f), new Vector3(0.28f, 0.4f, 0.28f), null, new Color(0.15f, 0.45f, 0.80f));
+			var wp = Item(g, "WaterPurifier", new Vector3(r.xMin + 0.22f, 0f, r.yMax - 0.6f), 90f);
+			Box(wp, "Body", new Vector3(0f, 0.65f, 0f), new Vector3(0.34f, 1.3f, 0.4f), null, white);
+
+			// 북쪽 통창 난간 앞, 동쪽(계단실) 쪽부터 분리수거함 4개 (앞 = 남쪽)
+			Color[] cols = { new Color(0.55f, 0.32f, 0.28f), new Color(0.12f, 0.12f, 0.13f), new Color(0.85f, 0.86f, 0.88f), new Color(0.15f, 0.40f, 0.75f) };
+			for (int k = 0; k < cols.Length; k++)
+			{
+				var rb = Item(g, $"RecycleBin_{k + 1}", new Vector3(r.xMax - 0.55f - k * 0.62f, 0f, r.yMax - 0.4f), 180f);
+				if (k == cols.Length - 1)
+				{
+					var cyl = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+					cyl.name = "Body"; cyl.isStatic = true;
+					cyl.transform.SetParent(rb, false);
+					cyl.transform.localPosition = new Vector3(0f, 0.4f, 0f);
+					cyl.transform.localScale = new Vector3(0.5f, 0.4f, 0.5f);
+					DoorBuilder.Paint(cyl.GetComponent<Renderer>(), null, cols[k]);
+				}
+				else Box(rb, "Body", new Vector3(0f, 0.4f, 0f), new Vector3(0.5f, 0.8f, 0.4f), null, cols[k]);
+			}
+		}
+
+		static void HallSouth(Transform root, Rect r)
+		{
+			var g = Group(root, "Hall_South_Study");
+			Color top = new Color(0.86f, 0.76f, 0.58f), leg = new Color(0.92f, 0.92f, 0.91f), seat = new Color(0.45f, 0.45f, 0.47f),
+				  wood = new Color(0.70f, 0.55f, 0.36f), vinyl = new Color(0.42f, 0.43f, 0.45f);
+			float zEnd = r.yMax - 0.6f;                       // 학습공간 바닥이 끝나는 선 (복도 쪽)
+			// 학습공간 회색 바닥 + 금속 띠
+			NoCol(Box(g, "Floor_Vinyl", new Vector3(r.center.x, 0.003f, (r.yMin + zEnd) * 0.5f), new Vector3(r.width - 0.1f, 0.006f, zEnd - r.yMin), null, vinyl));
+			NoCol(Box(g, "Floor_Edge", new Vector3(r.center.x, 0.004f, zEnd), new Vector3(r.width - 0.1f, 0.008f, 0.04f), null, Stainless));
+
+			// 긴 탁자 2개 (창과 수직) + 양쪽 의자 3개씩
+			float tz = r.yMin + 0.55f + 1.2f;
+			foreach (float fx in new[] { 0.3f, 0.7f })
+			{
+				float tx = r.xMin + r.width * fx;
+				var t = Item(g, fx < 0.5f ? "Table_W" : "Table_E", new Vector3(tx, 0f, tz), 0f);
+				Box(t, "Top", new Vector3(0f, 0.725f, 0f), new Vector3(0.8f, 0.03f, 2.4f), null, top);
+				foreach (float lx in new[] { -0.36f, 0.36f })
+					foreach (float lz in new[] { -1.15f, 1.15f })
+						NoCol(Box(t, "Leg", new Vector3(lx, 0.355f, lz), new Vector3(0.04f, 0.71f, 0.04f), null, leg));
+				for (int side = -1; side <= 1; side += 2)
+					for (int k = -1; k <= 1; k++)
+					{
+						var c = Item(g, "Chair", new Vector3(tx + side * 0.62f, 0f, tz + k * 0.8f), side > 0 ? -90f : 90f);
+						NoCol(Box(c, "Seat", new Vector3(0f, 0.46f, 0f), new Vector3(0.48f, 0.08f, 0.46f), null, seat));
+						NoCol(Box(c, "Back", new Vector3(0f, 0.68f, -0.21f), new Vector3(0.5f, 0.32f, 0.06f), null, seat));
+						NoCol(Box(c, "Leg", new Vector3(0f, 0.21f, 0f), new Vector3(0.04f, 0.42f, 0.04f), null, new Color(0.10f, 0.10f, 0.11f)));
+					}
+			}
+
+			// 동쪽 벽(여자화장실 쪽): 나무 판 + 유리 화이트보드 (앞 = 서쪽)
+			float wz0 = r.yMin + 0.15f, wz1 = zEnd;
+			var wall = Item(g, "Wall_Wood", new Vector3(r.xMax - 0.01f, 0f, (wz0 + wz1) * 0.5f), -90f);
+			NoCol(Box(wall, "Panel", new Vector3(0f, 1.45f, 0f), new Vector3(wz1 - wz0, 2.9f, 0.02f), null, wood));
+			NoCol(Box(wall, "GlassBoard", new Vector3(0f, 1.45f, 0.015f), new Vector3(Mathf.Min(2.6f, wz1 - wz0 - 0.4f), 1.1f, 0.01f), null, new Color(0.95f, 0.96f, 0.96f)));
+			// 서쪽 벽(508호 쪽) 안내판
+			var sign = Item(g, "Sign", new Vector3(r.xMin + 0.01f, 0f, zEnd - 0.6f), 90f);
+			NoCol(Box(sign, "Plate", new Vector3(0f, 1.65f, 0f), new Vector3(0.32f, 0.22f, 0.01f), null, new Color(0.90f, 0.85f, 0.70f)));
 		}
 
 		// ── 비상구 유도등 (초록 상자). 앞 = 로컬 +Z ──

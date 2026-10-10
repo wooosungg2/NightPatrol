@@ -10,6 +10,15 @@ namespace NightPatrol
 	/// 일반 강의실 설정 (단은 선택). 앞(교탁·칠판)이 방의 짧은 옆벽 쪽에 있고,
 	/// 좌석 줄은 방 길이 방향으로 뒤로 늘어서며 복도 쪽·가운데·창가 쪽 세 열로 나뉜다. (524호 사진 기준)
 	/// </summary>
+	/// <summary>fromRow ~ toRow 행(1부터)의 열마다 책상 수</summary>
+	[System.Serializable]
+	public class RowColumns
+	{
+		[Min(1)] public int fromRow = 1;
+		[Min(1)] public int toRow = 1;
+		[Tooltip("복도 쪽 → 창가 쪽")] public int[] columns = { 2, 3, 2 };
+	}
+
 	[System.Serializable]
 	public class LectureRoomSettings
 	{
@@ -19,7 +28,13 @@ namespace NightPatrol
 
 		[Header("좌석 (1행 = 칠판에 가장 가까운 줄)")]
 		[Min(1)] public int rows = 11;
-		[Tooltip("열마다 책상 수 (복도 쪽 → 창가 쪽)")] public int[] columns = { 2, 3, 2 };
+		[Tooltip("열마다 책상 수 (복도 쪽 → 창가 쪽). Row Columns에 없는 행은 이 구성")] public int[] columns = { 2, 3, 2 };
+		[Tooltip("행마다 다른 열 구성 (복도 쪽 → 창가 쪽). 524호: 1~4행 2·2·3, 5행 2·2·2")]
+		public List<RowColumns> rowColumns = new List<RowColumns>
+		{
+			new RowColumns { fromRow = 1, toRow = 4, columns = new[] { 2, 2, 3 } },
+			new RowColumns { fromRow = 5, toRow = 5, columns = new[] { 2, 2, 2 } },
+		};
 		[Tooltip("뒷문 앞 행 (1부터). 이 행은 복도 쪽 열이 비고, 대신 가운데 열이 복도 쪽으로 한 자리 늘어남")]
 		public int[] doorRows = { 9, 10 };
 		[Tooltip("뒷문 앞 행에서 가운데 열에 한 자리 더 (사진: 3자리 → 4자리)")] public bool doorRowExtraSeat = true;
@@ -118,6 +133,31 @@ namespace NightPatrol
 				colStart[c] = zc;
 				zc += s.columns[c] * s.deskWidth + inner;
 			}
+			// 행마다 열 구성 (Row Columns). 복도 쪽 열은 복도 벽, 창가 쪽 열은 창가 벽에 붙이고,
+			// 가운데 열은 기본 구성(Columns)의 가운데 열 중심에 맞춰서 통로가 줄마다 같은 자리에 오게 함
+			int[] ColsFor(int r)
+			{
+				if (s.rowColumns != null)
+					foreach (var rc in s.rowColumns)
+						if (rc != null && rc.columns != null && rc.columns.Length > 0 && r + 1 >= rc.fromRow && r + 1 <= rc.toRow)
+							return rc.columns;
+				return s.columns;
+			}
+			// 줄마다: 복도 쪽 열은 복도 벽, 창가 쪽 열은 창가 벽에 붙이고 남는 폭을 열 사이 통로로 똑같이 나눔
+			// (자리 수가 늘어난 열 옆 통로가 좁아지지 않게)
+			var warnedRows = new HashSet<string>();
+			float ColStart(int[] cols, int c)
+			{
+				int tot = 0; foreach (int v in cols) tot += Mathf.Max(0, v);
+				int k = cols.Length;
+				float inn = k > 1 ? ((zc1 - zc0) - tot * s.deskWidth - 2f * s.wallGap) / (k - 1) : 0f;
+				string key = string.Join(",", cols);
+				if (inn < 0.65f && warnedRows.Add(key))
+					Debug.LogWarning($"[Lecture] {label}: 열 구성 {key}의 열 사이 통로가 {inn:0.##}m라 플레이어가 못 지나갈 수 있음", ctx);
+				float z = zc0 + s.wallGap;
+				for (int j = 0; j < c; j++) z += Mathf.Max(0, cols[j]) * s.deskWidth + inn;
+				return z;
+			}
 			float laneEnd = nc > 1 ? colStart[1] : zc1;   // 경사로가 끝나는 선 (가운데 열 앞)
 
 			// ── 행 (X) ──
@@ -182,7 +222,8 @@ namespace NightPatrol
 			{
 				if (IsDoorRow(r)) return true;
 				if (!hasRamp) return false;
-				float a0 = RowS(r) - s.deskDepth * 0.5f - s.chairOffset - 0.25f, a1 = RowS(r) + s.deskDepth * 0.5f;
+				// 책상 앞 모서리 ~ 의자 등받이 (의자는 뒤쪽 = 앞벽에서 먼 쪽)
+				float a0 = RowS(r) - s.deskDepth * 0.5f, a1 = RowS(r) + s.chairOffset + 0.25f;
 				return a1 > rs0 && a0 < rs1;
 			}
 
@@ -241,15 +282,17 @@ namespace NightPatrol
 				float y = Level(r) * s.stepRise;
 				var row = Group(seats, $"Row_{r + 1}");
 				int n = 0;
-				bool blocked = nc > 1 && CorridorSeatBlocked(r);
-				for (int c = 0; c < nc; c++)
+				int[] cols = ColsFor(r);
+				int ncr = cols.Length;
+				bool blocked = ncr > 1 && CorridorSeatBlocked(r);
+				for (int c = 0; c < ncr; c++)
 				{
-					if (c == 0 && blocked) { n += s.columns[c]; continue; }
+					if (c == 0 && blocked) { n += cols[c]; continue; }
 					// 뒷문 앞 행: 가운데 열이 복도 쪽으로 한 자리 더
 					int extra = c == 1 && IsDoorRow(r) && s.doorRowExtraSeat ? 1 : 0;
-					for (int k = -extra; k < s.columns[c]; k++, n++)
+					for (int k = -extra; k < cols[c]; k++, n++)
 					{
-						float z = colStart[c] + (k + 0.5f) * s.deskWidth;
+						float z = ColStart(cols, c) + (k + 0.5f) * s.deskWidth;
 						Seat(row, $"Seat_{r + 1}_{n + 1:00}", new Vector3(X(RowS(r)), y, z), faceFront, s);
 					}
 				}
@@ -300,7 +343,9 @@ namespace NightPatrol
 					Box(tv, "Mount", new Vector3(0f, -0.2f, -0.03f), new Vector3(0.06f, 0.4f, 0.06f), null, RailBlack);
 					Box(tv, "Body", new Vector3(0f, -0.72f, 0f), new Vector3(1.25f, 0.72f, 0.06f), null, RailBlack);
 					// 화면 (이상현상 쪽에서 재질만 바꾸면 됨)
-					Box(tv, "Screen", new Vector3(0f, -0.72f, 0.032f), new Vector3(1.19f, 0.66f, 0.004f), null, new Color(0.04f, 0.04f, 0.05f));
+					var scr = Box(tv, "Screen", new Vector3(0f, -0.72f, 0.032f), new Vector3(1.19f, 0.66f, 0.004f), null, new Color(0.04f, 0.04f, 0.05f));
+					// 점검 대상 (정상 = 꺼짐). Id = R24.TV.01, 02
+					tv.gameObject.AddComponent<MonitorDevice>().Setup(label, "TV", scr.GetComponent<Renderer>());
 				}
 			}
 
