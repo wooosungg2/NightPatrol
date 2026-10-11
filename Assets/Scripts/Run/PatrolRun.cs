@@ -6,7 +6,8 @@ using UnityEngine;
 
 namespace NightPatrol.Run
 {
-    // 층 진행·실패·회차. 층은 같은 씬을 다시 쓰고, 층이 바뀔 때마다 사물을 처음 상태로 되돌린다
+    // 층 진행·실패·회차. 층은 같은 씬을 다시 쓰고, 층이 바뀔 때마다 사물을 처음 상태로 되돌린다.
+    // 이벤트 구독자(이상현상 등)에서 예외가 나도 콘솔에 남기고 나머지 구독자와 층 진행은 끝까지 간다 (SafeEvent)
     [DisallowMultipleComponent]
     public sealed class PatrolRun : MonoBehaviour
     {
@@ -23,15 +24,21 @@ namespace NightPatrol.Run
         private int step;
         private Pose? spawn;
 
+        /// <summary>지금 층 번호</summary>
         public int CurrentFloor => floors[step];
+        /// <summary>회차 (1부터, 실패할 때마다 +1)</summary>
         public int Attempt { get; private set; } = 1;
+        /// <summary>마지막 층(1층)에 도착했는지</summary>
         public bool IsCleared { get; private set; }
         /// <summary>실패한 층, 실패한 순서대로 (일지 첫 장용)</summary>
         public IReadOnlyList<int> FailedFloors => failedFloors;
+        /// <summary>지금 첫 층(보통 5층)인지 — 일지 첫 장 표시용</summary>
+        public bool IsFirstFloor => step == 0;
         /// <summary>사물 초기화 직후, 점검 항목 생성 전. 이상현상·표지판·조명은 여기서 바꾼다</summary>
         public event Action<int> FloorStarted;
         /// <summary>실패한 층. 바로 이어서 첫 층의 FloorStarted가 온다</summary>
         public event Action<int> Failed;
+        /// <summary>마지막 층 도착. 이때는 FloorStarted가 오지 않는다</summary>
         public event Action Cleared;
 
         private void Awake()
@@ -50,11 +57,13 @@ namespace NightPatrol.Run
             StartFloor();
         }
 
+        /// <summary>판정 후 하행 또는 실패 (엘리베이터가 부름)</summary>
         public void TryDescend()
         {
             if (!IsCleared) Descend(PatrolInspection.IsAllClear());
         }
 
+        /// <summary>판정 결과를 직접 넣어 하행(true) 또는 실패(false). 테스트·개발자 메뉴용</summary>
         public void Descend(bool allClear)
         {
             if (IsCleared) return;
@@ -68,6 +77,7 @@ namespace NightPatrol.Run
             else StartFloor();
         }
 
+        /// <summary>실패: 실패한 층 기록, 회차 +1, 시작 자리로 이동 후 첫 층부터</summary>
         public void Fail()
         {
             if (IsCleared) return;
@@ -81,7 +91,7 @@ namespace NightPatrol.Run
                 else if (spawn.HasValue) player.Teleport(spawn.Value.position, spawn.Value.rotation);
             }
             Debug.Log($"[Run] {failedFloor}층 실패", this);
-            Raise(Failed, failedFloor);
+            SafeEvent.Raise(Failed, failedFloor, this);
             StartFloor();
         }
 
@@ -108,7 +118,7 @@ namespace NightPatrol.Run
             {
                 if (obj == null) continue;
                 obj.ResetToDefault();
-                obj.ClearAnomalies();
+                obj.ClearFloorState();
             }
         }
 
@@ -121,7 +131,7 @@ namespace NightPatrol.Run
             WarnAbnormalAfterReset();
 #endif
             Debug.Log($"[Run] {CurrentFloor}층 시작 ({Attempt}회차)", this);
-            Raise(FloorStarted, CurrentFloor);
+            SafeEvent.Raise(FloorStarted, CurrentFloor, this);
             if (tasks == null) tasks = UnityEngine.Object.FindAnyObjectByType<FloorTasks>();
             if (tasks != null) tasks.Generate(CurrentFloor, Attempt);
         }
@@ -130,18 +140,7 @@ namespace NightPatrol.Run
         {
             IsCleared = true;
             Debug.Log($"[Run] {CurrentFloor}층 도착 — 클리어", this);
-            Cleared?.Invoke();
-        }
-
-        // 구독한 쪽(이상현상 등)에서 예외가 나도 나머지 구독자와 층 진행은 끝까지 간다. 예외는 콘솔에 그대로 뜬다
-        private void Raise(Action<int> evt, int floor)
-        {
-            if (evt == null) return;
-            foreach (Action<int> handler in evt.GetInvocationList())
-            {
-                try { handler(floor); }
-                catch (Exception e) { Debug.LogException(e, this); }
-            }
+            SafeEvent.Raise(Cleared, this);
         }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD

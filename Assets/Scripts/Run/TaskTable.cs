@@ -16,6 +16,8 @@ namespace NightPatrol.Run
             public string label;
             [Tooltip("대상 사물 Id. 여러 개면 그중 하나만 비정상이 된다 (예: 교수실 문들 → 교수실 구역 잠금 확인)")]
             public string[] ids;
+            [Tooltip("예외 지시: 대상을 비정상 상태로 두고, 이번 층에는 그 상태가 정상 (예: 521호 강사 PC는 끄지 말 것)")]
+            public bool exception;
         }
 
         [Tooltip("위에서부터 일지에 적히는 순서 (권장 순찰 순서대로)")]

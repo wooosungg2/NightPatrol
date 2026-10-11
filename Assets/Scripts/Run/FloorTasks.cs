@@ -17,9 +17,14 @@ namespace NightPatrol.Run
         [Tooltip("0이면 매번 다른 랜덤. 0이 아니면 같은 층·회차에 항상 같은 항목")]
         [SerializeField] private int seed = 0;
 
+        /// <summary>층마다 뽑는 최대 개수 (일지 "N건 이하" 표시용)</summary>
+        public int MaxTasks => maxTasks;
+        /// <summary>이번 층 점검 항목 (표 순서)</summary>
         public IReadOnlyList<PatrolTask> CurrentTasks { get; private set; } = Array.Empty<PatrolTask>();
+        /// <summary>점검 항목이 새로 정해졌을 때 (층 시작마다)</summary>
         public event Action<IReadOnlyList<PatrolTask>> TasksChanged;
 
+        /// <summary>표에서 항목을 뽑아 대상 사물을 비정상으로 만든다. 층 시작 때 PatrolRun이 부름</summary>
         public void Generate(int floor, int attempt)
         {
             var tasks = new List<PatrolTask>();
@@ -41,9 +46,9 @@ namespace NightPatrol.Run
                     if (entry != null && chosen.TryGetValue(entry, out var task)) tasks.Add(task);
             }
             CurrentTasks = tasks.AsReadOnly();
-            TasksChanged?.Invoke(CurrentTasks);
+            SafeEvent.Raise(TasksChanged, CurrentTasks, this);
             Debug.Log($"[Tasks] {floor}층 점검 항목 {CurrentTasks.Count}개: " +
-                string.Join(", ", CurrentTasks.Select(t => $"{t.Label}({t.Target.Id})")), this);
+                string.Join(", ", CurrentTasks.Select(t => $"{t.Label}({t.Target.Id}){(t.IsException ? " [예외]" : "")}")), this);
         }
 
         // 항목의 대상 중 정상인 사물 하나를 비정상으로 만든다. 하나도 안 되면 false (다른 항목을 뽑음)
@@ -53,12 +58,14 @@ namespace NightPatrol.Run
             var targets = new List<PatrolObject>();
             if (entry.ids != null)
                 foreach (var id in entry.ids)
-                    if (!string.IsNullOrEmpty(id) && map.TryGetValue(id, out var obj) && obj.IsClear)
+                    // 예외 지시 대상은 비정상인데도 IsClear라서 따로 빼야 같은 사물이 두 항목에 안 뽑힌다
+                    if (!string.IsNullOrEmpty(id) && map.TryGetValue(id, out var obj) && obj.IsClear && !obj.IsException)
                         targets.Add(obj);
             var hit = TaskPicker.Pick(targets, 1, o => o.TrySetAbnormal(), rng);
             if (hit.Count == 0) return false;
+            if (entry.exception) hit[0].IsException = true;   // 비정상 상태로 두는 게 이번 층의 정상
             string label = string.IsNullOrEmpty(entry.label) ? hit[0].Id : entry.label;
-            chosen[entry] = new PatrolTask(label, hit[0]);
+            chosen[entry] = new PatrolTask(label, hit[0], entry.exception);
             return true;
         }
 
@@ -77,13 +84,16 @@ namespace NightPatrol.Run
     // 이번 층 점검 항목 하나: 일지 문구 + 비정상으로 만든 사물
     public sealed class PatrolTask
     {
-        public PatrolTask(string label, PatrolObject target)
+        public PatrolTask(string label, PatrolObject target, bool isException = false)
         {
             Label = label;
             Target = target;
+            IsException = isException;
         }
 
         public string Label { get; }
         public PatrolObject Target { get; }
+        /// <summary>예외 지시 항목인지 (대상을 비정상 상태로 둬야 통과)</summary>
+        public bool IsException { get; }
     }
 }

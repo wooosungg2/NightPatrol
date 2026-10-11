@@ -12,17 +12,18 @@ namespace NightPatrol.Patrol
             if (objects == null) return result;
             foreach (var obj in objects)
             {
-                if (obj != null && obj.isActiveAndEnabled && obj.gameObject.activeInHierarchy && !obj.IsClear)
+                if (obj != null && obj.isActiveAndEnabled && !obj.IsClear)
                     result.Add(obj);
             }
             result.Sort((a, b) => StringComparer.Ordinal.Compare(a.Id, b.Id));
             return result;
         }
 
-        // Scene-wide inspection: do not call every frame.
+        /// <summary>씬의 켜진 점검 사물 중 비정상인 것 (Id 순). 씬 전체를 검색하므로 매 프레임 부르지 말 것</summary>
         public static List<PatrolObject> FindAbnormal() => FindAbnormal(
             UnityEngine.Object.FindObjectsByType<PatrolObject>(FindObjectsInactive.Exclude));
 
+        /// <summary>켜진 점검 사물이 전부 정상인지 (엘리베이터 판정)</summary>
         public static bool IsAllClear() => FindAbnormal().Count == 0;
 
         // Id → 사물. 기본은 켜진 사물만. Id가 빈 사물은 건너뛰고, 중복 Id는 경고 후 먼저 찾은 것만 쓴다
