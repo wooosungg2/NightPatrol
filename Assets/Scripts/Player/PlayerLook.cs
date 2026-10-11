@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -10,8 +11,12 @@ namespace NightPatrol.Player
         [SerializeField] private PlayerSettings settings;
         [SerializeField] private Transform cameraTransform;
         [SerializeField] private InputActionReference lookAction;
+        private readonly HashSet<object> blockers = new HashSet<object>();
         private InputAction look;
         private float pitch;
+
+        /// <summary>True while any owner blocks looking around. Cursor lock handling still works.</summary>
+        public bool IsBlocked => blockers.Count > 0;
 
         private void Awake()
         {
@@ -51,6 +56,22 @@ namespace NightPatrol.Player
             Cursor.visible = !locked;
         }
 
+        /// <summary>Blocks per owner, so one owner releasing does not clear another owner's block.</summary>
+        public void SetBlocked(object owner, bool blocked)
+        {
+            if (owner == null) return;
+            if (blocked) blockers.Add(owner);
+            else blockers.Remove(owner);
+        }
+
+        /// <summary>Looks straight ahead (after a teleport).</summary>
+        public void ResetPitch()
+        {
+            if (cameraTransform == null) return;
+            pitch = 0f;
+            cameraTransform.localRotation = Quaternion.identity;
+        }
+
         private void Update()
         {
             if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
@@ -65,6 +86,7 @@ namespace NightPatrol.Player
                     SetCursorLocked(true);
                 return;
             }
+            if (IsBlocked) return;
 
             // Pointer delta is already a per-frame displacement; do not multiply by deltaTime.
             Vector2 delta = look.ReadValue<Vector2>() * settings.MouseSensitivity;

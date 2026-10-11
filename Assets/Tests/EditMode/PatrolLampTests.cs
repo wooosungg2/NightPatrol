@@ -77,6 +77,22 @@ namespace NightPatrol.Tests
         }
 
         [Test]
+        public void TrySetAbnormal_TurnsLightOn()
+        {
+            var lamp = CreateLamp(startsOn: false);
+            Assert.IsTrue(lamp.TrySetAbnormal());
+            Assert.IsTrue(light.enabled);
+            Assert.IsFalse(lamp.IsNormal);
+        }
+
+        [Test]
+        public void TrySetAbnormal_WithoutLight_ReturnsFalse()
+        {
+            var lamp = CreateLamp(startsOn: false, withLight: false);
+            Assert.IsFalse(lamp.TrySetAbnormal());
+        }
+
+        [Test]
         public void MissingLight_DoesNotThrow_AndIsNotNormal()
         {
             var lamp = CreateLamp(startsOn: true, withLight: false);

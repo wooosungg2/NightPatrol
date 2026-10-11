@@ -68,6 +68,13 @@ namespace NightPatrol.Tests
         }
 
         [Test]
+        public void Default_DoesNotSupportAbnormal()
+        {
+            Assert.IsFalse(obj.TrySetAbnormal());
+            Assert.IsTrue(obj.IsNormal);
+        }
+
+        [Test]
         public void NotNormal_WithoutAnomaly_IsNotClear()
         {
             obj.normal = false;
