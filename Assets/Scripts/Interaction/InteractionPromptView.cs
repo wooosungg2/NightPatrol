@@ -31,6 +31,9 @@ namespace NightPatrol.Interaction
         private PlayerInteractor subscribed;
         private string shownPrompt;
         private string keyName = "E";
+        private string cachedPrompt;
+        private string cachedKey;
+        private string cachedResult = string.Empty;
         private float pulseStartTime = float.NegativeInfinity;
 
         private void Awake()
@@ -70,7 +73,14 @@ namespace NightPatrol.Interaction
         {
             bool visible = IsVisible(interactor != null && interactor.isActiveAndEnabled,
                 interactor != null && interactor.IsBlocked, Cursor.lockState == CursorLockMode.Locked);
-            string prompt = WithKey(PromptFor(visible, interactor != null ? interactor.CurrentTarget : null), keyName);
+            string rawPrompt = PromptFor(visible, interactor != null ? interactor.CurrentTarget : null);
+            if (rawPrompt != cachedPrompt || keyName != cachedKey)
+            {
+                cachedPrompt = rawPrompt;
+                cachedKey = keyName;
+                cachedResult = WithKey(rawPrompt, keyName);
+            }
+            string prompt = cachedResult;
 
             if (crosshair != null)
             {

@@ -59,6 +59,11 @@ namespace NightPatrol.Menu
         private static readonly Row[] MainRows = { Row.Continue, Row.Settings, Row.Restart, Row.Quit };
         private static readonly Row[] SettingsRows =
             { Row.Sensitivity, Row.Volume, Row.ScreenMode, Row.Resolution, Row.FrameLimit, Row.Keys, Row.Back };
+        private static readonly Key[] UpKeys = { Key.W, Key.UpArrow };
+        private static readonly Key[] DownKeys = { Key.S, Key.DownArrow };
+        private static readonly Key[] LeftKeys = { Key.A, Key.LeftArrow };
+        private static readonly Key[] RightKeys = { Key.D, Key.RightArrow };
+        private static readonly Key[] ConfirmKeys = { Key.E, Key.Enter, Key.NumpadEnter, Key.Space };
         // ◀ ▶는 글자가 작아서 클릭 판정을 이만큼(메뉴 장 글자 단위) 넓힌다
         private const float ArrowPadding = 6f;
         // 클립보드 한 장에 들어가는 줄 수 (조작 키 장은 목록 + 기본값으로 + 뒤로)
@@ -81,6 +86,7 @@ namespace NightPatrol.Menu
         private readonly float[] lineTops = new float[MaxRows];
         private readonly float[] lineBottoms = new float[MaxRows];
         private PlayerMovement movement;
+        private PlayerControl control;
         private PlayerLook look;
         private PlayerInteractor interactor;
         private FloorTransition transition;
@@ -118,6 +124,7 @@ namespace NightPatrol.Menu
         {
             if (holder == null) holder = GetComponent<JournalHolder>();
             if (pointerCamera == null) pointerCamera = GetComponentInParent<Camera>();
+            control = GetComponentInParent<PlayerControl>();
             movement = GetComponentInParent<PlayerMovement>();
             if (movement != null)
             {
@@ -128,8 +135,30 @@ namespace NightPatrol.Menu
             GameSettings.Load();
             ApplySettings();
             if (keyBindings != null) KeyBindings.Load(keyBindings.Asset);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            WarnKeyBindings();
+#endif
             if (menuPage != null) menuPage.SetActive(false);
         }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private void WarnKeyBindings()
+        {
+            if (keyBindings == null) return;
+            if (keyBindings.Asset != InputSystem.actions)
+                Debug.LogWarning("[Keys] 조작 키 목록의 입력 에셋이 프로젝트 기본 입력과 다름 — 바꾼 키가 일부만 적용될 수 있음", this);
+            var entries = keyBindings.Entries;
+            if (entries.Count > MaxRows - 2)
+                Debug.LogWarning("[Keys] 조작 키 목록이 10줄을 넘음 — 11번째부터 메뉴에 안 나옴", this);
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+                var action = entry?.action != null ? entry.action.action : null;
+                if (action == null || entry.BindingIndex < 0)
+                    Debug.LogWarning($"[Keys] 조작 키 목록 {i + 1}번째 줄 '{entry?.label}': 동작·합성 파트·그룹을 찾을 수 없음 — 메뉴에서 눌러도 안 바뀜", this);
+            }
+        }
+#endif
 
         // ESC는 메뉴가 맡는다 (PlayerLook이 커서를 풀지 않게)
         private void OnEnable()
@@ -162,11 +191,11 @@ namespace NightPatrol.Menu
             }
             if (!IsOpen || HandlePointer(Mouse.current)) return;
 
-            if (Pressed(keyboard, Key.W, Key.UpArrow)) Move(-1);
-            else if (Pressed(keyboard, Key.S, Key.DownArrow)) Move(1);
-            else if (Pressed(keyboard, Key.A, Key.LeftArrow)) Adjust(-1);
-            else if (Pressed(keyboard, Key.D, Key.RightArrow)) Adjust(1);
-            else if (Pressed(keyboard, Key.E, Key.Enter, Key.NumpadEnter, Key.Space)) Confirm();
+            if (Pressed(keyboard, UpKeys)) Move(-1);
+            else if (Pressed(keyboard, DownKeys)) Move(1);
+            else if (Pressed(keyboard, LeftKeys)) Adjust(-1);
+            else if (Pressed(keyboard, RightKeys)) Adjust(1);
+            else if (Pressed(keyboard, ConfirmKeys)) Confirm();
         }
 
         /// <summary>메뉴 열기 (첫 장). 이미 열렸거나 층 이동 연출 중이면 무시</summary>
@@ -530,7 +559,8 @@ namespace NightPatrol.Menu
         private List<(InputAction action, int index)> BindingRows()
         {
             var list = new List<(InputAction action, int index)>();
-            for (int i = 0; i < KeyCount; i++)
+            if (keyBindings == null) return list;
+            for (int i = 0; i < keyBindings.Entries.Count; i++)
             {
                 var entry = keyBindings.Entries[i];
                 var action = entry?.action != null ? entry.action.action : null;
@@ -539,7 +569,7 @@ namespace NightPatrol.Menu
             return list;
         }
 
-        private static bool Pressed(Keyboard keyboard, params Key[] keys)
+        private static bool Pressed(Keyboard keyboard, Key[] keys)
         {
             if (keyboard == null) return false;
             foreach (var key in keys)
@@ -635,6 +665,11 @@ namespace NightPatrol.Menu
 
         private void Lock(bool locked)
         {
+            if (control != null)
+            {
+                control.Lock(this, locked, includeJournal: false);
+                return;
+            }
             if (movement != null) movement.SetBlocked(this, locked);
             if (look != null) look.SetBlocked(this, locked);
             if (interactor != null) interactor.SetBlocked(this, locked);

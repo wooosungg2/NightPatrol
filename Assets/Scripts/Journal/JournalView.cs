@@ -69,6 +69,7 @@ namespace NightPatrol.Journal
         {
             if (run == null) run = UnityEngine.Object.FindAnyObjectByType<PatrolRun>();
             if (tasks == null) tasks = UnityEngine.Object.FindAnyObjectByType<FloorTasks>();
+            if (interactor == null) interactor = GetComponentInParent<PlayerInteractor>();
             if (interactor == null) interactor = UnityEngine.Object.FindAnyObjectByType<PlayerInteractor>();
             subscribedRun = run;
             subscribedTasks = tasks;
