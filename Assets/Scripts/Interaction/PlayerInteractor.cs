@@ -25,6 +25,8 @@ namespace NightPatrol.Interaction
         public float HoldProgress => hold.Progress;
         /// <summary>누군가 상호작용을 막고 있으면 true (일지를 든 동안, 연출 중 등)</summary>
         public bool IsBlocked => blockers.Count > 0;
+        /// <summary>현재 잠근 주체들 (진단용)</summary>
+        public IReadOnlyCollection<object> Blockers => blockers;
         public Camera PlayerCamera => playerCamera;
         public PlayerSettings Settings => settings;
         public LayerMask RaycastMask => raycastMask;
@@ -43,14 +45,13 @@ namespace NightPatrol.Interaction
                 enabled = false;
                 return;
             }
-            // 에셋의 액션을 그대로 쓴다 (설정에서 바꾼 키가 바로 먹히게). 이 액션을 켜고 끄는 건 이 컴포넌트뿐
+            // 설정에서 바꾼 키가 바로 먹히도록 공용 액션을 쓴다. 다른 소비자를 위해 끄지 않는다.
             interact = interactAction.action;
         }
 
         private void OnEnable() => interact?.Enable();
         private void OnDisable()
         {
-            interact?.Disable();
             Release();
         }
 

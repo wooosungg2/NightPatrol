@@ -17,14 +17,16 @@ namespace NightPatrol.Run
     [DisallowMultipleComponent]
     public sealed class FloorTransition : MonoBehaviour
     {
+        private enum DescendResult { Descended, Failed, Error }
+
         [Tooltip("비어 있으면 씬에서 찾는다")]
         [SerializeField] private PatrolRun run;
-        [Tooltip("비어 있으면 씬에서 찾는다")]
+        [Tooltip("비어 있으면 부모에서, 없으면 씬에서 찾는다")]
         [SerializeField] private PlayerMovement player;
-        [Tooltip("비어 있으면 씬에서 찾는다. 없으면 화면 연출 없이 진행")]
+        [Tooltip("비어 있으면 자식에서, 없으면 씬에서 찾는다. 없으면 화면 연출 없이 진행")]
         [SerializeField] private ScreenFader fader;
         [Tooltip("비어 있으면 씬에서 찾는다. 없으면 문 연출 없이 진행")]
-        [SerializeField] private ElevatorDoors doors;
+        [SerializeField] private NightPatrol.ElevatorDoors doors;
         [Tooltip("도착할 때 \"N층\"을 띄울 글자. 없으면 안 띄움")]
         [SerializeField] private TMP_Text floorCaption;
         [Tooltip("어두워지는·밝아지는 시간(초)")]
@@ -38,6 +40,7 @@ namespace NightPatrol.Run
         [Tooltip("게임 시작 때 검은 화면에서 밝아짐")]
         [SerializeField] private bool fadeInOnStart = true;
         private PlayerLook look;
+        private PlayerControl control;
         private PlayerInteractor interactor;
         private JournalHolder journal;
         private PatrolRun subscribedRun;
@@ -58,11 +61,14 @@ namespace NightPatrol.Run
         private void Awake()
         {
             if (run == null) run = UnityEngine.Object.FindAnyObjectByType<PatrolRun>();
+            if (player == null) player = GetComponentInParent<PlayerMovement>();
             if (player == null) player = UnityEngine.Object.FindAnyObjectByType<PlayerMovement>();
+            if (fader == null) fader = GetComponentInChildren<ScreenFader>(true);
             if (fader == null) fader = UnityEngine.Object.FindAnyObjectByType<ScreenFader>();
-            if (doors == null) doors = UnityEngine.Object.FindAnyObjectByType<ElevatorDoors>();
+            if (doors == null) doors = UnityEngine.Object.FindAnyObjectByType<NightPatrol.ElevatorDoors>();
             if (player != null)
             {
+                control = player.GetComponent<PlayerControl>();
                 look = player.GetComponent<PlayerLook>();
                 interactor = player.GetComponent<PlayerInteractor>();
                 journal = player.GetComponentInChildren<JournalHolder>(true);
@@ -105,34 +111,64 @@ namespace NightPatrol.Run
         {
             Begin();
             SafeEvent.Raise(DescendStarted, this);
-            if (HasDoors) yield return doors.Close();
+            yield return WaitDoors(false);
             if (fader != null) yield return fader.FadeTo(1f, fadeSeconds);
 
-            if (JudgeInTheDark())
+            var result = JudgeInTheDark();
+            if (result == DescendResult.Failed)
             {
                 if (HasDoors) doors.SetOpenImmediate(true);   // 다음 하행을 위해 문은 열어 둠
                 yield return WakeUp();
             }
             else
             {
-                SafeEvent.Raise(Arrived, run.CurrentFloor, this);
-                SetCaption($"{run.CurrentFloor}층");
-                yield return new WaitForSeconds(holdSeconds);
+                if (result == DescendResult.Descended)
+                {
+                    SafeEvent.Raise(Arrived, run.CurrentFloor, this);
+                    SetCaption($"{run.CurrentFloor}층");
+                    yield return new WaitForSeconds(holdSeconds);
+                }
+                else
+                {
+                    Debug.LogError("[Transition] 하행 판정 중 오류 — 층 상태를 확인하세요", this);
+                }
                 SetCaption(string.Empty);
                 if (fader != null) yield return fader.FadeTo(0f, fadeSeconds);
-                if (HasDoors) yield return doors.Open();
+                yield return WaitDoors(true);
             }
             End();
         }
 
-        // 어두운 동안 판정·층 바꾸기 (실패면 시작 자리로 순간이동까지). 실패했으면 true.
-        // 판정 중 예외(사물 코드 오류 등)가 나도 연출은 끝까지 가서 잠금이 풀리게 한다 — 그때는 층 그대로
-        private bool JudgeInTheDark()
+        private IEnumerator WaitDoors(bool open)
         {
-            int attemptBefore = run.Attempt;
-            try { run.TryDescend(); }
-            catch (Exception e) { Debug.LogException(e, this); }
-            return run.Attempt != attemptBefore;
+            if (!HasDoors) yield break;
+
+            float timeout = doors.moveSeconds + 0.5f;
+            if (open) doors.Open();
+            else doors.Close();
+
+            // 문이 멈춰도 제한 시간이 지나면 연출을 계속한다.
+            for (float elapsed = 0f; elapsed < timeout; elapsed += Time.deltaTime)
+            {
+                if (!HasDoors || (open ? doors.IsOpen : doors.IsClosed)) yield break;
+                yield return null;
+            }
+        }
+
+        // 판정 중 예외가 나면 정상 도착으로 알리지 않고, 화면·문·잠금만 복구한다. 층 상태 복원은 보장하지 않는다.
+        private DescendResult JudgeInTheDark()
+        {
+            try
+            {
+                int attemptBefore = run.Attempt;
+                run.TryDescend();
+                return run.Attempt != attemptBefore ? DescendResult.Failed : DescendResult.Descended;
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, this);
+                return DescendResult.Error;
+            }
         }
 
         // 개발자 메뉴 F3처럼 엘리베이터 밖에서 실패가 나도 같은 깨어나기 연출
@@ -201,6 +237,11 @@ namespace NightPatrol.Run
 
         private void Lock(bool locked)
         {
+            if (control != null)
+            {
+                control.Lock(this, locked);
+                return;
+            }
             if (player != null) player.SetBlocked(this, locked);
             if (look != null) look.SetBlocked(this, locked);
             if (interactor != null) interactor.SetBlocked(this, locked);

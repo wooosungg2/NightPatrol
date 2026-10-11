@@ -18,6 +18,8 @@ namespace NightPatrol.Player
 
         /// <summary>누군가 이동을 막고 있으면 true. 막혀도 중력은 그대로</summary>
         public bool IsBlocked => blockers.Count > 0;
+        /// <summary>현재 잠근 주체들 (진단용)</summary>
+        public IReadOnlyCollection<object> Blockers => blockers;
 
         private void Awake()
         {
@@ -30,14 +32,13 @@ namespace NightPatrol.Player
                 enabled = false;
                 return;
             }
-            // 에셋의 액션을 그대로 쓴다: 설정에서 바꾼 키(KeyBindings)가 바로 먹히게. 이 액션을 켜고 끄는 건 이 컴포넌트뿐
+            // 설정에서 바꾼 키가 바로 먹히도록 공용 액션을 쓴다. 다른 소비자를 위해 끄지 않는다.
             move = moveAction.action;
         }
 
         private void OnEnable() => move?.Enable();
         private void OnDisable()
         {
-            move?.Disable();
             verticalVelocity = 0f;
         }
 

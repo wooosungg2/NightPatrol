@@ -27,6 +27,8 @@ namespace NightPatrol.Journal
         public bool IsRaised { get; private set; }
         /// <summary>누군가 일지 들기를 막고 있으면 true (층 이동 연출 등). 막힌 동안 Tab·들기는 무시</summary>
         public bool IsBlocked => blockers.Count > 0;
+        /// <summary>현재 잠근 주체들 (진단용)</summary>
+        public IReadOnlyCollection<object> Blockers => blockers;
         /// <summary>일시정지 메뉴가 클립보드를 쓰는 중인지 (이 동안 클립보드는 들려 있고 Tab은 무시)</summary>
         public bool IsMenuOpen { get; private set; }
         /// <summary>들거나 내릴 때 (true = 듦)</summary>
@@ -35,7 +37,7 @@ namespace NightPatrol.Journal
         private void Awake()
         {
             if (interactor == null) interactor = GetComponentInParent<PlayerInteractor>();
-            // 에셋의 액션을 그대로 쓴다 (설정에서 바꾼 키가 바로 먹히게). 이 액션을 켜고 끄는 건 이 컴포넌트뿐
+            // 설정에서 바꾼 키가 바로 먹히도록 공용 액션을 쓴다. 다른 소비자를 위해 끄지 않는다.
             toggleAction = journalAction != null ? journalAction.action : null;
         }
         private void OnEnable()
@@ -45,7 +47,6 @@ namespace NightPatrol.Journal
         }
         private void OnDisable()
         {
-            toggleAction?.Disable();
             if (interactor != null) interactor.SetBlocked(this, false);
         }
         private void Start()

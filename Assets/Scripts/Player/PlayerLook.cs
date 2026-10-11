@@ -17,6 +17,8 @@ namespace NightPatrol.Player
 
         /// <summary>누군가 시점 회전을 막고 있으면 true. 막혀도 커서 잠금 처리(ESC·클릭)는 동작</summary>
         public bool IsBlocked => blockers.Count > 0;
+        /// <summary>현재 잠근 주체들 (진단용)</summary>
+        public IReadOnlyCollection<object> Blockers => blockers;
         /// <summary>마우스 감도 배율 (설정 메뉴). PlayerSettings의 감도에 곱한다. 에셋은 바꾸지 않음</summary>
         public float SensitivityScale { get; set; } = 1f;
         /// <summary>ESC로 커서를 풀지. 일시정지 메뉴가 있으면 메뉴가 ESC를 맡으므로 false</summary>
@@ -31,7 +33,7 @@ namespace NightPatrol.Player
                 enabled = false;
                 return;
             }
-            // 에셋의 액션을 그대로 쓴다 (설정에서 바꾼 키가 바로 먹히게). 이 액션을 켜고 끄는 건 이 컴포넌트뿐
+            // 설정에서 바꾼 키가 바로 먹히도록 공용 액션을 쓴다. 다른 소비자를 위해 끄지 않는다.
             look = lookAction.action;
             look.bindingMask = InputBinding.MaskByGroup("Keyboard&Mouse");
             pitch = Mathf.DeltaAngle(0f, cameraTransform.localEulerAngles.x);
@@ -46,7 +48,6 @@ namespace NightPatrol.Player
 
         private void OnDisable()
         {
-            look?.Disable();
             if (look != null) SetCursorLocked(false);
         }
         private void OnApplicationFocus(bool focused)
