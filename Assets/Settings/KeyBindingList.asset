@@ -37,3 +37,7 @@ MonoBehaviour:
     action: {fileID: -916101742365270005, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     compositePart: 
     group: Keyboard&Mouse
+  - label: "\uC190\uC804\uB4F1"
+    action: {fileID: 346019026430069724, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+    compositePart: 
+    group: Keyboard&Mouse
