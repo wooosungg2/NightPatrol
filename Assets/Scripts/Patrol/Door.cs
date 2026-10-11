@@ -46,6 +46,14 @@ namespace NightPatrol
 
 		public override void ResetToDefault() => SetStateImmediate(defaultLocked, defaultOpen);
 
+		/// <summary>점검 항목으로 뽑혔을 때: 잠금이 풀리고 열린 채로 둠</summary>
+		public override bool TrySetAbnormal()
+		{
+			if (leaves == null || leaves.Length == 0) return false;
+			SetStateImmediate(false, true);
+			return true;
+		}
+
 		void Awake() => ResetToDefault();
 
 		// ── 직접 조작 ──

@@ -24,8 +24,11 @@ namespace NightPatrol
 		[Tooltip("세면대 한 개가 차지하는 길이(m)")] public float sinkSpacing = 0.7f;
 		[Tooltip("(지금은 안 씀. 세면대는 Counter Nook Gap 기준으로 가운데 배치)")] public float counterFrontGap = 0.1f;
 		public float urinalSpacing = 0.7f;
-		[Tooltip("세면기 양 끝 ~ 옆 벽 최소 여유(m). 카운터는 벽에서 벽까지 붙고, 세면기는 가운데에 모임. 화장실 최소 길이 계산에 씀")]
+		[Tooltip("세면기 양 끝 ~ 카운터 끝 여유(m). 화장실 최소 길이 계산에도 씀")]
 		public float counterNookGap = 0.3f;
+		[Tooltip("카운터를 앞벽 ~ 튀어나온 벽까지 벽에서 벽으로 늘림. 끄면 카운터는 세면기 수에 맞는 길이이고, " +
+				 "튀어나온 벽이 카운터 끝에 붙으며 남는 길이는 변기 칸이 나눠 가짐")]
+		public bool counterWallToWall = false;
 		[Tooltip("거울 윗선 높이(m)")] public float mirrorTop = 2.0f;
 		[Tooltip("튀어나온 벽에 수건걸이·선반·수건 (사진처럼)")] public bool nookAccessories = true;
 
@@ -84,17 +87,29 @@ namespace NightPatrol
 			// 세면대 공간과 변기 칸 사이 튀어나온 벽 (옆벽 ~ 칸 문 선, 천장까지)
 			bool nookWall = toilets > 0 && sinks > 0;
 			const float nookT = 0.15f;
+			float sw = s.stallWidth;                    // 실제 칸 폭
+			if (nookWall && !s.counterWallToWall)
+			{
+				// 튀어나온 벽을 카운터 끝에 붙이고, 남는 길이는 변기 칸을 넓혀서 채움
+				float counterLen = sinks * s.sinkSpacing + 2f * s.counterNookGap;
+				float front = z0 + counterLen + nookT;
+				if (front < stallFrontZ)
+				{
+					stallFrontZ = front;
+					sw = (z1 - stallFrontZ) / toilets;
+				}
+			}
 			if (nookWall)
 				Box(root, "Wall_SinkNook", new Vector3((xw + xs) * 0.5f, wallHeight * 0.5f, stallFrontZ - nookT * 0.5f),
 					new Vector3(stallDepth, wallHeight, nookT), wallMat);
 			for (int i = 0; i < toilets; i++)
 			{
-				float zb = z1 - i * s.stallWidth, za = zb - s.stallWidth, zc = (za + zb) * 0.5f;
+				float zb = z1 - i * sw, za = zb - sw, zc = (za + zb) * 0.5f;
 				if (!(nookWall && i == toilets - 1)) // 맨 앞 칸 앞쪽 칸막이는 튀어나온 벽이 대신함
 					Box(root, $"Stall_Divider_{i}", new Vector3((xw + xs) * 0.5f, py, za),
 						new Vector3(stallDepth, ph, s.panelThickness), s.partitionMaterial);
 				Box(root, $"Stall_Door_{i}", new Vector3(xs, py, zc),
-					new Vector3(s.panelThickness, ph, s.stallWidth - 0.04f), s.partitionMaterial);
+					new Vector3(s.panelThickness, ph, sw - 0.04f), s.partitionMaterial);
 				Place(root, s.toiletPrefab, $"Toilet_{i}", new Vector3(xw, 0f, zc), FaceAisle(ss),
 					new Vector3(0f, 0.2f, 0.33f), new Vector3(0.4f, 0.4f, 0.65f), s.placeholderMaterial);
 			}
@@ -108,6 +123,7 @@ namespace NightPatrol
 				float segB = nookWall ? stallFrontZ - nookT : z1;
 				float za = z0, len = Mathf.Max(0.1f, segB - z0);
 				float sinkSpan = sinks * s.sinkSpacing;
+				if (!s.counterWallToWall) len = Mathf.Min(len, sinkSpan + 2f * s.counterNookGap); // 세면기 수만큼만
 				if (sinkSpan > len + 0.001f)
 					Debug.LogWarning($"[Fixtures] {label}: 세면기 {sinks}개가 카운터({len:0.##}m)보다 김. " +
 									 "화장실 길이를 늘리거나 Sink Spacing을 줄일 것", ctx);

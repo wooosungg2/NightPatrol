@@ -16,9 +16,14 @@ namespace NightPatrol
 		[Tooltip("바닥 ~ 창 아랫선(m)")] public float sill = 0.9f;
 		[Tooltip("바닥 ~ 창 윗선(m)")] public float head = 2.7f;
 		[Tooltip("바닥 ~ 가로대(m). 위는 고정창, 아래는 여닫는 창")] public float transom = 1.4f;
-		[Tooltip("창 한 칸 폭(m)")] public float unitWidth = 2.0f;
+		[Tooltip("창 한 칸 폭(m). Fit To Wall이 켜져 있으면 개수를 정하는 기준으로만 쓰고 실제 폭은 늘어나거나 줄어듦")] public float unitWidth = 2.0f;
+		[Tooltip("창 폭을 조절해서 양 끝 벽기둥(Pillar) 폭을 창 사이 벽(Pier) 폭과 같게 맞춤")] public bool fitToWall = true;
 		[Tooltip("창 칸 사이 벽 폭(m)")] public float pier = 0.35f;
-		[Tooltip("창 사이 벽기둥이 방 안으로 튀어나온 깊이(m). 0이면 평평한 벽")] public float pillarDepth = 0.3f;
+		[Tooltip("창턱이 방 안으로 나온 깊이(m). 창과 창 사이 벽과 창 아래 벽도 이만큼 나와서 창턱과 이어짐")] public float sillDepth = 0.21f;
+		[Tooltip("양쪽 옆벽에 붙은 벽기둥 깊이(m). 0이면 창턱 깊이와 같음")] public float sidePillarDepth = 0f;
+		[Tooltip("창 사이가 얇은 벽이 아니라 굵은 기둥인 방 (524호 사진)")] public string[] columnRooms = { "524" };
+		[Tooltip("굵은 기둥 폭(m)")] public float columnWidth = 0.6f;
+		[Tooltip("굵은 기둥이 방 안으로 나온 깊이(m)")] public float columnDepth = 0.45f;
 		[Tooltip("옆벽 ~ 첫 창 사이 최소(m)")] public float sideMargin = 0.5f;
 		[Tooltip("창틀 굵기(m)")] public float frame = 0.06f;
 
@@ -43,6 +48,21 @@ namespace NightPatrol
 		static readonly Color BlindColor = new Color(0.90f, 0.89f, 0.86f);
 		static readonly Color SillColor = new Color(0.85f, 0.84f, 0.80f);
 
+		/// <summary>창문 벽이 방 안으로 튀어나온 깊이 (좌석 배치에서 빼는 값)</summary>
+		public static float Inset(WindowSettings s, string label = null)
+		{
+			if (s == null) return 0f;
+			float d = Mathf.Max(Mathf.Max(0f, s.sillDepth), s.sidePillarDepth);
+			return IsColumnRoom(s, label) ? Mathf.Max(d, s.columnDepth) : d;
+		}
+
+		static bool IsColumnRoom(WindowSettings s, string label)
+		{
+			if (s == null || s.columnRooms == null || label == null) return false;
+			foreach (var r in s.columnRooms) if (r == label) return true;
+			return false;
+		}
+
 		public static bool Applies(WindowSettings s, string label)
 		{
 			if (s == null || !s.enabled || s.rooms == null) return false;
@@ -59,48 +79,65 @@ namespace NightPatrol
 
 			float hw = W * 0.5f, xin = hw - t, zw = D - t * 0.5f;
 			float y0 = Mathf.Clamp(s.sill, 0.1f, wallTop - 0.5f), y1 = Mathf.Clamp(s.head, y0 + 0.4f, wallTop - 0.05f);
+			bool cols = IsColumnRoom(s, label);              // 524호: 창 사이가 굵은 기둥
+			float pw = cols ? Mathf.Max(0.1f, s.columnWidth) : s.pier;
 			float span = 2f * xin - 2f * s.sideMargin;
-			int n = Mathf.Max(0, Mathf.FloorToInt((span + s.pier) / (s.unitWidth + s.pier)));
-			float total = n * s.unitWidth + Mathf.Max(0, n - 1) * s.pier;
+			int n = Mathf.Max(0, Mathf.FloorToInt((span + pw) / (s.unitWidth + pw)));
+			float uw = s.unitWidth;                          // 실제 창 한 칸 폭
+			if (s.fitToWall && n > 0)                        // 옆벽 ~ 첫 창 = 창 사이 벽 폭 (Pillar = Pier)
+				uw = Mathf.Max(0.5f, (2f * xin - (n + 1) * pw) / n);
+			float total = n * uw + Mathf.Max(0, n - 1) * pw;
 			float x0 = -total * 0.5f;
 
 			// ── 벽: 창 사이 기둥 + 창 아래·위 ──
+			// 방 안쪽: 창 사이 벽과 창 아래 벽이 창턱 깊이(p)만큼 나와서 창턱과 빈틈없이 이어지고,
+			// 양 끝(옆벽 ~ 첫/마지막 창)은 벽기둥(pd)
+			float p = Mathf.Max(0f, s.sillDepth), zi = D - t;
+			float pp = cols ? Mathf.Max(p, s.columnDepth) : p;  // 창 사이 벽(기둥) 깊이
+			float pd = cols ? pp : s.sidePillarDepth > 0.01f ? s.sidePillarDepth : p;
 			float cursor = -hw;
 			for (int i = 0; i < n; i++)
 			{
-				float a = x0 + i * (s.unitWidth + s.pier), b = a + s.unitWidth;
+				float a = x0 + i * (uw + pw), b = a + uw;
 				WallBox(root, $"Wall_{i}", cursor, a, 0f, wallTop, zw, t, wallMat);
-				if (i > 0 && s.pillarDepth > 0.01f) // 창 사이 벽기둥 (방 안으로 튀어나옴)
-					WallBox(root, $"Pillar_{i}", cursor, a, 0f, wallTop, D - t - s.pillarDepth * 0.5f, s.pillarDepth, wallMat);
+				if (i == 0 && pd > 0.01f)           // 왼쪽 옆벽 ~ 첫 창 사이 벽기둥
+					WallBox(root, "Pillar_L", -xin, a, 0f, wallTop, zi - pd * 0.5f, pd, wallMat);
+				else if (i > 0 && pp > 0.01f)       // 창과 창 사이 벽 (창턱만큼, 524호는 굵은 기둥)
+					WallBox(root, $"Pier_{i}", cursor, a, 0f, wallTop, zi - pp * 0.5f, pp, wallMat);
 				WallBox(root, $"Wall_Below_{i}", a, b, 0f, y0, zw, t, wallMat);
+				if (p > 0.01f)                      // 창 아래 벽 안쪽 (창턱 받침)
+					WallBox(root, $"Wall_Below_In_{i}", a, b, 0f, y0 - 0.04f, zi - p * 0.5f, p, wallMat);
 				WallBox(root, $"Wall_Above_{i}", a, b, y1, wallTop, zw, t, wallMat);
 				cursor = b;
 			}
 			WallBox(root, "Wall_End", cursor, hw, 0f, wallTop, zw, t, wallMat);
+			if (n > 0 && pd > 0.01f)                // 마지막 창 ~ 오른쪽 옆벽 사이 벽기둥
+				WallBox(root, "Pillar_R", cursor, xin, 0f, wallTop, zi - pd * 0.5f, pd, wallMat);
 
 			// ── 창 칸 ──
 			for (int i = 0; i < n; i++)
 			{
-				float a = x0 + i * (s.unitWidth + s.pier), cx = a + s.unitWidth * 0.5f;
-				BuildUnit(root, $"Window_{i}", cx, y0, y1, D, t, s, glassMat, label);
+				float a = x0 + i * (uw + pw), cx = a + uw * 0.5f;
+				BuildUnit(root, $"Window_{i}", cx, uw, y0, y1, D, t, s, glassMat, label);
 			}
 		}
 
-		static void BuildUnit(Transform parent, string name, float cx, float y0, float y1, float D, float t,
+		static void BuildUnit(Transform parent, string name, float cx, float w, float y0, float y1, float D, float t,
 							  WindowSettings s, Material glassMat, string label)
 		{
 			var unit = new GameObject(name).transform;
 			unit.SetParent(parent, false);
 			unit.localPosition = new Vector3(cx, 0f, D - t * 0.5f);   // 벽 두께 가운데
-			float w = s.unitWidth, fr = s.frame, h = y1 - y0, ym = (y0 + y1) * 0.5f;
+			float fr = s.frame, h = y1 - y0, ym = (y0 + y1) * 0.5f;
 
 			// 바깥 창틀 (벽 두께만큼)
 			Box(unit, "Frame_L", new Vector3(-w * 0.5f + fr * 0.5f, ym, 0f), new Vector3(fr, h, t), s.frameMaterial, FrameColor, true);
 			Box(unit, "Frame_R", new Vector3(w * 0.5f - fr * 0.5f, ym, 0f), new Vector3(fr, h, t), s.frameMaterial, FrameColor, true);
 			Box(unit, "Frame_Top", new Vector3(0f, y1 - fr * 0.5f, 0f), new Vector3(w, fr, t), s.frameMaterial, FrameColor, true);
 			Box(unit, "Frame_Bottom", new Vector3(0f, y0 + fr * 0.5f, 0f), new Vector3(w, fr, t), s.frameMaterial, FrameColor, true);
-			// 안쪽 창턱
-			Box(unit, "Sill", new Vector3(0f, y0 - 0.02f, -t * 0.5f - 0.07f), new Vector3(w + 0.1f, 0.04f, 0.14f), s.sillMaterial, SillColor, true);
+			// 안쪽 창턱: 창 폭 그대로 (양옆 창 사이 벽에 맞닿음), 벽보다 2cm 더 나옴
+			float sd = Mathf.Max(0f, s.sillDepth) + 0.02f;
+			Box(unit, "Sill", new Vector3(0f, y0 - 0.02f, -t * 0.5f - sd * 0.5f), new Vector3(w, 0.04f, sd), s.sillMaterial, SillColor, true);
 
 			// 가로대 + 위 고정창 2장 (가운데 세로 창살)
 			float ty = Mathf.Clamp(s.transom, y0 + 0.3f, y1 - 0.3f);
