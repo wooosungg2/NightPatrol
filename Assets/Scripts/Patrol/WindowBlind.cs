@@ -29,6 +29,13 @@ namespace NightPatrol
 		public override void Interact(PlayerInteractor who) => SetDown(!down);
 		public override void ResetToDefault() => SetStateImmediate(defaultDown);
 
+		/// <summary>점검 항목으로 뽑혔을 때: 규정과 반대 상태 (기본은 올라가 있음)</summary>
+		public override bool TrySetAbnormal()
+		{
+			SetStateImmediate(!normalDown);
+			return true;
+		}
+
 		void Awake() => ResetToDefault();
 
 		public void SetDown(bool value)

@@ -7,7 +7,13 @@ namespace NightPatrol
 	public class StairwellSettings
 	{
 		[Tooltip("끄면 예전처럼 Stairwell Prefab을 내용물로 넣음")] public bool enabled = true;
-		[Tooltip("문으로 들어가서 봤을 때 올라가는 계단이 오른쪽 (사진: 내려가는 계단이 왼쪽)")] public bool upOnRight = true;
+		[Tooltip("이 층이 계단의 맨 위 (올라가는 계단 없이 내려가는 계단만, 층 참 가장자리에 보호 난간). 동쪽 계단 5층")]
+		public bool topFloor = false;
+		[Tooltip("중간 참 창을 뒷벽 거의 전체 폭·높이의 큰 창으로 (동쪽 계단 사진)")] public bool tallWindow = false;
+		[Tooltip("복도 쪽 문 오른쪽 벽에 게시판 (동쪽 계단 사진)")] public bool bulletinBoard = false;
+
+		/// <summary>동쪽 계단 (2026-10 사진): 5층이 맨 위, 중간 참에 큰 창, 문 옆 게시판</summary>
+		public static StairwellSettings East() => new StairwellSettings { topFloor = true, tallWindow = true, bulletinBoard = true };
 
 		[Header("계단")]
 		[Tooltip("한 층을 두 번에 나눠 올라감. 한 번에 몇 단")][Min(1)] public int stepsPerFlight = 12;
@@ -31,6 +37,7 @@ namespace NightPatrol
 		[Tooltip("계단 디딤판 (회색 화강석)")] public Material stairMaterial;
 		[Tooltip("층 참·중간 참 바닥")] public Material landingMaterial;
 		public Material frameMaterial;
+		[Tooltip("계단 손잡이·난간살 (스테인리스). 비워두면 은색")] public Material railMaterial;
 	}
 
 	/// <summary>
@@ -39,7 +46,7 @@ namespace NightPatrol
 	///
 	///   뒷벽(창) ┌──────────────────┐
 	///            │   중간 참 (+반층) │   아래층 쪽 중간 참 (-반층)도 같은 자리 아래
-	///            │ ↓ 내려감 │ ↑ 올라감│   가운데 빈 공간(wellGap)에 손잡이
+	///            │ ↑ 올라감 │ ↓ 내려감│   가운데 빈 공간(wellGap)에 손잡이
 	///            │  (+위층) │        │
 	///            │   층 참 (0)       │
 	///   앞벽     └──────┐문┌─────────┘
@@ -66,7 +73,8 @@ namespace NightPatrol
 			float xin = W * 0.5f - t, zf0 = t, zb1 = D - t;        // 안쪽 면
 			float innerD = zb1 - zf0;
 			float fw = Mathf.Max(0.6f, (2f * xin - s.wellGap) * 0.5f); // 계단 한 줄 폭
-			float upX = (s.upOnRight ? 1f : -1f) * (s.wellGap * 0.5f + fw * 0.5f);
+																	   // 문으로 들어가서 봤을 때 내려가는 계단이 오른쪽, 올라가는 계단(맨 위 층은 막힌 쪽)이 왼쪽 (동·서 계단 공통)
+			float upX = -(s.wellGap * 0.5f + fw * 0.5f);
 			float downX = -upX;
 			int n = Mathf.Max(1, s.stepsPerFlight);
 			float run = n * s.tread;
@@ -91,19 +99,47 @@ namespace NightPatrol
 			// ── 참 ──
 			float st = s.slabThickness;
 			Slab(root, "Landing_Floor", 0f, zf0, zs, 0f, 2f * xin, st, s.landingMaterial, LandingColor);
-			Slab(root, "Landing_Mid", 0f, zm, zb1, half, 2f * xin, st, s.landingMaterial, LandingColor);
+			if (!s.topFloor)
+				Slab(root, "Landing_Mid", 0f, zm, zb1, half, 2f * xin, st, s.landingMaterial, LandingColor);
 			if (y0 < -half + 0.01f)
 				Slab(root, "Landing_Mid_Lower", 0f, zm, zb1, -half, 2f * xin, st, s.landingMaterial, LandingColor);
+			if (s.topFloor && y0 < -2f * half + 0.01f)
+				Slab(root, "Landing_Floor_Lower", 0f, zf0, zs, -2f * half, 2f * xin, st, s.landingMaterial, LandingColor);
 
 			// ── 계단: 올라감(0 → 반층), 내려감(-반층 → 0, 뒤에서 앞으로), 위층으로(반층 → 한 층) ──
 			// 손잡이는 가운데 빈 공간 쪽. 반대로 도는 계단도 180° 돌아 있어서 로컬 방향이 같음
-			var rail = s.upOnRight ? StairSlab.RailSide.Left : StairSlab.RailSide.Right;
-			Flight(root, "Flight_Up", new Vector3(upX, 0f, zs), 0f, fw, half, run, n, rail, s);
-			Flight(root, "Flight_Down", new Vector3(downX, -half, zm), 180f, fw, half, run, n, rail, s);
-			Flight(root, "Flight_ToUpper", new Vector3(downX, half, zm), 180f, fw, half, run, n, rail, s);
+			var rail = StairSlab.RailSide.Right;
+			if (s.topFloor)
+			{
+				// 맨 위 층: 내려가는 계단(0 → -반층)과 그 아래 계단(-반층 → -한 층)만
+				Flight(root, "Flight_Down", new Vector3(downX, -half, zm), 180f, fw, half, run, n, rail, s);
+				Flight(root, "Flight_Below", new Vector3(upX, -2f * half, zs), 0f, fw, half, run, n, rail, s);
+				// 층 참 가장자리 보호 난간 (아래 계단 위로 뚫린 쪽)
+				float gz0 = zs - 0.03f, gh = 1.0f;
+				float gx0 = upX - fw * 0.5f, gx1 = upX + fw * 0.5f;
+				Box(root, "LandingGuard_Top", new Vector3(upX, gh, gz0), new Vector3(fw, 0.045f, 0.045f), s.railMaterial, RailColor);
+				int gb = Mathf.Max(2, Mathf.RoundToInt(fw / 0.12f));
+				for (int i = 0; i <= gb; i++)
+					Box(root, $"LandingGuard_Bar{i}", new Vector3(Mathf.Lerp(gx0 + 0.03f, gx1 - 0.03f, i / (float)gb), gh * 0.5f, gz0),
+						new Vector3(0.022f, gh, 0.022f), s.railMaterial, RailColor);
+				if (s.tactile)
+				{
+					float d = run / n;
+					Box(root, "Tactile_Down", new Vector3(downX, 0.004f, zs - 0.35f), new Vector3(fw, 0.008f, 0.3f), null, YellowColor);
+					Box(root, "NonSlip_Top", new Vector3(downX, 0.003f, zs + d - 0.04f), new Vector3(fw, 0.006f, 0.05f), null, YellowColor);
+					Box(root, "Tactile_MidA", new Vector3(downX, -half + 0.004f, zm + 0.35f), new Vector3(fw, 0.008f, 0.3f), null, YellowColor);
+					Box(root, "Tactile_MidB", new Vector3(upX, -half + 0.004f, zm + 0.35f), new Vector3(fw, 0.008f, 0.3f), null, YellowColor);
+				}
+			}
+			else
+			{
+				Flight(root, "Flight_Up", new Vector3(upX, 0f, zs), 0f, fw, half, run, n, rail, s);
+				Flight(root, "Flight_Down", new Vector3(downX, -half, zm), 180f, fw, half, run, n, rail, s);
+				Flight(root, "Flight_ToUpper", new Vector3(downX, half, zm), 180f, fw, half, run, n, rail, s);
+			}
 
 			// ── 바닥 표시: 올라가는 계단·내려가는 계단 앞 점자블록, 첫 단 노란 줄 ──
-			if (s.tactile)
+			if (s.tactile && !s.topFloor)
 			{
 				Box(root, "Tactile_Up", new Vector3(upX, 0.004f, zs - 0.35f), new Vector3(fw, 0.008f, 0.3f), null, YellowColor);
 				Box(root, "Tactile_Down", new Vector3(downX, 0.004f, zs - 0.35f), new Vector3(fw, 0.008f, 0.3f), null, YellowColor);
@@ -120,38 +156,41 @@ namespace NightPatrol
 				Box(wall, "Wall", new Vector3(0f, ym, zw), new Vector3(W, h, t), wallMat, Color.white, true);
 				return;
 			}
-			float ww = Mathf.Min(s.windowWidth, fw);
-			float wx0 = upX - ww * 0.5f, wx1 = upX + ww * 0.5f;
-			float wy0 = half + s.windowSill, wy1 = y1 - 0.15f;
+			// 창은 중간 참 위 (맨 위 층이면 아래쪽 중간 참). 큰 창은 뒷벽 가운데에 거의 전체 폭
+			float midY = s.topFloor ? -half : half;
+			float winX = s.tallWindow ? 0f : upX;
+			float ww = s.tallWindow ? Mathf.Max(1f, 2f * xin - 0.8f) : Mathf.Min(s.windowWidth, fw);
+			float wx0 = winX - ww * 0.5f, wx1 = winX + ww * 0.5f;
+			float wy0 = midY + s.windowSill, wy1 = s.tallWindow ? y1 - 0.6f : y1 - 0.15f;
 			float hw = W * 0.5f;
 			Box(wall, "Wall_L", new Vector3((-hw + wx0) * 0.5f, ym, zw), new Vector3(wx0 + hw, h, t), wallMat, Color.white, true);
 			Box(wall, "Wall_R", new Vector3((wx1 + hw) * 0.5f, ym, zw), new Vector3(hw - wx1, h, t), wallMat, Color.white, true);
-			Box(wall, "Wall_Below", new Vector3(upX, (y0 + wy0) * 0.5f, zw), new Vector3(ww, wy0 - y0, t), wallMat, Color.white, true);
-			Box(wall, "Wall_Above", new Vector3(upX, (wy1 + y1) * 0.5f, zw), new Vector3(ww, y1 - wy1, t), wallMat, Color.white, true);
+			Box(wall, "Wall_Below", new Vector3(winX, (y0 + wy0) * 0.5f, zw), new Vector3(ww, wy0 - y0, t), wallMat, Color.white, true);
+			Box(wall, "Wall_Above", new Vector3(winX, (wy1 + y1) * 0.5f, zw), new Vector3(ww, y1 - wy1, t), wallMat, Color.white, true);
 
 			var win = new GameObject("Window").transform;
 			win.SetParent(root, false);
 			win.gameObject.isStatic = true;
-			var glass = Box(win, "Glass", new Vector3(upX, (wy0 + wy1) * 0.5f, zw), new Vector3(ww, wy1 - wy0, 0.02f), glassMat, Color.white, true);
+			var glass = Box(win, "Glass", new Vector3(winX, (wy0 + wy1) * 0.5f, zw), new Vector3(ww, wy1 - wy0, 0.02f), glassMat, Color.white, true);
 			if (glass != null && glassMat == null) glass.GetComponent<Renderer>().enabled = false; // 재질 없으면 안 보이는 막
-			// 창틀: 테두리 + 가운데 세로 + 가로 3줄 (사진처럼 2열 격자)
+																								   // 창틀: 테두리 + 가운데 세로 + 가로 3줄 (사진처럼 2열 격자)
 			const float mf = 0.06f;
 			float zc = zw - t * 0.25f;
 			Box(win, "Frame_L", new Vector3(wx0 + mf * 0.5f, (wy0 + wy1) * 0.5f, zc), new Vector3(mf, wy1 - wy0, 0.08f), s.frameMaterial, FrameColor);
 			Box(win, "Frame_R", new Vector3(wx1 - mf * 0.5f, (wy0 + wy1) * 0.5f, zc), new Vector3(mf, wy1 - wy0, 0.08f), s.frameMaterial, FrameColor);
-			Box(win, "Frame_Mid", new Vector3(upX, (wy0 + wy1) * 0.5f, zc), new Vector3(mf * 0.6f, wy1 - wy0, 0.06f), s.frameMaterial, FrameColor);
+			Box(win, "Frame_Mid", new Vector3(winX, (wy0 + wy1) * 0.5f, zc), new Vector3(mf * 0.6f, wy1 - wy0, 0.06f), s.frameMaterial, FrameColor);
 			for (int i = 0; i <= 4; i++)
 			{
 				float y = Mathf.Lerp(wy0, wy1, i / 4f);
-				Box(win, $"Frame_H{i}", new Vector3(upX, Mathf.Clamp(y, wy0 + mf * 0.5f, wy1 - mf * 0.5f), zc),
+				Box(win, $"Frame_H{i}", new Vector3(winX, Mathf.Clamp(y, wy0 + mf * 0.5f, wy1 - mf * 0.5f), zc),
 					new Vector3(ww, mf, 0.08f), s.frameMaterial, FrameColor);
 			}
 			// 창 아래쪽 안쪽 보호 난간 (사진: 창 아랫칸 앞 쇠 난간)
-			float gy = half + s.windowGuardHeight, gz = zb1 - 0.12f;
-			Box(win, "Guard_Top", new Vector3(upX, gy, gz), new Vector3(ww, 0.04f, 0.04f), null, RailColor);
+			float gy = midY + s.windowGuardHeight, gz = zb1 - 0.12f;
+			Box(win, "Guard_Top", new Vector3(winX, gy, gz), new Vector3(ww, 0.04f, 0.04f), null, RailColor);
 			int bars = Mathf.Max(2, Mathf.RoundToInt(ww / 0.12f));
 			for (int i = 0; i <= bars; i++)
-				Box(win, $"Guard_Bar{i}", new Vector3(wx0 + ww * i / bars, half + s.windowGuardHeight * 0.5f, gz),
+				Box(win, $"Guard_Bar{i}", new Vector3(wx0 + ww * i / bars, midY + s.windowGuardHeight * 0.5f, gz),
 					new Vector3(0.02f, s.windowGuardHeight, 0.02f), null, RailColor);
 		}
 
@@ -173,9 +212,24 @@ namespace NightPatrol
 			slab.railHeight = s.railHeight;
 			slab.wellHalfGap = s.wellGap * 0.5f;
 			slab.Build();
+			// 계단 판과 난간 재질을 따로 (서브메시 0 = 계단, 1 = 난간)
 			var r = go.GetComponent<Renderer>();
-			if (s.stairMaterial != null) r.sharedMaterial = s.stairMaterial;
-			else DoorBuilder.Paint(r, null, StairColor);
+			var mats = r.sharedMaterials;
+			if (s.stairMaterial != null) mats[0] = s.stairMaterial;
+			if (mats.Length > 1 && s.railMaterial != null) mats[1] = s.railMaterial;
+			r.sharedMaterials = mats;
+			var mpb = new MaterialPropertyBlock();
+			if (s.stairMaterial == null)
+			{
+				mpb.SetColor("_BaseColor", StairColor); mpb.SetColor("_Color", StairColor);
+				r.SetPropertyBlock(mpb, 0);
+			}
+			if (mats.Length > 1 && s.railMaterial == null)
+			{
+				mpb.Clear();
+				mpb.SetColor("_BaseColor", RailColor); mpb.SetColor("_Color", RailColor);
+				r.SetPropertyBlock(mpb, 1);
+			}
 			go.isStatic = true;
 		}
 

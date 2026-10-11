@@ -7,7 +7,7 @@ using UnityEditor;
 namespace NightPatrol
 {
 	public enum ScreenWall { Window, Corridor }
-	public enum LecternPlacement { InFirstRow, Front }
+	public enum LecternPlacement { Front, InFirstRow }
 	public enum SideWall { None, Left, Right, NearDoor }
 
 	/// <summary>
@@ -24,23 +24,27 @@ namespace NightPatrol
 
 		[Header("학생 좌석 (1열 = 스크린에 가장 가까운 줄)")]
 		[Min(1)] public int rows = 3;
-		[Min(1)] public int seatsPerRow = 12;
+		[Min(1)] public int seatsPerRow = 13;
 		[Tooltip("책상 하나에 몇 자리")][Min(1)] public int seatsPerBlock = 2;
 		[Tooltip("한 자리 폭(m)")] public float seatPitch = 0.7f;
 		[Tooltip("책상 사이 틈(m). 0이면 책상이 붙어서 한 줄로 이어짐")] public float aisleWidth = 0f;
-		[Tooltip("줄 간격(m), 책상 앞 모서리 ~ 다음 줄 책상 앞 모서리")] public float rowPitch = 1.7f;
+		[Tooltip("줄 간격(m), 책상 앞 모서리 ~ 다음 줄 책상 앞 모서리")] public float rowPitch = 1.8f;
 		public float deskDepth = 0.7f;
 		public float deskHeight = 0.72f;
 		[Tooltip("책상 가운데선 ~ 의자 가운데 거리(m)")] public float chairOffset = 0.45f;
-		[Tooltip("스크린 벽 ~ 1열 책상 앞 모서리(m)")] public float lecternZone = 2.0f;
+		[Tooltip("스크린 벽 ~ 1열 책상 앞 모서리(m)")] public float lecternZone = 1.8f;
 		[Tooltip("좌석 전체를 좌우로 옮김(m). 0이면 방 가운데")] public float offsetX = 0f;
 		[Tooltip("끄면 책상·의자만 (일반 강의실)")] public bool computers = true;
+		[Tooltip("모든 줄의 이 자리는 컴퓨터 없는 일반 책상 하나로 따로 떨어짐 (왼쪽부터 1, 0이면 없음). 521호: 컴퓨터 6 · 일반 1 · 컴퓨터 6")]
+		[Min(0)] public int plainSeat = 7;
+		[Tooltip("일반 책상 양옆 틈(m). 521호는 0 (컴퓨터 책상과 붙어 있음)")] public float plainGap = 0f;
 
 		[Header("교수님 책상 (학생 쪽을 봄)")]
-		[Tooltip("InFirstRow = 1열의 lecternSeat번째 자리, Front = 스크린 앞 lecternX 위치")]
-		public LecternPlacement lecternPlacement = LecternPlacement.InFirstRow;
-		[Tooltip("1열 몇 번째 자리가 교수님 자리인지 (복도에서 봤을 때 왼쪽부터 1)")][Min(1)] public int lecternSeat = 6;
+		[Tooltip("Front = 스크린과 1열 사이 (1열 일반 책상과 마주 봄), InFirstRow = 1열의 lecternSeat번째 자리")]
+		public LecternPlacement lecternAt = LecternPlacement.Front;
+		[Tooltip("InFirstRow일 때 1열 몇 번째 자리가 교수님 자리인지 (복도에서 봤을 때 왼쪽부터 1)")][Min(1)] public int lecternSeat = 7;
 		[Tooltip("Front일 때 책상 폭(m)")] public float lecternWidth = 1.2f;
+		[Tooltip("Front일 때 1열 일반 책상 앞에 맞붙여 마주 보게 함 (폭도 일반 책상과 같음). 끄면 Lectern X, Lectern Width")] public bool lecternAtPlainSeat = true;
 		[Tooltip("Front일 때 책상 가운데 X(m)")] public float lecternX = 0f;
 
 		[Header("빔 스크린·프로젝터 (스크린 벽)")]
@@ -95,10 +99,10 @@ namespace NightPatrol
 	///
 	///   521호 (screenWall = Corridor)
 	///   창문 ┌──────────────────────────┐
-	///        │   ▭▭▭▭▭▭▭▭▭▭▭▭     │   3열  (학생은 복도 쪽을 봄,
-	///   칠판 │   ▭▭▭▭▭▭▭▭▭▭▭▭     │   2열   모니터 화면은 창문 쪽을 봄)
-	///        │   ▭▭▭▭▭[교]▭▭▭▭▭▭     │   1열: 6번째 자리가 교수님 책상 (학생을 봄)
-	///        │                          │
+	///        │   ▭▭▭▭▭▭ □ ▭▭▭▭▭▭    │   3열  (학생은 복도 쪽을 봄,
+	///   칠판 │   ▭▭▭▭▭▭ □ ▭▭▭▭▭▭    │   2열   모니터 화면은 창문 쪽을 봄)
+	///        │   ▭▭▭▭▭▭ □ ▭▭▭▭▭▭    │   1열  □ = 따로 떨어진 일반 책상
+	///        │          [교]            │   교수님 책상: 1열 일반 책상과 마주 봄
 	///   복도 └─┐문┌분전반 [스크린][스크린] ┘   스크린은 벽 가운데
 	///
 	/// 자리마다 Seat_열_번호 오브젝트가 생기고 그 아래 Monitor(자식 Screen), Keyboard, PC, Chair가 붙는다.
@@ -107,9 +111,12 @@ namespace NightPatrol
 	public static class ClassroomInteriorBuilder
 	{
 		/// <param name="doors">앞벽 문 구멍 (방 로컬 X 구간, x 오름차순)</param>
+		/// <param name="backInset">창문 벽(뒷벽)에서 방 안으로 튀어나온 깊이 (창턱·창 사이 벽). 좌석은 그만큼 덜 씀</param>
 		public static void Build(Transform room, float W, float D, float t, IList<Vector2> doors,
-								 ClassroomInteriorSettings s, float ceilingHeight, string label, Object ctx)
+								 ClassroomInteriorSettings s, float ceilingHeight, string label, Object ctx,
+								 float backInset = 0f)
 		{
+			float Db = D - Mathf.Max(0f, backInset);        // 실제로 쓸 수 있는 깊이 (뒷벽 안쪽 면 = Db - t)
 			if (s == null || !s.enabled) return;
 
 			var root = new GameObject("Interior").transform;
@@ -127,7 +134,7 @@ namespace NightPatrol
 
 			float xin = W * 0.5f - t;                       // 옆벽 안쪽 면 |x|
 			bool back = s.screenWall == ScreenWall.Window;
-			float zs = back ? D - t : t;                    // 스크린 벽 안쪽 면
+			float zs = back ? Db - t : t;                    // 스크린 벽 안쪽 면
 			float u = back ? -1f : 1f;                      // 스크린 벽 → 학생 쪽 방향
 			var faceScreen = Quaternion.Euler(0f, back ? 0f : 180f, 0f);   // 학생이 스크린을 봄
 			var faceStudents = Quaternion.Euler(0f, back ? 180f : 0f, 0f); // 교수님이 학생을 봄
@@ -135,7 +142,7 @@ namespace NightPatrol
 
 			// 방이 얕아서 안 들어가면 스크린 쪽 공간(최소 1.3m) → 줄 간격(최소 1.45m) 순서로 줄임
 			float zoneL = s.lecternZone, rp = s.rowPitch;
-			float avail = D - 2f * t - 0.9f - (dd * 0.5f + s.chairOffset + 0.25f); // 뒤쪽 통로 0.9m 남김
+			float avail = Db - 2f * t - 0.9f - (dd * 0.5f + s.chairOffset + 0.25f); // 뒤쪽 통로 0.9m 남김
 			if (zoneL + (s.rows - 1) * rp > avail)
 			{
 				zoneL = Mathf.Max(1.3f, avail - (s.rows - 1) * rp);
@@ -146,51 +153,70 @@ namespace NightPatrol
 			}
 
 			// ── 학생 좌석 ──
+			// Plain Seat 자리는 모든 줄에서 컴퓨터 없는 일반 책상 하나 (양옆 Plain Gap만큼 떨어짐).
+			// 교수님 책상은 Front면 스크린과 1열 사이에서 그 줄을 마주 봄, InFirstRow면 1열의 Lectern Seat 자리
 			int n = Mathf.Max(1, s.seatsPerRow), pb = Mathf.Max(1, s.seatsPerBlock);
-			int blocks = (n + pb - 1) / pb;
-			float total = n * s.seatPitch + (blocks - 1) * s.aisleWidth;
-			float x0 = s.offsetX - total * 0.5f;
-			float SeatX(int i) => x0 + (i + 0.5f) * s.seatPitch + (i / pb) * s.aisleWidth;
-			float RowZ(int r) => zs + u * (zoneL + dd * 0.5f + r * rp);
-
-			// 1열 안의 교수님 자리 (없으면 -1). 이 자리는 학생 자리·책상에서 빠짐
-			bool inRow = s.lecternPlacement == LecternPlacement.InFirstRow;
+			bool inRow = s.lecternAt == LecternPlacement.InFirstRow;
 			int lec = inRow ? Mathf.Clamp(s.lecternSeat, 1, n) - 1 : -1;
+			int plainIdx = s.plainSeat > 0 ? Mathf.Clamp(s.plainSeat, 1, n) - 1 : -1;
+			int col = plainIdx >= 0 ? plainIdx : lec;                 // 따로 떨어진 칸
+			float gap = col >= 0 ? Mathf.Max(0f, s.plainGap) : 0f;
+			int leftBlocks = col < 0 ? 0 : (col + pb - 1) / pb;
+			// 책상 묶음 번호: 따로 떨어진 칸 왼쪽은 왼쪽부터, 오른쪽은 그 칸 다음부터 pb자리씩
+			int Block(int i) => col < 0 || i < col ? i / pb : i == col ? leftBlocks : leftBlocks + 1 + (i - col - 1) / pb;
+			int blocks = Block(n - 1) + 1;
+			float total = n * s.seatPitch + (blocks - 1) * s.aisleWidth + 2f * gap;
+			float x0 = s.offsetX - total * 0.5f;
+			float SeatX(int i) => x0 + (i + 0.5f) * s.seatPitch + Block(i) * s.aisleWidth
+				+ (col < 0 || i < col ? 0f : i == col ? gap : 2f * gap);
+			float RowZ(int r) => zs + u * (zoneL + dd * 0.5f + r * rp);
 
 			var seatsRoot = Group(root, "Seats");
 			for (int r = 0; r < s.rows; r++)
 			{
 				float zc = RowZ(r);
 				var row = Group(seatsRoot, $"Row_{r + 1}");
-				int skip = r == 0 ? lec : -1;
+				int skip = inRow && r == 0 ? lec : -1;                          // 1열 교수님 칸은 아래에서 따로
+				int plain = plainIdx;                                           // 컴퓨터 없는 칸
 				int di = 0;
-				for (int b = 0; b < blocks; b++)
+				for (int i0 = 0; i0 < n;)
 				{
-					int i0 = b * pb, i1 = Mathf.Min(n, i0 + pb) - 1;
-					// 교수님 자리가 이 책상 안에 있으면 그 앞뒤로 나눔
-					var segs = new List<Vector2Int>();
-					if (skip >= i0 && skip <= i1)
+					int i1 = i0;
+					while (i1 + 1 < n && Block(i1 + 1) == Block(i0)) i1++;
+					if (i0 != skip)
 					{
-						if (skip > i0) segs.Add(new Vector2Int(i0, skip - 1));
-						if (skip < i1) segs.Add(new Vector2Int(skip + 1, i1));
+						float xa = SeatX(i0) - s.seatPitch * 0.5f, xb = SeatX(i1) + s.seatPitch * 0.5f;
+						Desk(row, i0 == plain ? "Desk_Plain" : $"Desk_{di++}", (xa + xb) * 0.5f, zc, xb - xa, dd, H, -u, s,
+							panel: i0 != plain);
 					}
-					else segs.Add(new Vector2Int(i0, i1));
-					foreach (var sg in segs)
-					{
-						float xa = SeatX(sg.x) - s.seatPitch * 0.5f, xb = SeatX(sg.y) + s.seatPitch * 0.5f;
-						Desk(row, $"Desk_{di++}", (xa + xb) * 0.5f, zc, xb - xa, dd, H, -u, s);
-					}
+					i0 = i1 + 1;
 				}
 				// 이름은 실제 위치 번호 (1열 교수님 자리 번호는 비어 있음)
 				for (int i = 0; i < n; i++)
 					if (i != skip)
-						Seat(row, $"Seat_{r + 1}_{i + 1:00}", new Vector3(SeatX(i), 0f, zc), faceScreen, s);
+						Seat(row, i == plain ? $"Seat_{r + 1}_{i + 1:00}_Plain" : $"Seat_{r + 1}_{i + 1:00}",
+							new Vector3(SeatX(i), 0f, zc), faceScreen, s, computers: i == plain ? false : s.computers);
 			}
 
 			// ── 교수님 책상 (학생을 봄, 의자는 스크린 쪽) ──
 			float lx, lz, lw;
 			if (inRow) { lx = SeatX(lec); lz = RowZ(0); lw = s.seatPitch; }
-			else { lx = s.lecternX; lz = zs + u * (s.chairOffset + 0.55f + dd * 0.5f); lw = s.lecternWidth; }
+			else
+			{
+				if (s.lecternAtPlainSeat && plainIdx >= 0)
+				{
+					// 1열 일반 책상 앞(스크린 쪽)에 맞붙음: 책상끼리 앞면을 마주 봄
+					lx = SeatX(plainIdx);
+					lz = RowZ(0) - u * dd;
+					lw = s.seatPitch;
+				}
+				else
+				{
+					lx = s.lecternX;
+					lz = zs + u * (s.chairOffset + 0.55f + dd * 0.5f);
+					lw = s.lecternWidth;
+				}
+			}
 			var lectern = Group(root, "Lectern");
 			Desk(lectern, "Desk", lx, lz, lw, dd, H + 0.03f, u, s, panel: false);
 			Seat(lectern, "Seat_Prof", new Vector3(lx, 0f, lz), faceStudents, s, H + 0.03f);
@@ -210,28 +236,54 @@ namespace NightPatrol
 					? dr.x - 0.15f - s.panelWidth * 0.5f   // 문이 오른쪽이면 문 왼쪽에
 					: dr.y + 0.15f + s.panelWidth * 0.5f;  // 문이 왼쪽이면 문 오른쪽에
 			}
+			// 복도 벽의 문·분전반을 피해서 빈 구간에 스크린을 놓음. 구간이 모자라면 스크린 폭을 줄임
+			float sw = s.screenWidth;
 			float scx = s.screenCenterX;
-			if (hasPanel && !back && sc > 0)
+			if (!back && sc > 0)
 			{
-				float pa = px - s.panelWidth * 0.5f, pb2 = px + s.panelWidth * 0.5f;
-				if (pb2 + s.screenGap > scx - spanS * 0.5f && pa - s.screenGap < scx + spanS * 0.5f)
+				const float mg = 0.15f;                   // 문틀·분전반과 띄우는 거리
+				var blocked = new List<Vector2>();
+				if (doors != null) foreach (var dr in doors) blocked.Add(new Vector2(dr.x - mg, dr.y + mg));
+				if (hasPanel) blocked.Add(new Vector2(px - s.panelWidth * 0.5f - mg, px + s.panelWidth * 0.5f + mg));
+				blocked.Sort((q1, q2) => q1.x.CompareTo(q2.x));
+				float bestLo = 0f, bestHi = 0f, bestScore = float.MinValue;
+				void Consider(float ca, float cb)
 				{
-					float away = px < scx ? 1f : -1f; // 분전반 반대쪽
-					scx = away > 0f ? pb2 + s.screenGap + spanS * 0.5f : pa - s.screenGap - spanS * 0.5f;
-					Debug.Log($"[Interior] {label}: 분전반과 겹치지 않게 스크린 가운데를 X {s.screenCenterX:0.##} → {scx:0.##}로 옮김", ctx);
+					if (cb - ca < 0.5f) return;
+					float fit = Mathf.Min(cb - ca, spanS);
+					float near = Mathf.Abs(Mathf.Clamp(scx, ca + fit * 0.5f, cb - fit * 0.5f) - scx);
+					float score = fit * 10f - near;      // 스크린이 넓게 들어가는 구간 우선, 비슷하면 원래 위치에 가까운 곳
+					if (score > bestScore) { bestScore = score; bestLo = ca; bestHi = cb; }
+				}
+				float lo = -xin + mg;
+				foreach (var bl in blocked) { Consider(lo, bl.x); lo = Mathf.Max(lo, bl.y); }
+				Consider(lo, xin - mg);
+				if (bestScore > float.MinValue)
+				{
+					float free = bestHi - bestLo;
+					if (spanS > free)
+					{
+						sw = (free - (sc - 1) * s.screenGap) / sc;
+						spanS = free;
+						Debug.Log($"[Interior] {label}: 문·분전반 사이에 맞게 스크린 폭을 {s.screenWidth:0.##} → {sw:0.##}m로 줄임", ctx);
+					}
+					float nx = Mathf.Clamp(scx, bestLo + spanS * 0.5f, bestHi - spanS * 0.5f);
+					if (Mathf.Abs(nx - scx) > 0.01f)
+						Debug.Log($"[Interior] {label}: 문·분전반을 피해 스크린 가운데를 X {s.screenCenterX:0.##} → {nx:0.##}로 옮김", ctx);
+					scx = nx;
 				}
 			}
 			var screens = Group(root, "Screens");
 			for (int i = 0; i < sc; i++)
 			{
-				float cx = scx - spanS * 0.5f + s.screenWidth * 0.5f + i * (s.screenWidth + s.screenGap);
+				float cx = scx - spanS * 0.5f + sw * 0.5f + i * (sw + s.screenGap);
 				var g = Group(screens, $"Screen_{i}");
 				Box(g, "Cloth", new Vector3(cx, (sb + st) * 0.5f, zs + u * 0.06f),
-					new Vector3(s.screenWidth, st - sb, 0.01f), s.projectionScreenMaterial);
+					new Vector3(sw, st - sb, 0.01f), s.projectionScreenMaterial);
 				Box(g, "Case", new Vector3(cx, st + 0.05f, zs + u * 0.06f),
-					new Vector3(s.screenWidth + 0.2f, 0.1f, 0.1f), s.metalMaterial);
+					new Vector3(sw + 0.2f, 0.1f, 0.1f), s.metalMaterial);
 				Box(g, "BottomBar", new Vector3(cx, sb - 0.01f, zs + u * 0.06f),
-					new Vector3(s.screenWidth, 0.03f, 0.03f), s.metalMaterial);
+					new Vector3(sw, 0.03f, 0.03f), s.metalMaterial);
 				if (s.projector)
 				{
 					var pj = new GameObject("Projector").transform;
@@ -245,11 +297,6 @@ namespace NightPatrol
 			}
 			if (sc > 0 && Mathf.Abs(scx) + spanS * 0.5f > xin)
 				Debug.LogWarning($"[Interior] {label}: 스크린이 벽 밖으로 나감. Screen Width나 Screen Gap을 줄일 것", ctx);
-			if (sc > 0 && !back && doors != null)
-				foreach (var d in doors)
-					if (d.y > scx - spanS * 0.5f && d.x < scx + spanS * 0.5f)
-						Debug.LogWarning($"[Interior] {label}: 스크린이 문(X {d.x:0.##} ~ {d.y:0.##})을 가림. " +
-										 $"스크린 범위 X {scx - spanS * 0.5f:0.##} ~ {scx + spanS * 0.5f:0.##}. Screen Center X나 Screen Width를 조정할 것", ctx);
 
 			// ── 칠판 (옆벽) ──
 			if (s.chalkboardSide != SideWall.None)
@@ -269,20 +316,28 @@ namespace NightPatrol
 				Box(root, "ElectricPanel", new Vector3(px, (s.panelBottom + s.panelTop) * 0.5f, t + 0.075f),
 					new Vector3(s.panelWidth, s.panelTop - s.panelBottom, 0.15f), s.metalMaterial);
 
+			// ── 모니터를 점검 대상으로 (정상 = 꺼짐). Id는 생성기가 R21.Monitor.01부터 생성 순서대로 붙임 ──
+			foreach (var mt in root.GetComponentsInChildren<Transform>(true))
+				if (mt.name == "Monitor" && mt.GetComponent<MonitorDevice>() == null)
+				{
+					var scrT = FindChild(mt, "Screen");
+					mt.gameObject.AddComponent<MonitorDevice>().Setup(label, "Monitor", scrT != null ? scrT.GetComponent<Renderer>() : null);
+				}
+
 			// ── 검사 ──
 			float aisleL = x0 + xin, aisleR = xin - (x0 + total);
 			if (aisleL < 0.6f || aisleR < 0.6f)
 				Debug.LogWarning($"[Interior] {label}: 옆 통로가 좁음 (왼쪽 {aisleL:0.##}m, 오른쪽 {aisleR:0.##}m). Offset X나 Seat Pitch를 조정할 것", ctx);
 			float lastChair = zoneL + dd * 0.5f + (s.rows - 1) * rp + s.chairOffset + 0.25f;
-			float frontAisle = (D - 2f * t) - lastChair;
+			float frontAisle = (Db - 2f * t) - lastChair;
 			if (frontAisle < 0.9f)
 				Debug.LogWarning($"[Interior] {label}: 마지막 줄 뒤 통로가 {frontAisle:0.##}m로 좁음. 줄 수나 Row Pitch를 줄일 것", ctx);
 			float between = rp - dd * 0.5f - (s.chairOffset + 0.25f);
-			if (s.rows > 1 && between < 0.55f)
+			if (s.rows > 1 && between < 0.65f)
 				Debug.LogWarning($"[Interior] {label}: 줄 사이(의자 등받이 ~ 뒷줄 책상)가 {between:0.##}m라 플레이어가 못 지나갈 수 있음", ctx);
 			if (!back && !inRow && doors != null)
 				foreach (var d in doors)
-					if (lx + s.lecternWidth * 0.5f > d.x && lx - s.lecternWidth * 0.5f < d.y)
+					if (lx + lw * 0.5f > d.x && lx - lw * 0.5f < d.y)
 						Debug.LogWarning($"[Interior] {label}: 교수님 책상이 문 앞을 막음. Lectern X를 바꿀 것", ctx);
 		}
 
@@ -327,6 +382,17 @@ namespace NightPatrol
 			Slab("Floor_Front_End", cur, xin, z0, z0 + rl);
 		}
 
+		static Transform FindChild(Transform t, string name)
+		{
+			foreach (Transform c in t)
+			{
+				if (c.name == name) return c;
+				var r = FindChild(c, name);
+				if (r != null) return r;
+			}
+			return null;
+		}
+
 		static Transform Group(Transform parent, string name)
 		{
 			var g = new GameObject(name).transform;
@@ -354,7 +420,7 @@ namespace NightPatrol
 
 		// 한 자리: 기준점 = 책상 가운데 바닥, +Z = 앉은 사람이 보는 방향
 		static void Seat(Transform parent, string name, Vector3 pos, Quaternion rot, ClassroomInteriorSettings s,
-						 float deskTop = -1f)
+						 float deskTop = -1f, bool? computers = null)
 		{
 			float H = deskTop > 0f ? deskTop : s.deskHeight;
 			var seat = new GameObject(name).transform;
@@ -363,7 +429,7 @@ namespace NightPatrol
 			seat.localRotation = rot;
 
 			var flip = Quaternion.Euler(0f, 180f, 0f); // 앞면이 앉은 사람을 봄
-			if (s.computers)
+			if (computers ?? s.computers)
 			{
 				Place(seat, s.monitorPrefab, "Monitor", new Vector3(0f, H, 0.12f), flip, go => MonitorPH(go, s));
 				Place(seat, s.keyboardPrefab, "Keyboard", new Vector3(0f, H, -0.15f), flip,
@@ -385,7 +451,8 @@ namespace NightPatrol
 			Box(go, "Stand", new Vector3(0f, 0.01f, 0f), new Vector3(0.24f, 0.02f, 0.2f), s.placeholderMaterial);
 			Box(go, "Neck", new Vector3(0f, 0.12f, -0.04f), new Vector3(0.05f, 0.2f, 0.03f), s.placeholderMaterial);
 			Box(go, "Body", new Vector3(0f, 0.36f, 0f), new Vector3(0.55f, 0.34f, 0.04f), s.placeholderMaterial);
-			Box(go, "Screen", new Vector3(0f, 0.365f, 0.0205f), new Vector3(0.51f, 0.29f, 0.002f), s.monitorScreenMaterial);
+			var scr = Box(go, "Screen", new Vector3(0f, 0.365f, 0.0205f), new Vector3(0.51f, 0.29f, 0.002f), s.monitorScreenMaterial);
+			if (s.monitorScreenMaterial == null) DoorBuilder.Paint(scr.GetComponent<Renderer>(), null, new Color(0.04f, 0.04f, 0.05f)); // 꺼진 화면
 		}
 
 		static void Place(Transform parent, GameObject prefab, string name, Vector3 pos, Quaternion rot,

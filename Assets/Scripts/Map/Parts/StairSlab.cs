@@ -87,6 +87,7 @@ namespace NightPatrol
 			// 맨 위 끝면
 			Quad(new Vector3(-hw, Bot(run), run), new Vector3(hw, Bot(run), run), new Vector3(hw, rise, run), new Vector3(-hw, rise, run), Vector3.forward);
 
+			int railFrom = t.Count;   // 여기부터 난간 삼각형 → 두 번째 서브메시 (재질 따로)
 			if (rail != RailSide.None)
 			{
 				float side = rail == RailSide.Right ? 1f : -1f;
@@ -125,7 +126,10 @@ namespace NightPatrol
 
 			mesh.Clear();
 			mesh.SetVertices(v);
-			mesh.SetTriangles(t, 0);
+			bool hasRail = t.Count > railFrom;
+			mesh.subMeshCount = hasRail ? 2 : 1;
+			mesh.SetTriangles(t.GetRange(0, railFrom), 0);
+			if (hasRail) mesh.SetTriangles(t.GetRange(railFrom, t.Count - railFrom), 1);
 			mesh.SetUVs(0, uv);
 			mesh.RecalculateNormals();
 			mesh.RecalculateBounds();
@@ -133,6 +137,14 @@ namespace NightPatrol
 			GetComponent<MeshFilter>().sharedMesh = mesh;
 			var mr = GetComponent<MeshRenderer>();
 			if (mr.sharedMaterial == null) mr.sharedMaterial = DefaultMaterial();
+			// 서브메시 수만큼 재질 칸 (난간 재질이 비어 있으면 계단 재질로 채움)
+			var mats = mr.sharedMaterials;
+			if (mats.Length != mesh.subMeshCount)
+			{
+				var nm = new Material[mesh.subMeshCount];
+				for (int i = 0; i < nm.Length; i++) nm[i] = i < mats.Length && mats[i] != null ? mats[i] : mats[0];
+				mr.sharedMaterials = nm;
+			}
 
 			if (addCollider)
 			{
