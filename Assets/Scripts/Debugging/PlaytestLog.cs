@@ -66,6 +66,10 @@ namespace NightPatrol.Debugging
         private FloorTasks tasks;
         private PlayerInteractor interactor;
         private JournalHolder journal;
+        private PatrolRun subscribedRun;
+        private FloorTasks subscribedTasks;
+        private PlayerInteractor subscribedInteractor;
+        private JournalHolder subscribedJournal;
         private int attempt, floor, presses, journalViews;
         private string taskText = string.Empty;
         private float runStart;
@@ -75,31 +79,53 @@ namespace NightPatrol.Debugging
         {
             run = Object.FindAnyObjectByType<PatrolRun>();
             tasks = Object.FindAnyObjectByType<FloorTasks>();
-            interactor = Object.FindAnyObjectByType<PlayerInteractor>();
-            journal = Object.FindAnyObjectByType<JournalHolder>();
+            interactor = GetComponent<PlayerInteractor>();
+            if (interactor == null) interactor = Object.FindAnyObjectByType<PlayerInteractor>();
+            journal = GetComponentInChildren<JournalHolder>(true);
+            if (journal == null) journal = Object.FindAnyObjectByType<JournalHolder>();
             runStart = Time.time;
         }
 
         private void OnEnable()
         {
             if (run == null) return;
-            run.FloorStarted += OnFloorStarted;
-            run.Failed += OnFailed;
-            run.Cleared += OnCleared;
-            if (tasks != null) tasks.TasksChanged += OnTasksChanged;
-            if (interactor != null) interactor.Interacted += OnInteracted;
-            if (journal != null) journal.RaisedChanged += OnJournalRaised;
+            subscribedRun = run;
+            subscribedRun.FloorStarted += OnFloorStarted;
+            subscribedRun.Failed += OnFailed;
+            subscribedRun.Cleared += OnCleared;
+            if (tasks != null)
+            {
+                subscribedTasks = tasks;
+                subscribedTasks.TasksChanged += OnTasksChanged;
+            }
+            if (interactor != null)
+            {
+                subscribedInteractor = interactor;
+                subscribedInteractor.Interacted += OnInteracted;
+            }
+            if (journal != null)
+            {
+                subscribedJournal = journal;
+                subscribedJournal.RaisedChanged += OnJournalRaised;
+            }
         }
 
         private void OnDisable()
         {
-            if (run == null) return;
-            run.FloorStarted -= OnFloorStarted;
-            run.Failed -= OnFailed;
-            run.Cleared -= OnCleared;
-            if (tasks != null) tasks.TasksChanged -= OnTasksChanged;
-            if (interactor != null) interactor.Interacted -= OnInteracted;
-            if (journal != null) journal.RaisedChanged -= OnJournalRaised;
+            // Unity 오브젝트가 파괴된 뒤에도 C# 이벤트에서는 구독을 해제할 수 있다.
+            if (!ReferenceEquals(subscribedRun, null))
+            {
+                subscribedRun.FloorStarted -= OnFloorStarted;
+                subscribedRun.Failed -= OnFailed;
+                subscribedRun.Cleared -= OnCleared;
+            }
+            if (!ReferenceEquals(subscribedTasks, null)) subscribedTasks.TasksChanged -= OnTasksChanged;
+            if (!ReferenceEquals(subscribedInteractor, null)) subscribedInteractor.Interacted -= OnInteracted;
+            if (!ReferenceEquals(subscribedJournal, null)) subscribedJournal.RaisedChanged -= OnJournalRaised;
+            subscribedRun = null;
+            subscribedTasks = null;
+            subscribedInteractor = null;
+            subscribedJournal = null;
             Close("중단");   // 테스터가 도중에 끄면 마지막 층(포기한 층) 기록이 남게
         }
 

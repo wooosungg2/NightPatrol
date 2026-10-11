@@ -6,6 +6,8 @@ using UnityEngine;
 
 namespace NightPatrol.Run
 {
+    public enum FloorStartReason { GameStart, Descend, Fail, Restart, Jump }
+
     // 층 진행·실패·회차. 층은 같은 씬을 다시 쓰고, 층이 바뀔 때마다 사물을 처음 상태로 되돌린다.
     // 이벤트 구독자(이상현상 등)에서 예외가 나도 콘솔에 남기고 나머지 구독자와 층 진행은 끝까지 간다 (SafeEvent)
     [DisallowMultipleComponent]
@@ -23,6 +25,9 @@ namespace NightPatrol.Run
         private readonly List<int> failedFloors = new List<int>();
         private int step;
         private Pose? spawn;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private bool checkedEmptyIds;
+#endif
 
         /// <summary>지금 층 번호</summary>
         public int CurrentFloor => floors[step];
@@ -34,7 +39,17 @@ namespace NightPatrol.Run
         public IReadOnlyList<int> FailedFloors => failedFloors;
         /// <summary>지금 첫 층(보통 5층)인지 — 일지 첫 장 표시용</summary>
         public bool IsFirstFloor => step == 0;
-        /// <summary>사물 초기화 직후, 점검 항목 생성 전. 이상현상·표지판·조명은 여기서 바꾼다</summary>
+        /// <summary>
+        /// 이번 층을 시작한 이유. FloorReset·FloorStarted에서 읽는다.
+        /// 예: 하행 성공 때만 다음 이상을 켜려면 LastStart == FloorStartReason.Descend.
+        /// </summary>
+        public FloorStartReason LastStart { get; private set; }
+        /// <summary>
+        /// 사물 초기화 직후, FloorStarted 전. 점검 사물이 아니면서 층마다 처음 상태로 돌아가야 하는 것(조명 구역 등)은 여기서 되돌린다.
+        /// 이상현상은 여기서 켜지 말 것 (FloorStarted에서).
+        /// </summary>
+        public event Action<int> FloorReset;
+        /// <summary>사물·FloorReset 초기화 뒤, 점검 항목 생성 전. 이상현상·표지판은 여기서 바꾼다. 시작 이유는 LastStart.</summary>
         public event Action<int> FloorStarted;
         /// <summary>실패한 층. 바로 이어서 첫 층의 FloorStarted가 온다</summary>
         public event Action<int> Failed;
@@ -48,12 +63,19 @@ namespace NightPatrol.Run
                 Debug.LogError("PatrolRun의 Floors는 2개 이상이어야 합니다. 기본값 5, 4, 3, 2, 1을 씁니다.", this);
                 floors = new[] { 5, 4, 3, 2, 1 };
             }
+            if (player == null && PlayerControl.Current != null)
+                player = PlayerControl.Current.GetComponent<PlayerMovement>();
             if (player == null) player = UnityEngine.Object.FindAnyObjectByType<PlayerMovement>();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (UnityEngine.Object.FindObjectsByType<PatrolRun>(FindObjectsInactive.Exclude).Length > 1)
+                Debug.LogWarning("[Run] PatrolRun이 둘 이상", this);
+#endif
         }
 
         private void Start()
         {
             if (player != null) spawn = new Pose(player.transform.position, player.transform.rotation);
+            LastStart = FloorStartReason.GameStart;
             StartFloor();
         }
 
@@ -73,6 +95,7 @@ namespace NightPatrol.Run
                 return;
             }
             step++;
+            LastStart = FloorStartReason.Descend;
             if (step == floors.Length - 1) Clear();
             else StartFloor();
         }
@@ -92,13 +115,16 @@ namespace NightPatrol.Run
             }
             Debug.Log($"[Run] {failedFloor}층 실패", this);
             SafeEvent.Raise(Failed, failedFloor, this);
+            LastStart = FloorStartReason.Fail;
             StartFloor();
         }
 
         /// <summary>개발자 메뉴: 지금 층을 처음부터 (사물 초기화 + 점검 항목 다시 뽑기). 클리어 후엔 무시</summary>
         public void RestartFloor()
         {
-            if (!IsCleared) StartFloor();
+            if (IsCleared) return;
+            LastStart = FloorStartReason.Restart;
+            StartFloor();
         }
 
         /// <summary>개발자 메뉴: 층 이동. 음수 = 위층, 양수 = 아래층. 회차는 그대로. 맨 위·맨 아래에서 더 가면 아무것도 안 함</summary>
@@ -107,6 +133,7 @@ namespace NightPatrol.Run
             int next = Mathf.Clamp(step + steps, 0, floors.Length - 1);
             if (next == step) return;
             step = next;
+            LastStart = FloorStartReason.Jump;
             if (step == floors.Length - 1) Clear();
             else StartFloor();
         }
@@ -117,17 +144,22 @@ namespace NightPatrol.Run
             foreach (var obj in UnityEngine.Object.FindObjectsByType<PatrolObject>(FindObjectsInactive.Include))
             {
                 if (obj == null) continue;
-                obj.ResetToDefault();
-                obj.ClearFloorState();
+                try { obj.ResetToDefault(); }
+                catch (Exception e) { Debug.LogException(e, obj); }
+                finally { obj.ClearFloorState(); }
             }
         }
 
-        // 층을 시작하는 곳은 여기 하나. 순서: 사물 초기화 → FloorStarted(이상현상 등) → 점검 항목 → 일지(TasksChanged)
+        // 사물 초기화·Id 표 → FloorReset(조명 복구 등) → FloorStarted(이상현상 등) → 점검 항목 → 일지(TasksChanged)
         private void StartFloor()
         {
+            PatrolInspection.ResetErrorLog();
             IsCleared = false;
             ResetAllObjects();
+            PatrolInspection.RefreshIdMap();
+            SafeEvent.Raise(FloorReset, CurrentFloor, this);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            WarnEmptyIdsOnce();
             WarnAbnormalAfterReset();
 #endif
             Debug.Log($"[Run] {CurrentFloor}층 시작 ({Attempt}회차)", this);
@@ -144,6 +176,23 @@ namespace NightPatrol.Run
         }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private void WarnEmptyIdsOnce()
+        {
+            if (checkedEmptyIds) return;
+            checkedEmptyIds = true;
+            int count = 0;
+            var names = new List<string>();
+            foreach (var obj in UnityEngine.Object.FindObjectsByType<PatrolObject>(FindObjectsInactive.Exclude))
+            {
+                if (obj == null || !obj.isActiveAndEnabled || !string.IsNullOrEmpty(obj.Id)) continue;
+                count++;
+                if (names.Count < 10) names.Add(obj.name);
+            }
+            if (count > 0)
+                Debug.LogWarning($"[Patrol] Id가 빈 점검 사물 {count}개 (점검 항목·이상현상 대상이 될 수 없음): " +
+                    string.Join(", ", names), this);
+        }
+
         // 기본 상태(ResetToDefault)가 비정상인 사물은 점검 목록에 없는데 판정에 걸린다
         private void WarnAbnormalAfterReset()
         {
