@@ -108,6 +108,22 @@ namespace NightPatrol.Tests
             SetField(menu, "keyBindings", list);
         }
 
+        // 같은 동작을 count줄 넣은 목록 (가운데 빈 줄을 하나 넣을 수 있음)
+        private KeyBindingList KeyListOf(int count, int emptyAt = -1)
+        {
+            var actions = ScriptableObject.CreateInstance<InputActionAsset>();
+            var ok = actions.AddActionMap("Player").AddAction("Ok", InputActionType.Button);
+            ok.AddBinding("<Keyboard>/e", groups: KeyBindings.KeyboardMouse);
+            var okRef = InputActionReference.Create(ok);
+            var entries = new KeyBindingList.Entry[count];
+            for (int i = 0; i < count; i++)
+                entries[i] = new KeyBindingList.Entry { label = i == emptyAt ? "빈 줄" : "줄" + i, action = i == emptyAt ? null : okRef };
+            var list = ScriptableObject.CreateInstance<KeyBindingList>();
+            SetField(list, "entries", entries);
+            createdAssets.AddRange(new Object[] { actions, okRef, list });
+            return list;
+        }
+
         private GameObject New(string name)
         {
             var go = new GameObject(name);
@@ -483,6 +499,46 @@ namespace NightPatrol.Tests
             menu.Open();
             Assert.IsFalse(menu.IsOpen);
             Assert.AreEqual(1f, Time.timeScale);
+        }
+
+        // 00_08d: 조작 키 목록 설정 실수는 경고 (메뉴에서 눌러도 안 바뀌는 줄, 10줄 초과)
+        [Test]
+        public void KeyListMistakes_AreWarned()
+        {
+            SetField(menu, "keyBindings", KeyListOf(11, emptyAt: 10));
+            LogAssert.Expect(LogType.Warning, new Regex("10줄을 넘음"));
+            LogAssert.Expect(LogType.Warning, new Regex("11번째 줄 '빈 줄'"));
+
+            typeof(PauseMenu).GetMethod("WarnKeyBindings", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(menu, null);
+        }
+
+        // 00_08d: 메뉴에는 10줄만 보여도 겹침 맞바꿈은 목록 전체를 본다 (숨은 줄의 키와도 안 겹치게)
+        [Test]
+        public void Swap_CoversRowsHiddenFromTheMenu()
+        {
+            SetField(menu, "keyBindings", KeyListOf(12));
+            var rows = (System.Collections.IList)typeof(PauseMenu)
+                .GetMethod("BindingRows", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(menu, null);
+
+            Assert.AreEqual(12, rows.Count);
+            Assert.AreEqual(12, PauseMenu.RowsOf(PauseMenu.Page.Keys, 12).Length);   // 키 10줄 + 기본값으로 + 뒤로
+        }
+
+        // 00_08c: PlayerControl이 있으면 메뉴는 그걸로 잠그되 일지는 내리지 않는다 (클립보드를 빌려 쓰므로)
+        [Test]
+        public void Open_WithPlayerControl_LocksWithoutJournal()
+        {
+            var control = movement.gameObject.AddComponent<PlayerControl>();
+            SetField(menu, "control", control);
+
+            menu.Open();
+            Assert.IsTrue(control.IsLocked);
+            Assert.IsTrue(movement.IsBlocked);
+            Assert.IsFalse(holder.IsBlocked);
+
+            menu.Close();
+            Assert.IsFalse(control.IsLocked);
+            Assert.IsFalse(movement.IsBlocked);
         }
     }
 }

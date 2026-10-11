@@ -103,19 +103,14 @@ namespace NightPatrol.Tests
             Assert.IsFalse(transition.IsBusy, "연출이 끝나지 않음");
         }
 
-        private ElevatorDoors MakeDoors(float seconds)
+        // 송지우님 ElevatorDoors (Elevator_Base 루트): 자식 Door_Left·Door_Right를 이름으로 찾고, 기본은 열린 채 시작
+        private NightPatrol.ElevatorDoors MakeDoors(float moveSeconds)
         {
-            var root = New("ElevatorDoors");
-            root.SetActive(false);   // Awake waits until the doors are assigned
-            var left = new GameObject("Door_Left").transform;
-            var right = new GameObject("Door_Right").transform;
-            left.SetParent(root.transform);
-            right.SetParent(root.transform);
-            var doors = root.AddComponent<ElevatorDoors>();
-            SetField(doors, "leftDoor", left);
-            SetField(doors, "rightDoor", right);
-            SetField(doors, "seconds", seconds);
-            root.SetActive(true);
+            var root = New("Elevator_Base");
+            new GameObject("Door_Left").transform.SetParent(root.transform);
+            new GameObject("Door_Right").transform.SetParent(root.transform);
+            var doors = root.AddComponent<NightPatrol.ElevatorDoors>();
+            doors.moveSeconds = moveSeconds;
             SetField(transition, "doors", doors);
             return doors;
         }
@@ -239,18 +234,37 @@ namespace NightPatrol.Tests
             Assert.AreEqual(0f, fader.Alpha);
         }
 
+        // 판정 중 사물 코드 오류(IsNormal 예외): 그 사물은 비정상으로 세서 실패 (00_08a — 조용히 통과시키면 버그가 묻힘)
         [UnityTest]
-        public IEnumerator JudgeException_StaysOnFloor_AndUnlocks()
+        public IEnumerator JudgeException_CountsAsAbnormal_FailsAndUnlocks()
         {
             yield return null;
             New("Broken").AddComponent<ThrowingPatrolObject>();   // after floor 5 started, so only the judgment hits it
-            LogAssert.Expect(LogType.Exception, new Regex("IsNormal bug"));
+            LogAssert.Expect(LogType.Exception, new Regex("IsNormal bug"));   // 판정
+            LogAssert.Expect(LogType.Exception, new Regex("IsNormal bug"));   // 실패 뒤 새 층의 초기화 직후 검사 (층마다 한 번)
 
             transition.Descend();
             yield return WaitUntilIdle();
 
             Assert.AreEqual(5, run.CurrentFloor);
-            Assert.AreEqual(1, run.Attempt);
+            Assert.AreEqual(2, run.Attempt);
+            Assert.IsFalse(movement.IsBlocked);
+            Assert.AreEqual(0f, fader.Alpha);
+        }
+
+        // 판정 밖으로 예외가 나오면(진행 코드 오류) 정상 도착으로 알리지 않고 화면·잠금만 되돌린다
+        [UnityTest]
+        public IEnumerator JudgeError_NoArrival_Unlocks()
+        {
+            yield return null;
+            SetField(run, "floors", null);   // 하행 계산에서 NullReferenceException이 나게
+            LogAssert.Expect(LogType.Exception, new Regex("NullReferenceException"));
+            LogAssert.Expect(LogType.Error, new Regex("하행 판정 중 오류"));
+
+            transition.Descend();
+            yield return WaitUntilIdle();
+
+            Assert.IsFalse(events.Exists(e => e.StartsWith("Arrived")), "오류인데 도착 알림이 나감");
             Assert.IsFalse(movement.IsBlocked);
             Assert.AreEqual(0f, fader.Alpha);
         }
@@ -275,15 +289,18 @@ namespace NightPatrol.Tests
             Assert.IsFalse(transition.IsBusy);
         }
 
-        // ── 엘리베이터 문 ──
+        // ── 엘리베이터 문 (송지우님 ElevatorDoors, 03_05c) ──
         [UnityTest]
-        public IEnumerator Descend_WithDoors_EndsWithDoorsOpen()
+        public IEnumerator Descend_ClosesDoorsBeforeArriving_ThenOpens()
         {
             yield return null;
-            var doors = MakeDoors(0f);
+            var doors = MakeDoors(0.05f);
+            bool closedOnArrive = false;
+            transition.Arrived += _ => closedOnArrive = doors.IsClosed;
             transition.Descend();
-            yield return WaitUntilIdle();
+            yield return WaitUntilIdleFor(3f);
             Assert.AreEqual(4, run.CurrentFloor);
+            Assert.IsTrue(closedOnArrive, "도착(어두운 동안)에는 문이 닫혀 있어야 함");
             Assert.IsTrue(doors.IsOpen);
         }
 
@@ -291,10 +308,10 @@ namespace NightPatrol.Tests
         public IEnumerator Fail_WithDoors_LeavesDoorsOpen()
         {
             yield return null;
-            var doors = MakeDoors(0f);
+            var doors = MakeDoors(0.05f);
             New("Lamp").AddComponent<FakePatrolObject>().normal = false;
             transition.Descend();
-            yield return WaitUntilIdle();
+            yield return WaitUntilIdleFor(3f);
             Assert.AreEqual(2, run.Attempt);
             Assert.IsTrue(doors.IsOpen);
         }
@@ -305,11 +322,65 @@ namespace NightPatrol.Tests
             yield return null;
             var doors = MakeDoors(10f);   // slow, so they are still closing a frame later
             transition.Descend();
-            yield return null;
+            float start = Time.realtimeSinceStartup;   // 프레임 간격이 짧아도 닫히기 시작할 때까지
+            while (doors.IsOpen && Time.realtimeSinceStartup - start < 1f) yield return null;
             Assert.IsFalse(doors.IsOpen);
+            Assert.IsTrue(transition.IsBusy);
 
             transition.enabled = false;
             Assert.IsTrue(doors.IsOpen);
+        }
+
+        // 문이 끝까지 안 닫혀도(다른 코드가 계속 엶 등) moveSeconds + 0.5초 뒤에는 연출이 계속되어 잠금이 풀린다
+        [UnityTest]
+        public IEnumerator StuckDoors_TimeOut_TransitionStillEnds()
+        {
+            yield return null;
+            var doors = MakeDoors(0.05f);
+            transition.Descend();
+            float start = Time.realtimeSinceStartup;
+            while (transition.IsBusy && Time.realtimeSinceStartup - start < 3f)
+            {
+                if (run.CurrentFloor == 5) doors.Open();   // 닫히지 못하게 계속 엶
+                yield return null;
+            }
+            Assert.IsFalse(transition.IsBusy, "문이 안 닫혀도 연출이 끝나야 함");
+            Assert.AreEqual(4, run.CurrentFloor);
+            Assert.IsFalse(movement.IsBlocked);
+        }
+
+        [UnityTest]
+        public IEnumerator DisabledDoors_AreSkipped()
+        {
+            yield return null;
+            var doors = MakeDoors(10f);
+            doors.enabled = false;
+            transition.Descend();
+            yield return WaitUntilIdle();
+            Assert.AreEqual(4, run.CurrentFloor);
+        }
+
+        private IEnumerator WaitUntilIdleFor(float seconds)
+        {
+            float start = Time.realtimeSinceStartup;
+            while (transition.IsBusy && Time.realtimeSinceStartup - start < seconds) yield return null;
+            Assert.IsFalse(transition.IsBusy, "연출이 끝나지 않음");
+        }
+
+        // 00_08c: PlayerControl이 있으면 그걸로 잠그고 푼다
+        [UnityTest]
+        public IEnumerator Descend_WithPlayerControl_LocksThroughIt()
+        {
+            yield return null;
+            var control = movement.gameObject.AddComponent<PlayerControl>();
+            SetField(transition, "control", control);
+
+            transition.Descend();
+            Assert.IsTrue(control.IsLocked);
+            yield return WaitUntilIdle();
+
+            Assert.IsFalse(control.IsLocked);
+            Assert.IsFalse(movement.IsBlocked);
         }
     }
 }
