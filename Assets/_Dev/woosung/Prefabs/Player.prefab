@@ -389,7 +389,7 @@ MonoBehaviour:
   titleText: {fileID: 5115419713765768218}
   bodyText: {fileID: 1175393216888236884}
   pointerCamera: {fileID: 7903758895214047317}
-  keyBindings: {fileID: 11400000, guid: db9d996e32a7bac42aa763d1f5929017, type: 2}
+  keyBindings: {fileID: 11400000, guid: 2b7063aa0eae3264e96fc0700192b96f, type: 2}
 --- !u!1 &2250382643417042813
 GameObject:
   m_ObjectHideFlags: 0
@@ -476,6 +476,8 @@ GameObject:
   - component: {fileID: 3681877128572066237}
   - component: {fileID: 3822811464582149780}
   - component: {fileID: 9075019998134237971}
+  - component: {fileID: 3601201056383655185}
+  - component: {fileID: 1503323067852493608}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -518,13 +520,13 @@ CharacterController:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Height: 2
+  m_Height: 1.8
   m_Radius: 0.3
   m_SlopeLimit: 45
   m_StepOffset: 0.3
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
-  m_Center: {x: 0, y: 1, z: 0}
+  m_Center: {x: 0, y: 0.9, z: 0}
 --- !u!114 &5731401744826051114
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -571,7 +573,7 @@ MonoBehaviour:
   interactAction: {fileID: 1781555164194001046, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   raycastMask:
     serializedVersion: 2
-    m_Bits: 4294967291
+    m_Bits: 115
 --- !u!114 &6623134844803472182
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -731,6 +733,42 @@ MonoBehaviour:
   arrive: {fileID: 0}
   wake: {fileID: 0}
   effectVolume: 0.8
+--- !u!114 &3601201056383655185
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2258116461089007196}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7631cb412d1744bbba438e04c542eee9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NightPatrol::NightPatrol.Lighting.Flashlight
+  playerCamera: {fileID: 0}
+  spot: {fileID: 0}
+  startOn: 0
+  toggleAction: {fileID: 346019026430069724, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  range: 14
+  spotAngle: 55
+  innerSpotAngle: 28
+  intensity: 4
+  color: {r: 1, g: 0.95, b: 0.85, a: 1}
+  shadows: 2
+  handOffset: {x: 0.22, y: -0.22, z: 0.15}
+  followSpeed: 14
+--- !u!114 &1503323067852493608
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2258116461089007196}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 08115f3db54d12646905eef1049bc752, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NightPatrol::NightPatrol.Player.PlayerControl
 --- !u!1 &3660377868929009871
 GameObject:
   m_ObjectHideFlags: 0
