@@ -3,6 +3,9 @@
     "rootNamespace": "NightPatrol.Tests",
     "references": [
         "NightPatrol",
+        "Unity.InputSystem",
+        "Unity.TextMeshPro",
+        "UnityEngine.UI",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

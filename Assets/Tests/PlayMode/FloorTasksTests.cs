@@ -246,6 +246,20 @@ namespace NightPatrol.Tests
         }
 
         [Test]
+        public void TasksChangedException_IsLogged_AndOthersStillGetTheList()
+        {
+            MakeSixWithEntries();
+            IReadOnlyList<PatrolTask> received = null;
+            tasks.TasksChanged += _ => throw new System.InvalidOperationException("journal bug");
+            tasks.TasksChanged += list => received = list;
+
+            LogAssert.Expect(LogType.Exception, new Regex("journal bug"));
+            tasks.Generate(5, 1);
+
+            Assert.AreSame(tasks.CurrentTasks, received);
+        }
+
+        [Test]
         public void SameSeed_SameFloorAndAttempt_SameTasks()
         {
             var all = MakeSixWithEntries();
@@ -304,6 +318,55 @@ namespace NightPatrol.Tests
             Assert.AreEqual(0, abnormalAtFloorStart);
             Assert.AreEqual(5, tasks.CurrentTasks.Count);
             CollectionAssert.DoesNotContain(Targets(tasks.CurrentTasks), all[0]);
+        }
+
+        // ── 예외 지시 (02_03) ──
+        private static TaskTable.Entry Exception(string label, params string[] ids) =>
+            new TaskTable.Entry { label = label, ids = ids, exception = true };
+
+        [Test]
+        public void ExceptionEntry_LeavesTargetAbnormal_ButClear()
+        {
+            var pc = Make("R21.PC.01");
+            SetEntries(Exception("521호 강사 PC는 끄지 말 것", pc.Id));
+            SetCount(1, 1);
+
+            tasks.Generate(5, 1);
+
+            Assert.IsFalse(pc.normal);                 // 켜진 채로 시작
+            Assert.IsTrue(pc.IsException);
+            Assert.IsTrue(tasks.CurrentTasks[0].IsException);
+            Assert.IsTrue(PatrolInspection.IsAllClear());
+
+            pc.normal = true;                          // 규정대로 꺼 버리면
+            Assert.IsFalse(PatrolInspection.IsAllClear());
+        }
+
+        [Test]
+        public void ExceptionTarget_IsNotPickedAgainByAnotherEntry()
+        {
+            var pc = Make("R21.PC.01");
+            SetEntries(Exception("PC 끄지 말 것", pc.Id), Entry("PC 끄기", pc.Id));
+            SetCount(2, 2);
+
+            tasks.Generate(5, 1);
+
+            Assert.AreEqual(1, tasks.CurrentTasks.Count);
+        }
+
+        [Test]
+        public void FloorStart_ClearsException()
+        {
+            var pc = Make("R21.PC.01");
+            SetEntries(Exception("PC 끄지 말 것", pc.Id));
+            SetCount(1, 1);
+            tasks.Generate(5, 1);
+            SetEntries();                              // 다음 층에서는 안 뽑히게
+
+            run.Descend(true);
+
+            Assert.IsFalse(pc.IsException);
+            Assert.IsTrue(pc.normal);
         }
     }
 }

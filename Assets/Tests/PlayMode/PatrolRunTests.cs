@@ -225,6 +225,21 @@ namespace NightPatrol.Tests
         }
 
         [Test]
+        public void ClearedSubscriberException_IsLogged_AndOthersStillHear()
+        {
+            bool after = false;
+            run.Cleared += () => throw new System.InvalidOperationException("ending bug");
+            run.Cleared += () => after = true;
+
+            LogAssert.Expect(LogType.Exception, new Regex("ending bug"));
+            run.JumpBy(4);
+
+            Assert.IsTrue(run.IsCleared);
+            Assert.AreEqual(1, clearedCount);
+            Assert.IsTrue(after);
+        }
+
+        [Test]
         public void Fail_WithoutPlayerOrStartPoint_DoesNotThrow()
         {
             Assert.DoesNotThrow(run.Fail);
@@ -365,7 +380,7 @@ namespace NightPatrol.Tests
         public void Elevator_FindsRunByItself()
         {
             var elevator = New("Elevator").AddComponent<Elevator>();
-            Assert.AreEqual("E - 아래층으로", elevator.Prompt);
+            Assert.AreEqual("E 길게 - 아래층으로", elevator.Prompt);
             elevator.Interact(null);
             Assert.AreEqual(4, run.CurrentFloor);
         }
@@ -375,13 +390,24 @@ namespace NightPatrol.Tests
         {
             var elevator = New("Elevator").AddComponent<Elevator>();
             SetField(elevator, "run", run);
-            Assert.AreEqual("E - 아래층으로", elevator.Prompt);
+            Assert.AreEqual("E 길게 - 아래층으로", elevator.Prompt);
 
             elevator.Interact(null);
             Assert.AreEqual(4, run.CurrentFloor);
 
             for (int i = 0; i < 3; i++) run.Descend(true);
             Assert.AreEqual(string.Empty, elevator.Prompt);
+        }
+
+        [Test]
+        public void Elevator_NeedsAHold_UnlessHoldIsZero()
+        {
+            var elevator = New("Elevator").AddComponent<Elevator>();
+            Assert.IsInstanceOf<IHoldInteractable>(elevator);
+            Assert.AreEqual(0.7f, elevator.HoldSeconds, 1e-5f);
+
+            SetField(elevator, "holdSeconds", 0f);
+            Assert.AreEqual("E - 아래층으로", elevator.Prompt);
         }
     }
 }
