@@ -1,0 +1,61 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc75c0a0df8c21a4ba0e492e3f7e9278, type: 3}
+  m_Name: TaskTable_Floor5
+  m_EditorClassIdentifier: NightPatrol::NightPatrol.Run.TaskTable
+  entries:
+  - label: "{room} \uBC29\uD654\uBB38 \uC7A0\uAE08 \uD655\uC778"
+    ids:
+    - Stair*.Door.*
+    exception: 0
+  - label: "{room} \uCD9C\uC785\uBB38 \uB2EB\uACE0 \uC7A0\uADF8\uAE30"
+    ids:
+    - R21.Door.*
+    exception: 0
+  - label: "{room} \uCC3D\uBB38 \uB2EB\uACE0 \uC7A0\uADF8\uAE30"
+    ids:
+    - R21.Window.*
+    exception: 0
+  - label: "{room} \uBE14\uB77C\uC778\uB4DC \uB0B4\uB9AC\uAE30"
+    ids:
+    - R21.Blind.*
+    exception: 0
+  - label: "{room} \uCD9C\uC785\uBB38 \uB2EB\uACE0 \uC7A0\uADF8\uAE30"
+    ids:
+    - R24.Door.*
+    exception: 0
+  - label: "{room} \uCC3D\uBB38 \uB2EB\uACE0 \uC7A0\uADF8\uAE30"
+    ids:
+    - R24.Window.*
+    exception: 0
+  - label: "{room} \uBE14\uB77C\uC778\uB4DC \uB0B4\uB9AC\uAE30"
+    ids:
+    - R24.Blind.*
+    exception: 0
+  - label: "\uAD50\uC218\uC2E4 \uAD6C\uC5ED \uC7A0\uAE08 \uD655\uC778"
+    ids:
+    - R05~R19.Door.*
+    exception: 0
+  - label: "{room} \uBAA8\uB2C8\uD130 \uB044\uAE30"
+    ids:
+    - R21.Monitor.*
+    exception: 0
+  - label: "{room} TV \uB044\uAE30"
+    ids:
+    - R24.TV.*
+    exception: 0
+  areaNames:
+  - area: StairW
+    name: "\uC11C\uCABD \uACC4\uB2E8\uC2E4"
+  - area: StairE
+    name: "\uB3D9\uCABD \uACC4\uB2E8\uC2E4"
+  roomFloor: 0
