@@ -29,6 +29,12 @@ namespace NightPatrol.Run
         private bool checkedEmptyIds;
 #endif
 
+        /// <summary>
+        /// 씬의 층 진행 (먼저 켜진 PatrolRun, 없으면 null). Start 이후·이벤트 안·Update에서 쓴다.
+        /// Awake·OnEnable에서는 PatrolRun보다 먼저 깨어나면 아직 null이라, 이벤트 구독은 지금처럼 FindAnyObjectByType으로 찾는다.
+        /// 둘 이상이면 먼저 켜진 쪽이고, 그 쪽이 꺼지면 다른 쪽이 켜져 있어도 null (씬에는 하나만)
+        /// </summary>
+        public static PatrolRun Current { get; private set; }
         /// <summary>지금 층 번호</summary>
         public int CurrentFloor => floors[step];
         /// <summary>회차 (1부터, 실패할 때마다 +1)</summary>
@@ -70,6 +76,16 @@ namespace NightPatrol.Run
             if (UnityEngine.Object.FindObjectsByType<PatrolRun>(FindObjectsInactive.Exclude).Length > 1)
                 Debug.LogWarning("[Run] PatrolRun이 둘 이상", this);
 #endif
+        }
+
+        private void OnEnable()
+        {
+            if (Current == null) Current = this;
+        }
+
+        private void OnDisable()
+        {
+            if (Current == this) Current = null;
         }
 
         private void Start()
@@ -174,6 +190,10 @@ namespace NightPatrol.Run
             Debug.Log($"[Run] {CurrentFloor}층 도착 — 클리어", this);
             SafeEvent.Raise(Cleared, this);
         }
+
+        // 에디터에서 도메인 리로드를 꺼도 지난 Play의 PatrolRun이 남지 않게
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() => Current = null;
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private void WarnEmptyIdsOnce()
