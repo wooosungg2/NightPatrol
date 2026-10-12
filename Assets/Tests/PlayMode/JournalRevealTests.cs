@@ -184,5 +184,48 @@ namespace NightPatrol.Tests
             CollectionAssert.IsEmpty(view.RevealedTargets);
             StringAssert.EndsWith("■ 점검 사항 0건\n※ 전등 1은 켜 둘 것", JournalText.Render(page));
         }
+
+        // 03_08 + 04_04: 문구에 방 번호가 들어가 층마다 바뀌어도(521호 → 421호) 층마다 새 장이라
+        // 5층 → 4층 → 실패 → 5층에서 드러남·중간선이 새로 시작한다
+        [Test]
+        public void RoomLabels_ChangeWithTheFloor_RevealAndStrikeStartOver()
+        {
+            lamp1.Id = "R21.Lamp.01";
+            lamp2.Id = "R24.Lamp.01";
+            SetField(table, "entries", new[] { new TaskTable.Entry { label = "{room} 전등 소등", ids = new[] { "R2*.Lamp.*" } } });
+            SetField(tasks, "minTasks", 1);
+            SetField(tasks, "maxTasks", 1);
+            Set("reveal", TaskReveal.WhenSolved);
+            Set("strikeSolved", true);
+
+            run.RestartFloor();                                   // 5층 (1회차)
+            var five = tasks.CurrentTasks[0];
+            StringAssert.IsMatch("^52[14]호 전등 소등$", five.Label);
+            ((FakeLamp)five.Target).SetNormal(true);
+            view.Refresh();
+            var page = view.BuildPage();
+            CollectionAssert.AreEqual(new[] { five.Label }, page.Solved);
+            CollectionAssert.AreEqual(new[] { five.Label }, page.Revealed);
+
+            run.Descend(true);                                    // 4층: 문구가 42x호로 바뀜
+            var four = tasks.CurrentTasks[0];
+            StringAssert.IsMatch("^42[14]호 전등 소등$", four.Label);
+            page = view.BuildPage();
+            CollectionAssert.AreEqual(new[] { four.Label }, page.Tasks);
+            CollectionAssert.IsEmpty(page.Solved);
+            CollectionAssert.IsEmpty(page.Revealed);
+            ((FakeLamp)four.Target).SetNormal(true);
+            view.Refresh();
+            CollectionAssert.AreEqual(new[] { four.Label }, view.BuildPage().Revealed);
+
+            run.Fail();                                           // 4층 실패 → 5층 (2회차)
+            var again = tasks.CurrentTasks[0];
+            StringAssert.IsMatch("^52[14]호 전등 소등$", again.Label);
+            page = view.BuildPage();
+            CollectionAssert.AreEqual(new[] { again.Label }, page.Tasks);
+            CollectionAssert.IsEmpty(page.Solved);
+            CollectionAssert.IsEmpty(page.Revealed);
+            CollectionAssert.IsEmpty(view.RevealedTargets);
+        }
     }
 }
