@@ -59,6 +59,24 @@ namespace NightPatrol.Menu
         /// <summary>메뉴 표시: "전체 화면" / "창 모드"</summary>
         public static string ScreenModeLabel(bool fullScreen) => fullScreen ? "전체 화면" : "창 모드";
 
+        /// <summary>에디터 Game 뷰는 해상도·화면 모드가 안 바뀐다는 안내 (메뉴 값 뒤에 붙임)</summary>
+        public const string EditorNote = " (빌드에서 적용)";
+
+        /// <summary>메뉴 표시: "1920×1080". 에디터면 뒤에 " (빌드에서 적용)"</summary>
+        public static string ResolutionLabel(Vector2Int size, bool inEditor) =>
+            ResolutionLabel(size) + (inEditor ? EditorNote : string.Empty);
+
+        /// <summary>메뉴 표시: "전체 화면" / "창 모드". 에디터면 뒤에 " (빌드에서 적용)"</summary>
+        public static string ScreenModeLabel(bool fullScreen, bool inEditor) =>
+            ScreenModeLabel(fullScreen) + (inEditor ? EditorNote : string.Empty);
+
+        /// <summary>
+        /// 화면 변경 로그 한 줄: "[Menu] 화면: 요청 1280×720 창 모드 → 실제 1280×720 Windowed".
+        /// 적용(프레임 끝) 다음 프레임의 실제 값과 같이 남겨, 빌드에서 요청대로 안 바뀐 경우를 추적한다
+        /// </summary>
+        public static string ChangeLog(Vector2Int requested, bool requestedFullScreen, Vector2Int actual, FullScreenMode actualMode) =>
+            $"[Menu] 화면: 요청 {ResolutionLabel(requested)} {ScreenModeLabel(requestedFullScreen)} → 실제 {ResolutionLabel(actual)} {actualMode}";
+
         /// <summary>지금 모드가 전체 화면인지 (창 모드만 아니면 전체 화면)</summary>
         public static bool IsFullScreen(FullScreenMode mode) => mode != FullScreenMode.Windowed;
 

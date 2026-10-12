@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using NightPatrol.Controls;
 using NightPatrol.Interaction;
 using NightPatrol.Journal;
@@ -54,11 +53,12 @@ namespace NightPatrol.Menu
             public IReadOnlyList<string> KeyNames;
             /// <summary>키 입력을 기다리는 줄 (없으면 null)</summary>
             public int? WaitingKey;
+            /// <summary>에디터에서 보는 중 (화면 모드·해상도 값 뒤에 "빌드에서 적용" 안내)</summary>
+            public bool InEditor;
         }
 
-        private static readonly Row[] MainRows = { Row.Continue, Row.Settings, Row.Restart, Row.Quit };
-        private static readonly Row[] SettingsRows =
-            { Row.Sensitivity, Row.Volume, Row.ScreenMode, Row.Resolution, Row.FrameLimit, Row.Keys, Row.Back };
+        private static readonly Row[] MainRows = PauseMenuText.MainRows;
+        private static readonly Row[] SettingsRows = PauseMenuText.SettingsRows;
         private static readonly Key[] UpKeys = { Key.W, Key.UpArrow };
         private static readonly Key[] DownKeys = { Key.S, Key.DownArrow };
         private static readonly Key[] LeftKeys = { Key.A, Key.LeftArrow };
@@ -66,8 +66,7 @@ namespace NightPatrol.Menu
         private static readonly Key[] ConfirmKeys = { Key.E, Key.Enter, Key.NumpadEnter, Key.Space };
         // ◀ ▶는 글자가 작아서 클릭 판정을 이만큼(메뉴 장 글자 단위) 넓힌다
         private const float ArrowPadding = 6f;
-        // 클립보드 한 장에 들어가는 줄 수 (조작 키 장은 목록 + 기본값으로 + 뒤로)
-        private const int MaxRows = 12;
+        private const int MaxRows = PauseMenuText.MaxRows;
 
         [Tooltip("비어 있으면 같은 오브젝트에서 찾는다")]
         [SerializeField] private JournalHolder holder;
@@ -75,6 +74,7 @@ namespace NightPatrol.Menu
         [SerializeField] private GameObject journalPage;
         [Tooltip("메뉴 장 (JournalCanvas/MenuPanel). 평소엔 꺼 둔다")]
         [SerializeField] private GameObject menuPage;
+        [Tooltip("메뉴 장 제목 글자 (일시정지·설정·조작 키)")]
         [SerializeField] private TMP_Text titleText;
         [Tooltip("메뉴 줄 글자. 마우스 판정에 쓰므로 줄바꿈 없이(No Wrap)")]
         [SerializeField] private TMP_Text bodyText;
@@ -100,6 +100,9 @@ namespace NightPatrol.Menu
         private int waitingKey = -1;
         private int inputIgnoredFrame = -1;
         private Vector2 lastPointer;
+        private int screenLogFrame = -1;          // 화면을 바꾼 프레임 (로그 대기 없으면 −1)
+        private Vector2Int requestedSize;
+        private bool requestedFullScreen;
 
         /// <summary>메뉴가 열려 있는지 (이 동안 Time.timeScale = 0)</summary>
         public bool IsOpen { get; private set; }
@@ -174,6 +177,7 @@ namespace NightPatrol.Menu
 
         private void Update()
         {
+            LogScreenChange();
             // 기다리던 입력이 알림 없이 끝났으면(다른 곳에서 취소 등) 메뉴가 멈추지 않게 푼다
             if (waitingKey >= 0 && !KeyBindings.IsRebinding)
             {
@@ -288,12 +292,14 @@ namespace NightPatrol.Menu
                         screenSize = ScreenOptions.WindowedSize(resolutions, screenSize,
                             new Vector2Int(Screen.currentResolution.width, Screen.currentResolution.height));
                     ScreenOptions.Apply(screenSize, fullScreen);
+                    NoteScreenChange();
                     break;
                 case Row.Resolution:
                     var next = ScreenOptions.StepResolution(resolutions, screenSize, direction);
                     if (next == screenSize) return;
                     screenSize = next;
                     ScreenOptions.Apply(screenSize, fullScreen);
+                    NoteScreenChange();
                     break;
                 default:
                     return;
@@ -382,119 +388,22 @@ namespace NightPatrol.Menu
             return row >= 0;
         }
 
+        // 문구·줄 계산은 PauseMenuText (순수 함수, 16번에서 분리). 아래는 예전 이름 그대로 부를 수 있게 남긴 것
         /// <summary>그 장의 줄 순서 (조작 키 장은 키 줄 keyCount개 + 기본값으로 + 뒤로)</summary>
-        public static Row[] RowsOf(Page page, int keyCount = 0)
-        {
-            if (page == Page.Main) return MainRows;
-            if (page == Page.Settings) return SettingsRows;
-            keyCount = Mathf.Clamp(keyCount, 0, MaxRows - 2);
-            var keys = new Row[keyCount + 2];
-            for (int i = 0; i < keyCount; i++) keys[i] = Row.KeyBinding;
-            keys[keyCount] = Row.ResetKeys;
-            keys[keyCount + 1] = Row.Back;
-            return keys;
-        }
+        public static Row[] RowsOf(Page page, int keyCount = 0) => PauseMenuText.RowsOf(page, keyCount);
 
-        /// <summary>
-        /// y가 몇 번째 줄인지. 줄 사이 틈은 가운데에서 나눠 빈틈 없이. 어느 줄도 아니면 −1.
-        /// tops·bottoms는 위에서부터 각 줄의 위·아래 y (아래로 갈수록 작아짐)
-        /// </summary>
-        public static int RowAt(float y, IReadOnlyList<float> tops, IReadOnlyList<float> bottoms, int count)
-        {
-            count = Mathf.Min(count, Mathf.Min(tops?.Count ?? 0, bottoms?.Count ?? 0));
-            for (int i = 0; i < count; i++)
-            {
-                float top = i == 0 ? tops[0] : (bottoms[i - 1] + tops[i]) * 0.5f;
-                float bottom = i == count - 1 ? bottoms[i] : (bottoms[i] + tops[i + 1]) * 0.5f;
-                if (y <= top && y >= bottom) return i;
-            }
-            return -1;
-        }
+        /// <summary>y가 몇 번째 줄인지 (줄 사이 틈은 가운데에서 나눔). 어느 줄도 아니면 −1</summary>
+        public static int RowAt(float y, IReadOnlyList<float> tops, IReadOnlyList<float> bottoms, int count) =>
+            PauseMenuText.RowAt(y, tops, bottoms, count);
 
         /// <summary>장 제목</summary>
-        public static string TitleText(Page page) =>
-            page == Page.Settings ? "설정" : page == Page.Keys ? "조작 키" : "일시정지";
+        public static string TitleText(Page page) => PauseMenuText.TitleText(page);
 
         /// <summary>메뉴 장 본문. 고른 줄 앞에 ▶, 값은 오른쪽에 ◀ 값 ▶ (마우스 판정용 link 태그 포함)</summary>
-        public static string BodyText(Page page, int selected, Values values)
-        {
-            int keyCount = values.KeyLabels?.Count ?? 0;
-            var pageRows = RowsOf(page, keyCount);
-            var text = new StringBuilder();
-            for (int i = 0; i < pageRows.Length; i++)
-            {
-                var row = pageRows[i];
-                if (i == selected) text.Append("<pos=0%>▶");
-                text.Append("<pos=8%><link=\"row").Append(i).Append("\">").Append(Label(row, i, values)).Append("</link>");
-                if (row == Row.KeyBinding)
-                {
-                    // 키는 ◀ ▶로 넘기는 값이 아니라 눌러서 새로 받는다
-                    text.Append("<pos=50%>").Append(i == values.WaitingKey
-                        ? "<color=#8A0000>키를 누르세요</color>"
-                        : At(values.KeyNames, i, "-"));
-                }
-                else
-                {
-                    string value = Value(row, values);
-                    if (value.Length > 0)
-                        text.Append("<pos=50%><link=\"dec").Append(i).Append("\"> ◀ </link>").Append(value)
-                            .Append("<link=\"inc").Append(i).Append("\"> ▶ </link>");
-                }
-                text.Append('\n');
-            }
-            text.Append("\n<size=70%>").Append(Footer(page, values.WaitingKey.HasValue)).Append("</size>");
-            return text.ToString();
-        }
+        public static string BodyText(Page page, int selected, Values values) => PauseMenuText.BodyText(page, selected, values);
 
         /// <summary>index를 0~count−1 안으로 (끝을 넘으면 반대쪽 끝)</summary>
-        public static int Wrap(int index, int count) => count <= 0 ? 0 : ((index % count) + count) % count;
-
-        private static string Footer(Page page, bool waiting)
-        {
-            if (waiting) return "새 키를 누르세요 · ESC 취소";
-            switch (page)
-            {
-                case Page.Settings: return "클릭 · W/S 선택 · A/D 조절 · ESC 뒤로";
-                case Page.Keys: return "클릭·E 키 바꾸기 · 겹치면 서로 바뀜 · ESC 뒤로";
-                default: return "클릭 · W/S 선택 · E 확인 · ESC 닫기";
-            }
-        }
-
-        private static string Label(Row row, int index, Values values)
-        {
-            switch (row)
-            {
-                case Row.Continue: return "계속하기";
-                case Row.Settings: return "설정";
-                case Row.Restart: return values.RestartArmed ? "정말 처음부터? 한 번 더" : "처음으로";
-                case Row.Quit: return values.QuitArmed ? "정말 종료? 한 번 더" : "게임 종료";
-                case Row.Sensitivity: return "마우스 감도";
-                case Row.Volume: return "소리 크기";
-                case Row.ScreenMode: return "화면 모드";
-                case Row.Resolution: return "해상도";
-                case Row.FrameLimit: return "프레임 제한";
-                case Row.Keys: return "조작 키";
-                case Row.KeyBinding: return At(values.KeyLabels, index, "?");
-                case Row.ResetKeys: return "기본값으로";
-                default: return "뒤로";
-            }
-        }
-
-        private static string Value(Row row, Values values)
-        {
-            switch (row)
-            {
-                case Row.Sensitivity: return GameSettings.SensitivityLabel(values.Sensitivity);
-                case Row.Volume: return GameSettings.VolumeLabel(values.Volume);
-                case Row.ScreenMode: return ScreenOptions.ScreenModeLabel(values.FullScreen);
-                case Row.Resolution: return ScreenOptions.ResolutionLabel(values.Resolution);
-                case Row.FrameLimit: return GameSettings.FrameLimitLabel(values.FrameLimit);
-                default: return string.Empty;
-            }
-        }
-
-        private static string At(IReadOnlyList<string> list, int index, string fallback) =>
-            list != null && index >= 0 && index < list.Count && !string.IsNullOrEmpty(list[index]) ? list[index] : fallback;
+        public static int Wrap(int index, int count) => PauseMenuText.Wrap(index, count);
 
         // 마우스: 올리면 그 줄 선택, 클릭하면 실행(◀ ▶는 값 조절), 휠은 선택 이동. 이번 프레임 입력을 다 썼으면 true
         private bool HandlePointer(Mouse mouse)
@@ -639,7 +548,26 @@ namespace NightPatrol.Menu
                 KeyLabels = labels,
                 KeyNames = names,
                 WaitingKey = waitingKey >= 0 ? waitingKey : (int?)null,
+                InEditor = Application.isEditor,
             };
+        }
+
+        // 화면 모드·해상도는 프레임 끝에 바뀐다: 요청을 기억했다가 다음 프레임에 실제 값과 같이 남긴다.
+        // 같은 프레임에 여러 번 바꾸면 마지막 요청만 남는다
+        private void NoteScreenChange()
+        {
+            requestedSize = screenSize;
+            requestedFullScreen = fullScreen;
+            screenLogFrame = Time.frameCount;
+        }
+
+        // Update는 일시정지(timeScale 0) 중에도, 메뉴를 닫은 뒤에도 돈다 (프레임 번호로 판단)
+        private void LogScreenChange()
+        {
+            if (screenLogFrame < 0 || Time.frameCount <= screenLogFrame) return;
+            screenLogFrame = -1;
+            Debug.Log(ScreenOptions.ChangeLog(requestedSize, requestedFullScreen,
+                new Vector2Int(Screen.width, Screen.height), Screen.fullScreenMode), this);
         }
 
         private void ApplySettings()

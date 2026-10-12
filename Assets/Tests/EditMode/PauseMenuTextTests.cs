@@ -123,6 +123,36 @@ namespace NightPatrol.Tests
             StringAssert.DoesNotContain("dec6", body);   // 뒤로 has no value
         }
 
+        // 01_05d: 에디터에서는 화면 모드·해상도 값 뒤에 "(빌드에서 적용)"을 흐리고 작게
+        [Test]
+        public void InEditor_ScreenRows_SayItAppliesInBuilds()
+        {
+            var values = Sample;
+            values.InEditor = true;
+            string[] lines = Lines(PauseMenu.Page.Settings, 0, values);
+            Assert.AreEqual("화면 모드 ◀ 전체 화면 (빌드에서 적용) ▶ ", Plain(lines[2]));
+            Assert.AreEqual("해상도 ◀ 1920×1080 (빌드에서 적용) ▶ ", Plain(lines[3]));
+            StringAssert.Contains("<size=70%><color=#6E6E6E> (빌드에서 적용)</color></size>", lines[2]);
+            StringAssert.DoesNotContain("빌드에서 적용", lines[0]);   // 마우스 감도
+            StringAssert.DoesNotContain("빌드에서 적용", lines[1]);   // 소리 크기
+            StringAssert.DoesNotContain("빌드에서 적용", lines[4]);   // 프레임 제한
+        }
+
+        [Test]
+        public void InEditor_NoteSitsInsideTheClickableArrows()
+        {
+            var values = Sample;
+            values.InEditor = true;
+            StringAssert.Contains("<link=\"dec3\"> ◀ </link>1920×1080<size=70%><color=#6E6E6E> (빌드에서 적용)</color></size><link=\"inc3\"> ▶ </link>",
+                PauseMenu.BodyText(PauseMenu.Page.Settings, 0, values));
+        }
+
+        [Test]
+        public void NotInEditor_HasNoNote()
+        {
+            StringAssert.DoesNotContain("빌드에서 적용", PauseMenu.BodyText(PauseMenu.Page.Settings, 0, Sample));
+        }
+
         [Test]
         public void WindowedMode_Label()
         {

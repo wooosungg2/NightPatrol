@@ -65,5 +65,25 @@ namespace NightPatrol.Tests
             Assert.IsTrue(ScreenOptions.IsFullScreen(FullScreenMode.ExclusiveFullScreen));
             Assert.IsFalse(ScreenOptions.IsFullScreen(FullScreenMode.Windowed));
         }
+
+        // 01_05d: 에디터 Game 뷰는 Screen.SetResolution을 무시하므로 메뉴 값 뒤에 안내
+        [Test]
+        public void Labels_InEditor_AddTheBuildNote()
+        {
+            Assert.AreEqual("1920×1080 (빌드에서 적용)", ScreenOptions.ResolutionLabel(new Vector2Int(1920, 1080), true));
+            Assert.AreEqual("1920×1080", ScreenOptions.ResolutionLabel(new Vector2Int(1920, 1080), false));
+            Assert.AreEqual("전체 화면 (빌드에서 적용)", ScreenOptions.ScreenModeLabel(true, true));
+            Assert.AreEqual("창 모드 (빌드에서 적용)", ScreenOptions.ScreenModeLabel(false, true));
+            Assert.AreEqual("창 모드", ScreenOptions.ScreenModeLabel(false, false));
+        }
+
+        [Test]
+        public void ChangeLog_ShowsTheRequestAndWhatTheScreenReallyIs()
+        {
+            Assert.AreEqual("[Menu] 화면: 요청 1280×720 창 모드 → 실제 1280×720 Windowed",
+                ScreenOptions.ChangeLog(new Vector2Int(1280, 720), false, new Vector2Int(1280, 720), FullScreenMode.Windowed));
+            Assert.AreEqual("[Menu] 화면: 요청 1920×1080 전체 화면 → 실제 1600×900 FullScreenWindow",
+                ScreenOptions.ChangeLog(new Vector2Int(1920, 1080), true, new Vector2Int(1600, 900), FullScreenMode.FullScreenWindow));
+        }
     }
 }
