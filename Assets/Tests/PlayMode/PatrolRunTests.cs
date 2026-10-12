@@ -162,7 +162,7 @@ namespace NightPatrol.Tests
         public void Fail_ResetsObjects_AndTeleportsPlayerToStartPoint()
         {
             // PlayerMovement logs an error when its input references are empty; that is expected here.
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings and Player/Move"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerMovement에 PlayerSettings와 Player/Move"));
             var player = New("Player").AddComponent<PlayerMovement>();
             player.transform.position = new Vector3(0f, 0f, 15f);
             var start = New("StartPoint").transform;
@@ -183,7 +183,7 @@ namespace NightPatrol.Tests
         public IEnumerator Fail_WithoutStartPoint_ReturnsPlayerToWhereItStarted()
         {
             // SetUp's run already passed its Start (a frame runs before a UnityTest body), so use a new one.
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings and Player/Move"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerMovement에 PlayerSettings와 Player/Move"));
             var player = New("Player").AddComponent<PlayerMovement>();
             player.transform.SetPositionAndRotation(new Vector3(2f, 0f, 4f), Quaternion.Euler(0f, 180f, 0f));
             var other = New("Run2").AddComponent<PatrolRun>();   // Awake finds the player
@@ -200,7 +200,7 @@ namespace NightPatrol.Tests
         public void Fail_BeforeStartPositionIsKnown_DoesNotMovePlayer()
         {
             // Start has not run yet, so there is no remembered position: stay put rather than jump to the origin.
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings and Player/Move"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerMovement에 PlayerSettings와 Player/Move"));
             var player = New("Player").AddComponent<PlayerMovement>();
             player.transform.position = new Vector3(1f, 0f, 7f);
             SetField(run, "player", player);

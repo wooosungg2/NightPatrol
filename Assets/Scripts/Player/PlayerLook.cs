@@ -8,8 +8,11 @@ namespace NightPatrol.Player
     [DefaultExecutionOrder(-100)]
     public sealed class PlayerLook : MonoBehaviour
     {
+        [Tooltip("마우스 감도·위아래로 볼 수 있는 각도 (PlayerSettings 에셋)")]
         [SerializeField] private PlayerSettings settings;
+        [Tooltip("위아래로 돌릴 카메라. 플레이어의 자식이어야 한다")]
         [SerializeField] private Transform cameraTransform;
+        [Tooltip("시점 입력 (Player/Look, 마우스)")]
         [SerializeField] private InputActionReference lookAction;
         private readonly HashSet<object> blockers = new HashSet<object>();
         private InputAction look;
@@ -29,7 +32,7 @@ namespace NightPatrol.Player
             if (settings == null || cameraTransform == null || cameraTransform == transform ||
                 !cameraTransform.IsChildOf(transform) || lookAction == null || lookAction.action == null)
             {
-                Debug.LogError("Assign PlayerSettings, a child camera, and Player/Look to PlayerLook on the player body.", this);
+                Debug.LogError("[Player] PlayerLook에 PlayerSettings, 자식 카메라, Player/Look 입력을 연결할 것 (플레이어 몸에) — 시점 회전이 꺼짐", this);
                 enabled = false;
                 return;
             }

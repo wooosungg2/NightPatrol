@@ -17,6 +17,7 @@ namespace NightPatrol.Interaction
         [SerializeField] private PlayerInteractor interactor;
         [Tooltip("조준점 글자 (•)")]
         [SerializeField] private TMP_Text crosshair;
+        [Tooltip("조준한 대상의 안내 글자 (예: E - 전등 끄기). E 자리는 지금 설정된 키 이름으로 바뀐다")]
         [SerializeField] private TMP_Text promptText;
         [Tooltip("E 길게 누르기 진행 링 (엘리베이터 등). 없으면 안 보임")]
         [SerializeField] private ProgressRing holdRing;
@@ -28,6 +29,13 @@ namespace NightPatrol.Interaction
         [SerializeField] private float pulseScale = 1.6f;
         [Tooltip("커졌다가 돌아오는 시간(초)")]
         [SerializeField] private float pulseSeconds = 0.15f;
+        [Header("첫 시작 조작 힌트 (기본 꺼짐)")]
+        [Tooltip("게임을 시작하면 잠깐 조준점 아래에 조작 키를 보여 준다 (지금 설정된 키 이름으로). 대상을 조준하면 그 안내가 먼저")]
+        [SerializeField] private bool showStartHint = false;
+        [Tooltip("힌트를 보여 주는 시간 (초, 게임 시간이라 ESC 메뉴를 연 동안은 멈춤)")]
+        [SerializeField, Min(0f)] private float startHintSeconds = 8f;
+        [Tooltip("힌트에 쓸 조작 키 목록 (Assets/Settings/KeyBindingList). 비어 있으면 힌트 없음")]
+        [SerializeField] private KeyBindingList hintKeys = null;
         private PlayerInteractor subscribed;
         private string shownPrompt;
         private string keyName = "E";
@@ -35,6 +43,8 @@ namespace NightPatrol.Interaction
         private string cachedKey;
         private string cachedResult = string.Empty;
         private float pulseStartTime = float.NegativeInfinity;
+        private string hintText = string.Empty;
+        private float hintUntil = float.NegativeInfinity;
 
         private void Awake()
         {
@@ -57,7 +67,11 @@ namespace NightPatrol.Interaction
         }
 
         // PlayerInteractor.Awake 뒤에 키 이름을 읽는다 (OnEnable은 그보다 먼저일 수 있음)
-        private void Start() => RefreshKeyName();
+        private void Start()
+        {
+            if (showStartHint && hintKeys != null) hintUntil = Time.time + startHintSeconds;
+            RefreshKeyName();
+        }
 
         private void RefreshKeyName()
         {
@@ -65,6 +79,8 @@ namespace NightPatrol.Interaction
             keyName = action != null
                 ? KeyBindings.KeyName(action, KeyBindings.FindBindingIndex(action, null, KeyBindings.KeyboardMouse))
                 : "E";
+            // 힌트를 보여 주는 동안 키를 바꾸면 힌트도 새 키로
+            if (Time.time < hintUntil) hintText = ControlsHint.Text(ControlsHint.From(hintKeys));
         }
 
         private void OnInteracted(IInteractable _) => pulseStartTime = Time.time;
@@ -81,6 +97,7 @@ namespace NightPatrol.Interaction
                 cachedResult = WithKey(rawPrompt, keyName);
             }
             string prompt = cachedResult;
+            string shown = WithHint(prompt, visible, hintText, Time.time < hintUntil);
 
             if (crosshair != null)
             {
@@ -91,10 +108,10 @@ namespace NightPatrol.Interaction
                 float scale = PulseScale(Time.time - pulseStartTime, pulseSeconds, pulseScale);
                 if (crosshair.transform.localScale.x != scale) crosshair.transform.localScale = Vector3.one * scale;
             }
-            if (promptText != null && prompt != shownPrompt)
+            if (promptText != null && shown != shownPrompt)
             {
-                promptText.text = prompt;   // 바뀔 때만 대입 (TMP가 매 프레임 글자를 다시 만들지 않게)
-                shownPrompt = prompt;
+                promptText.text = shown;   // 바뀔 때만 대입 (TMP가 매 프레임 글자를 다시 만들지 않게)
+                shownPrompt = shown;
             }
             if (holdRing != null)
             {
@@ -128,6 +145,13 @@ namespace NightPatrol.Interaction
             if (prompt[0] != 'E' || (prompt.Length > 1 && prompt[1] != ' ' && prompt[1] != '-')) return prompt;
             return key + prompt.Substring(1);
         }
+
+        /// <summary>
+        /// 안내 자리에 보일 글: 대상 안내가 있으면 그것, 없고 힌트 시간이면 힌트. 안 보이는 상태(일지를 든 동안 등)면 힌트도 없음.
+        /// 조준점 밝기·진행 링은 힌트와 상관없이 대상 안내로만 정한다
+        /// </summary>
+        public static string WithHint(string prompt, bool visible, string hint, bool hintActive) =>
+            string.IsNullOrEmpty(prompt) && visible && hintActive && !string.IsNullOrEmpty(hint) ? hint : prompt ?? string.Empty;
 
         /// <summary>E를 누른 뒤 elapsed초가 지났을 때 조준점 배율: peak에서 1로 선형, 범위 밖이면 1</summary>
         public static float PulseScale(float elapsed, float seconds, float peak)

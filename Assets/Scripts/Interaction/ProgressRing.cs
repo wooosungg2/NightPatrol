@@ -10,6 +10,7 @@ namespace NightPatrol.Interaction
     [RequireComponent(typeof(CanvasRenderer))]
     public sealed class ProgressRing : MaskableGraphic
     {
+        [Tooltip("채워진 정도 (0~1). 실행 중에는 E 길게 누르기 진행에 맞춰 코드가 바꾼다")]
         [SerializeField, Range(0f, 1f)] private float fill;
         [Tooltip("링 두께 (UI 단위)")]
         [SerializeField, Min(0.5f)] private float thickness = 3f;

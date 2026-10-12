@@ -10,8 +10,11 @@ namespace NightPatrol.Interaction
     [DisallowMultipleComponent]
     public sealed class PlayerInteractor : MonoBehaviour
     {
+        [Tooltip("E가 닿는 거리·조준 보정 값 (PlayerSettings 에셋)")]
         [SerializeField] private PlayerSettings settings;
+        [Tooltip("조준 기준 카메라. 화면 가운데로 조준선을 쏜다 (플레이어 카메라)")]
         [SerializeField] private Camera playerCamera;
+        [Tooltip("E 입력 (Player/Interact). 설정에서 바꾼 키가 바로 먹힌다")]
         [SerializeField] private InputActionReference interactAction;
         [Tooltip("상호작용 대상뿐 아니라 벽처럼 시선을 막는 것도 포함. 플레이어 레이어는 제외")]
         [SerializeField] private LayerMask raycastMask = Physics.DefaultRaycastLayers;
@@ -41,7 +44,7 @@ namespace NightPatrol.Interaction
         {
             if (settings == null || playerCamera == null || interactAction == null || interactAction.action == null)
             {
-                Debug.LogError("Assign PlayerSettings, the player camera, and Player/Interact to PlayerInteractor.", this);
+                Debug.LogError("[Player] PlayerInteractor에 PlayerSettings, 플레이어 카메라, Player/Interact 입력을 연결할 것 — E 조작이 꺼짐", this);
                 enabled = false;
                 return;
             }

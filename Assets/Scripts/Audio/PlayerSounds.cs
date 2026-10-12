@@ -20,6 +20,7 @@ namespace NightPatrol.Audio
         [SerializeField] private AudioClip[] footsteps = new AudioClip[0];
         [Tooltip("이만큼(m) 걸을 때마다 한 걸음")]
         [SerializeField, Min(0.1f)] private float stepDistance = 0.9f;
+        [Tooltip("발소리 음량 (0~1). 설정 메뉴의 전체 음량과 곱해진다")]
         [SerializeField, Range(0f, 1f)] private float footstepVolume = 0.5f;
         [Tooltip("걸음마다 높낮이를 이만큼 무작위로 (반복이 덜 거슬리게)")]
         [SerializeField, Range(0f, 0.3f)] private float footstepPitchJitter = 0.06f;
@@ -39,6 +40,7 @@ namespace NightPatrol.Audio
         [SerializeField] private AudioClip arrive;
         [Tooltip("졸다 깸 (숨 들이쉼)")]
         [SerializeField] private AudioClip wake;
+        [Tooltip("효과음 음량 (조작·일지·엘리베이터·실패·깨어남, 0~1). 설정 메뉴의 전체 음량과 곱해진다")]
         [SerializeField, Range(0f, 1f)] private float effectVolume = 0.8f;
 
         // 한 프레임에 이만큼(m) 넘게 움직이면 순간이동(실패 후 데스크로)이라 발소리를 내지 않는다

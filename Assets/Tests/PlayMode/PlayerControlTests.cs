@@ -43,9 +43,9 @@ namespace NightPatrol.Tests
         // 설정이 빠진 플레이어 (이동·시점·E는 오류를 찍고 스스로 꺼지지만 잠금 집합은 그대로 쓸 수 있음)
         private PlayerControl MakePlayer(string name = "Player", bool expectSecondWarning = false)
         {
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings and Player/Move"));
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings, a child camera, and Player/Look"));
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings, the player camera, and Player/Interact"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerMovement에 PlayerSettings와 Player/Move"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerLook에 PlayerSettings, 자식 카메라, Player/Look"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerInteractor에 PlayerSettings, 플레이어 카메라, Player/Interact"));
             if (expectSecondWarning) LogAssert.Expect(LogType.Warning, new Regex("플레이어가 둘 이상"));   // PlayerControl.OnEnable (오류들 다음)
             var body = Track(new GameObject(name));
             movement = body.AddComponent<PlayerMovement>();

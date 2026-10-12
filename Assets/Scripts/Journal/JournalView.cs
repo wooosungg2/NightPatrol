@@ -18,7 +18,9 @@ namespace NightPatrol.Journal
     [Serializable]
     public struct FloorDisplay
     {
+        [Tooltip("층 번호")]
         public int floor;
+        [Tooltip("그 층의 점검 사항 표시: List 목록 / Count N건 / Unknown ?건 / AtMost N건 이하")]
         public TaskDisplay display;
     }
 
@@ -29,10 +31,15 @@ namespace NightPatrol.Journal
     [DisallowMultipleComponent]
     public sealed class JournalView : MonoBehaviour
     {
+        [Tooltip("비어 있으면 씬에서 찾는다 (층 번호·회차·실패 기록)")]
         [SerializeField] private PatrolRun run;
+        [Tooltip("비어 있으면 씬에서 찾는다 (이번 층 점검 항목)")]
         [SerializeField] private FloorTasks tasks;
+        [Tooltip("일지 제목 글자 (예: 근무일지 — 5층)")]
         [SerializeField] private TMP_Text titleText;
+        [Tooltip("일지 본문 글자 (규정·점검 사항·지난 순찰 기록)")]
         [SerializeField] private TMP_Text bodyText;
+        [Tooltip("일지 규정 줄 (위에서부터 그대로 적힌다)")]
         [SerializeField] private string[] rules =
         {
             "제1조. 건물 내 인원이 없을 것",
@@ -54,6 +61,7 @@ namespace NightPatrol.Journal
         [SerializeField] private TaskReveal reveal = TaskReveal.Off;
         [Tooltip("해결한 점검 사항에 중간선")]
         [SerializeField] private bool strikeSolved = false;
+        [Tooltip("해결·조준 드러내기와 중간선에 쓰는 플레이어. 비어 있으면 부모에서, 없으면 씬에서 찾는다")]
         [SerializeField] private PlayerInteractor interactor;
         private readonly HashSet<PatrolObject> revealedTargets = new HashSet<PatrolObject>();
         private readonly List<IJournalModifier> modifiers = new List<IJournalModifier>();

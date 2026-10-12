@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -41,9 +42,9 @@ namespace NightPatrol.Tests
             savedKeyBindings = PlayerPrefs.HasKey(KeyBindings.PrefsKey) ? PlayerPrefs.GetString(KeyBindings.PrefsKey) : null;
 
             // The player scripts log an error when their input references are empty; that is expected here.
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings and Player/Move"));
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings, a child camera, and Player/Look"));
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings, the player camera, and Player/Interact"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerMovement에 PlayerSettings와 Player/Move"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerLook에 PlayerSettings, 자식 카메라, Player/Look"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerInteractor에 PlayerSettings, 플레이어 카메라, Player/Interact"));
             var body = New("Player");
             movement = body.AddComponent<PlayerMovement>();
             look = body.AddComponent<PlayerLook>();
@@ -539,6 +540,161 @@ namespace NightPatrol.Tests
             menu.Close();
             Assert.IsFalse(control.IsLocked);
             Assert.IsFalse(movement.IsBlocked);
+        }
+
+        // ── 01_05d 화면 변경 로그: 적용은 프레임 끝이라 다음 프레임에 실제 값과 같이 남긴다 ──
+        private readonly List<string> screenLogs = new List<string>();
+
+        private void OnScreenLog(string message, string stackTrace, LogType type)
+        {
+            if (type == LogType.Log && message.StartsWith("[Menu] 화면:")) screenLogs.Add(message);
+        }
+
+        // 설정 장의 해상도 줄을 고르고, 해상도 목록·지금 크기를 정해 둔다 (에디터 모니터와 상관없이)
+        private void SelectResolution(Vector2Int current, params Vector2Int[] options)
+        {
+            OpenSettings();
+            SetField(menu, "resolutions", new List<Vector2Int>(options));
+            SetField(menu, "screenSize", current);
+            menu.Select(3);
+            Assert.AreEqual(PauseMenu.Row.Resolution, menu.Selected);
+        }
+
+        private static readonly Vector2Int Small = new Vector2Int(800, 600), Medium = new Vector2Int(1280, 720);
+
+        [UnityTest]
+        public IEnumerator ScreenChange_IsLoggedNextFrame_EvenWhilePaused()
+        {
+            screenLogs.Clear();
+            Application.logMessageReceived += OnScreenLog;
+            try
+            {
+                SelectResolution(Small, Small, Medium);
+                menu.Adjust(1);
+                Assert.AreEqual(0f, Time.timeScale);
+                Assert.IsEmpty(screenLogs, "바뀌기 전(같은 프레임)에는 남기지 않음");
+
+                yield return null;
+                Assert.AreEqual(1, screenLogs.Count);
+                StringAssert.StartsWith("[Menu] 화면: 요청 1280×720 ", screenLogs[0]);
+                StringAssert.Contains(" → 실제 ", screenLogs[0]);
+
+                yield return null;
+                Assert.AreEqual(1, screenLogs.Count, "한 번만 남김");
+            }
+            finally
+            {
+                Application.logMessageReceived -= OnScreenLog;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator SeveralChangesInOneFrame_LogOnce_WithTheLastRequest()
+        {
+            screenLogs.Clear();
+            Application.logMessageReceived += OnScreenLog;
+            try
+            {
+                SelectResolution(Small, Small, Medium, new Vector2Int(1920, 1080));
+                menu.Adjust(1);
+                menu.Adjust(1);
+                yield return null;
+                Assert.AreEqual(1, screenLogs.Count);
+                StringAssert.StartsWith("[Menu] 화면: 요청 1920×1080 ", screenLogs[0]);
+            }
+            finally
+            {
+                Application.logMessageReceived -= OnScreenLog;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator ChangesOnLaterFrames_AreEachLogged()
+        {
+            screenLogs.Clear();
+            Application.logMessageReceived += OnScreenLog;
+            try
+            {
+                SelectResolution(Small, Small, Medium);
+                menu.Adjust(1);
+                yield return null;
+                menu.Adjust(-1);
+                yield return null;
+                Assert.AreEqual(2, screenLogs.Count);
+                StringAssert.StartsWith("[Menu] 화면: 요청 1280×720 ", screenLogs[0]);
+                StringAssert.StartsWith("[Menu] 화면: 요청 800×600 ", screenLogs[1]);
+            }
+            finally
+            {
+                Application.logMessageReceived -= OnScreenLog;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator ClosingRightAfterAChange_StillLogs()
+        {
+            screenLogs.Clear();
+            Application.logMessageReceived += OnScreenLog;
+            try
+            {
+                SelectResolution(Small, Small, Medium);
+                menu.Adjust(1);
+                menu.Close();
+                Assert.AreEqual(1f, Time.timeScale);
+                yield return null;
+                Assert.AreEqual(1, screenLogs.Count);
+                StringAssert.StartsWith("[Menu] 화면: 요청 1280×720 ", screenLogs[0]);
+            }
+            finally
+            {
+                Application.logMessageReceived -= OnScreenLog;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator NoScreenChange_NoLog()
+        {
+            screenLogs.Clear();
+            Application.logMessageReceived += OnScreenLog;
+            try
+            {
+                SelectResolution(Medium, Small, Medium);
+                menu.Adjust(1);          // 이미 맨 끝: 안 바뀜
+                menu.Select(0);          // 마우스 감도
+                menu.Adjust(1);
+                yield return null;
+                Assert.IsEmpty(screenLogs);
+            }
+            finally
+            {
+                Application.logMessageReceived -= OnScreenLog;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator ScreenModeToggle_LogsTheRequestedMode()
+        {
+            screenLogs.Clear();
+            Application.logMessageReceived += OnScreenLog;
+            try
+            {
+                OpenSettings();
+                menu.Select(2);
+                Assert.AreEqual(PauseMenu.Row.ScreenMode, menu.Selected);
+                bool full = ScreenOptions.IsFullScreen(Screen.fullScreenMode);
+                menu.Adjust(1);
+                yield return null;
+                Assert.AreEqual(1, screenLogs.Count);
+                StringAssert.Contains(" " + ScreenOptions.ScreenModeLabel(!full) + " → 실제 ", screenLogs[0]);
+                menu.Adjust(1);          // 원래 모드로
+                yield return null;
+                Assert.AreEqual(2, screenLogs.Count);
+                StringAssert.Contains(" " + ScreenOptions.ScreenModeLabel(full) + " → 실제 ", screenLogs[1]);
+            }
+            finally
+            {
+                Application.logMessageReceived -= OnScreenLog;
+            }
         }
     }
 }

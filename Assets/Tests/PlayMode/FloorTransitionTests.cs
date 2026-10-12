@@ -51,8 +51,8 @@ namespace NightPatrol.Tests
             run = New("PatrolRun").AddComponent<PatrolRun>();
 
             // The player scripts log an error when their input references are empty; that is expected here.
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings and Player/Move"));
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings, a child camera, and Player/Look"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerMovement에 PlayerSettings와 Player/Move"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerLook에 PlayerSettings, 자식 카메라, Player/Look"));
             var body = New("Player");
             movement = body.AddComponent<PlayerMovement>();
             look = body.AddComponent<PlayerLook>();
@@ -381,6 +381,53 @@ namespace NightPatrol.Tests
 
             Assert.IsFalse(control.IsLocked);
             Assert.IsFalse(movement.IsBlocked);
+        }
+
+        // ── 15번 실패 후 일지 자동 들기 (기본 꺼짐) ──
+        private IEnumerator WaitForTransitionEnd(float seconds)
+        {
+            for (float t = 0f; t < seconds && transition.IsBusy; t += Time.unscaledDeltaTime) yield return null;
+            Assert.IsFalse(transition.IsBusy, "연출이 끝나지 않음");
+        }
+
+        [UnityTest]
+        public IEnumerator RaiseAfterFailure_WaitsForTheWakeUp_ThenRaisesTheJournal()
+        {
+            SetField(journal, "raiseAfterFailure", true);
+            SetField(transition, "wakeSeconds", 0.3f);   // 깨어나는 동안 확인할 수 있게
+            yield return null;                           // PatrolRun.Start
+            run.Fail();                                  // 개발자 키처럼 엘리베이터 밖에서 실패 → 깨어나기 연출
+            yield return null;
+            Assert.IsTrue(transition.IsBusy);
+            Assert.IsTrue(journal.IsBlocked);
+            Assert.IsFalse(journal.IsRaised, "깨어나는 동안에는 안 듦");
+
+            yield return WaitForTransitionEnd(3f);
+            yield return null;                           // 잠금이 풀린 다음 프레임
+            Assert.IsTrue(journal.IsRaised);
+        }
+
+        [UnityTest]
+        public IEnumerator RaiseAfterFailure_Off_LeavesTheJournalDown()
+        {
+            yield return null;
+            run.Fail();
+            yield return WaitForTransitionEnd(3f);
+            yield return null;
+            yield return null;
+            Assert.IsFalse(journal.IsRaised);
+        }
+
+        [UnityTest]
+        public IEnumerator RaiseAfterFailure_DescendingNormally_DoesNotRaise()
+        {
+            SetField(journal, "raiseAfterFailure", true);
+            yield return null;
+            transition.Descend();                        // 사물이 없으니 하행 성공
+            yield return WaitForTransitionEnd(3f);
+            yield return null;
+            Assert.AreEqual(4, run.CurrentFloor);
+            Assert.IsFalse(journal.IsRaised);
         }
     }
 }

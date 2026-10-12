@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using NightPatrol.Interaction;
+using NightPatrol.Run;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -9,19 +10,30 @@ namespace NightPatrol.Journal
     [DisallowMultipleComponent]
     public sealed class JournalHolder : MonoBehaviour
     {
+        [Tooltip("일지를 든 동안 E 조작을 막을 플레이어. 비어 있으면 부모에서 찾는다")]
         [SerializeField] private PlayerInteractor interactor;
         [Tooltip("일지 들기/내리기 키 (Player/Journal, 설정에서 바꿀 수 있음). 비어 있으면 Tab")]
         [SerializeField] private InputActionReference journalAction;
         [Tooltip("일지를 든 동안 E 조작을 막는다. 끄면 들고도 조작 가능")]
         [SerializeField] private bool blockInteractionWhileRaised = true;
+        [Tooltip("내렸을 때 위치 (부모 기준 로컬 좌표, m)")]
         [SerializeField] private Vector3 loweredPosition = new Vector3(-0.16f, -0.30f, 0.30f);
+        [Tooltip("내렸을 때 각도 (부모 기준 로컬 회전, 도)")]
         [SerializeField] private Vector3 loweredEuler = new Vector3(55f, 12f, 0f);
+        [Tooltip("들었을 때 위치 (눈앞, 부모 기준 로컬 좌표, m)")]
         [SerializeField] private Vector3 raisedPosition = new Vector3(0f, -0.06f, 0.28f);
+        [Tooltip("들었을 때 각도 (부모 기준 로컬 회전, 도)")]
         [SerializeField] private Vector3 raisedEuler = new Vector3(8f, 0f, 0f);
+        [Tooltip("들고 내리는 데 걸리는 시간 (초). 일시정지 중에도 진행")]
         [SerializeField] private float transitionSeconds = 0.25f;
+        [Tooltip("실패하면 깨어나기 연출이 끝나고 일지 잠금이 풀린 뒤 일지를 자동으로 든다 (지난 순찰 기록을 바로 보게). 기본 꺼짐")]
+        [SerializeField] private bool raiseAfterFailure = false;
         private readonly HashSet<object> blockers = new HashSet<object>();
         private InputAction toggleAction;
         private float progress;
+        private PatrolRun run;
+        private PatrolRun subscribedRun;
+        private bool raisePending;
 
         /// <summary>일지를 눈앞에 들고 있는지</summary>
         public bool IsRaised { get; private set; }
@@ -37,6 +49,7 @@ namespace NightPatrol.Journal
         private void Awake()
         {
             if (interactor == null) interactor = GetComponentInParent<PlayerInteractor>();
+            run = UnityEngine.Object.FindAnyObjectByType<PatrolRun>();
             // 설정에서 바꾼 키가 바로 먹히도록 공용 액션을 쓴다. 다른 소비자를 위해 끄지 않는다.
             toggleAction = journalAction != null ? journalAction.action : null;
         }
@@ -44,10 +57,20 @@ namespace NightPatrol.Journal
         {
             toggleAction?.Enable();
             SetRaised(IsRaised);
+            subscribedRun = run;
+            if (subscribedRun != null) subscribedRun.Failed += OnFailed;
         }
         private void OnDisable()
         {
             if (interactor != null) interactor.SetBlocked(this, false);
+            if (subscribedRun != null) subscribedRun.Failed -= OnFailed;
+            subscribedRun = null;
+            raisePending = false;
+        }
+        // 실패 즉시가 아니라, 깨어나기 연출(일지를 막음)이 끝나고 잠금이 풀린 다음 프레임에 든다 (Update)
+        private void OnFailed(int _)
+        {
+            if (raiseAfterFailure) raisePending = true;
         }
         private void Start()
         {
@@ -58,6 +81,11 @@ namespace NightPatrol.Journal
         private void Update()
         {
             if (!IsMenuOpen) HandleInput();
+            if (raisePending && !IsBlocked && !IsMenuOpen)
+            {
+                raisePending = false;
+                SetRaised(true);
+            }
             // 일시정지(시간 0) 중에도 메뉴를 들어 올려야 하므로 실제 시간으로 움직인다
             progress = Step(progress, IsRaised || IsMenuOpen, Time.unscaledDeltaTime, transitionSeconds);
             ApplyPose();

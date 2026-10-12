@@ -8,7 +8,9 @@ namespace NightPatrol.Player
     [RequireComponent(typeof(CharacterController))]
     public sealed class PlayerMovement : MonoBehaviour
     {
+        [Tooltip("걷는 속도·중력 (PlayerSettings 에셋)")]
         [SerializeField] private PlayerSettings settings;
+        [Tooltip("이동 입력 (Player/Move). 설정에서 바꾼 키가 바로 먹힌다")]
         [SerializeField] private InputActionReference moveAction;
         private readonly HashSet<object> blockers = new HashSet<object>();
         private CharacterController controller;
@@ -28,7 +30,7 @@ namespace NightPatrol.Player
             look = GetComponent<PlayerLook>();
             if (settings == null || moveAction == null || moveAction.action == null)
             {
-                Debug.LogError("Assign PlayerSettings and Player/Move to PlayerMovement.", this);
+                Debug.LogError("[Player] PlayerMovement에 PlayerSettings와 Player/Move 입력을 연결할 것 — 이동이 꺼짐", this);
                 enabled = false;
                 return;
             }
