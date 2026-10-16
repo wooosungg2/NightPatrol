@@ -8,7 +8,8 @@ namespace NightPatrol.Audio
 {
     /// <summary>
     /// 플레이어 쪽 소리 연결점. 소리 파일을 비워 두면 그 소리만 안 난다 — 사운드 방향(공동 결정)이 정해지면 파일만 넣으면 된다.
-    /// 발소리(걸은 거리마다), E 조작, 일지·메뉴 들기·내리기, 엘리베이터 하행 시작·도착, 깨어나기.
+    /// 발소리(걸은 거리마다), E 조작, 일지·메뉴 들기·내리기, 깨어나기 — 플레이어 몸에서 나는 소리라 방향 없이(2D).
+    /// 엘리베이터 하행·도착처럼 사물에서 나는 소리는 그 사물의 SoundEmitter로 낸다.
     /// Player 루트에 붙인다. 전체 크기는 일시정지 메뉴의 "소리 크기"를 따른다 (AudioListener.volume)
     /// </summary>
     [DisallowMultipleComponent]
@@ -33,14 +34,10 @@ namespace NightPatrol.Audio
         [Tooltip("일지를 내릴 때. ESC 메뉴를 닫을 때도")]
         [SerializeField] private AudioClip journalLower;
 
-        [Header("엘리베이터·실패")]
-        [Tooltip("하행 시작 (문 닫힘·구동음)")]
-        [SerializeField] private AudioClip descend;
-        [Tooltip("도착 (띵)")]
-        [SerializeField] private AudioClip arrive;
+        [Header("실패")]
         [Tooltip("졸다 깸 (숨 들이쉼)")]
         [SerializeField] private AudioClip wake;
-        [Tooltip("효과음 음량 (조작·일지·엘리베이터·실패·깨어남, 0~1). 설정 메뉴의 전체 음량과 곱해진다")]
+        [Tooltip("효과음 음량 (조작·일지·깨어남, 0~1). 설정 메뉴의 전체 음량과 곱해진다")]
         [SerializeField, Range(0f, 1f)] private float effectVolume = 0.8f;
 
         // 한 프레임에 이만큼(m) 넘게 움직이면 순간이동(실패 후 데스크로)이라 발소리를 내지 않는다
@@ -82,12 +79,7 @@ namespace NightPatrol.Audio
             if (interactor != null) interactor.Interacted += OnInteracted;
             if (journal != null) journal.RaisedChanged += OnRaised;
             if (menu != null) menu.OpenChanged += OnRaised;
-            if (transition != null)
-            {
-                transition.DescendStarted += OnDescend;
-                transition.Arrived += OnArrived;
-                transition.WakeStarted += OnWake;
-            }
+            if (transition != null) transition.WakeStarted += OnWake;
         }
 
         private void OnDisable()
@@ -95,12 +87,7 @@ namespace NightPatrol.Audio
             if (interactor != null) interactor.Interacted -= OnInteracted;
             if (journal != null) journal.RaisedChanged -= OnRaised;
             if (menu != null) menu.OpenChanged -= OnRaised;
-            if (transition != null)
-            {
-                transition.DescendStarted -= OnDescend;
-                transition.Arrived -= OnArrived;
-                transition.WakeStarted -= OnWake;
-            }
+            if (transition != null) transition.WakeStarted -= OnWake;
         }
 
         private void Update()
@@ -158,8 +145,6 @@ namespace NightPatrol.Audio
 
         private void OnInteracted(IInteractable _) => Play(interact);
         private void OnRaised(bool raised) => Play(raised ? journalRaise : journalLower);
-        private void OnDescend() => Play(descend);
-        private void OnArrived(int floor) => Play(arrive);
         private void OnWake() => Play(wake);
     }
 }
