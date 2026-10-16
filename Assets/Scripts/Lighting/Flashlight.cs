@@ -14,6 +14,7 @@ namespace NightPatrol.Lighting
 		[Tooltip("비워두면 자식에서 Camera를 찾음")] [SerializeField] private Camera playerCamera;
 		[Tooltip("비워두면 실행할 때 Spot Light를 만듦")] [SerializeField] private Light spot;
 		[SerializeField] private bool startOn = false;
+		[Tooltip("손전등 켜고 끄기 입력. 비워두면 F키")] [SerializeField] private InputActionReference toggleAction;
 
 		[Header("빛")]
 		public float range = 14f;
@@ -53,6 +54,16 @@ namespace NightPatrol.Lighting
 			Snap();
 		}
 
+		void OnEnable()
+		{
+			if (toggleAction != null) toggleAction.action?.Enable();
+		}
+
+		void OnDisable()
+		{
+			if (toggleAction != null) toggleAction.action?.Disable();
+		}
+
 		void Apply()
 		{
 			spot.range = range;
@@ -70,8 +81,11 @@ namespace NightPatrol.Lighting
 
 		void Update()
 		{
-			var kb = Keyboard.current;
-			if (kb != null && kb.fKey.wasPressedThisFrame && Cursor.lockState == CursorLockMode.Locked && Time.timeScale > 0f)
+			var action = toggleAction != null ? toggleAction.action : null;
+			bool pressed = action != null
+				? action.WasPressedThisFrame()
+				: Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame;
+			if (pressed && Cursor.lockState == CursorLockMode.Locked && Time.timeScale > 0f)
 				Toggle();
 
 			// 깜빡임 (이상현상용)
