@@ -13,7 +13,7 @@ namespace NightPatrol.Anomalies
             if (normalChair == null || ceilingChair == null)
             {
                 Debug.LogWarning(
-                    "CeilingChairAnomaly: ÀÇÀÚ ÂüÁ¶°¡ ¼³Á¤µÇÁö ¾Ê¾Ò½À´Ï´Ù."
+                    "CeilingChairAnomaly: ì˜ì ì°¸ì¡°ê°€ ì„¤ì •ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤."
                 );
                 return;
             }

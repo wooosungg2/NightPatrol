@@ -5,10 +5,10 @@ namespace NightPatrol.Anomalies
 {
     public class LightColorAnomaly : Anomaly
     {
-        [Header("»ö»óÀ» º¯°æÇÒ Á¶¸í")]
+        [Header("ìƒ‰ìƒì„ ë³€ê²½í•  ì¡°ëª…")]
         [SerializeField] private Light targetLight;
 
-        [Header("ÀÌ»óÇö»ó ¼³Á¤")]
+        [Header("ì´ìƒí˜„ìƒ ì„¤ì •")]
         [SerializeField] private Color anomalyColor = Color.red;
 
         private Color originalColor;

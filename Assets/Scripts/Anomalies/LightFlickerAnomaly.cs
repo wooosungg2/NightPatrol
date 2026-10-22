@@ -6,10 +6,10 @@ namespace NightPatrol.Anomalies
 {
     public class LightFlickerAnomaly : Anomaly
     {
-        [Header("±τΊύΐΟ Α¶Έν")]
+        [Header("κΉλΉ΅μΌ μ΅°λª…")]
         [SerializeField] private Light targetLight;
 
-        [Header("±τΊύΐΣ Ό³Α¤")]
+        [Header("κΉλΉ΅μ„ μ„¤μ •")]
         [SerializeField] private float minInterval = 0.05f;
         [SerializeField] private float maxInterval = 0.4f;
         [SerializeField] private float minBrightness = 0f;

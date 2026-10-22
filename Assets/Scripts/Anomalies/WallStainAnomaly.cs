@@ -5,7 +5,7 @@ namespace NightPatrol.Anomalies
 {
     public class WallStainAnomaly : Anomaly
     {
-        [Header("ÆäÀÎÆ® ¿À¹ö·¹ÀÌ ¿ÀºêÁ§Æ®")]
+        [Header("í˜ì¸íŠ¸ ì˜¤ë²„ë ˆì´ ì˜¤ë¸Œì íŠ¸")]
         [SerializeField] private GameObject wallStainOverlay;
 
         public override void Activate()
