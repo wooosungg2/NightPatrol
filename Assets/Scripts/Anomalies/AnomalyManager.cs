@@ -19,11 +19,15 @@ namespace NightPatrol.Anomalies
         [Header("조명 색상 변경 이상현상 후보")]
         [SerializeField] private Anomaly[] lightColorAnomalies;
 
-        private Anomaly activeLightColor;
-        private Anomaly activeLightFlicker;
+        [Header("벽 페인트 이상현상 후보")]
+        [SerializeField] private Anomaly[] wallStainAnomalies;
 
         private Anomaly activeRedMonitor;
         private Anomaly activeGlitchMonitor;
+        private Anomaly activeLightFlicker;
+        private Anomaly activeLightColor;
+        private Anomaly activeWallStain;
+
         private PatrolRun patrolRun;
 
         private void OnEnable()
@@ -91,6 +95,10 @@ namespace NightPatrol.Anomalies
             activeLightColor = ActivateRandom(
                 lightColorAnomalies, null
             );
+
+            activeWallStain = ActivateRandom(
+                wallStainAnomalies, null
+            );
         }
 
         private Anomaly ActivateRandom(
@@ -154,6 +162,12 @@ namespace NightPatrol.Anomalies
                 activeLightColor.ResetAfterFloorReset();
                 activeLightColor = null;
             }
+
+            if (activeWallStain != null)
+            {
+                activeWallStain.ResetAfterFloorReset();
+                activeWallStain = null;
+            }
         }
 
         public void ClearAnomalies()
@@ -180,6 +194,12 @@ namespace NightPatrol.Anomalies
             {
                 activeLightColor.Deactivate();
                 activeLightColor = null;
+            }
+
+            if (activeWallStain != null)
+            {
+                activeWallStain.Deactivate();
+                activeWallStain = null;
             }
         }
     }
