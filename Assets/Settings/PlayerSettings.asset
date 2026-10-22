@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7646c1a7f097c734cb2381ceb69bc642, type: 3}
-  m_Name: PlayerSettings_Test
+  m_Name: PlayerSettings
   m_EditorClassIdentifier: Assembly-CSharp::NightPatrol.Player.PlayerSettings
-  walkSpeed: 2
+  walkSpeed: 2.6
   gravity: -9.81
   groundedVelocity: -2
   mouseSensitivity: 0.1

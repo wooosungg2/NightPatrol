@@ -9,7 +9,9 @@ namespace NightPatrol.Patrol
 {
     public class PatrolLamp : PatrolObject
     {
+        [Tooltip("켜고 끌 조명. 꺼져 있어야 정상이고, 비워 두면 항상 비정상으로 판정된다")]
         [SerializeField] private Light targetLight;
+        [Tooltip("층이 시작될 때 켜 둘지. 켜 두면 처음부터 비정상이 되므로 보통 끈다")]
         [SerializeField] private bool startsOn;
 
         public override bool IsNormal => targetLight != null && !targetLight.enabled;

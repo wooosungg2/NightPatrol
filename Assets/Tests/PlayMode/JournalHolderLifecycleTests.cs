@@ -19,7 +19,7 @@ namespace NightPatrol.Tests
         {
             player = new GameObject("Player");
             // PlayerInteractor logs an error when its references are empty; that is expected here.
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerInteractor에 PlayerSettings"));
             interactor = player.AddComponent<PlayerInteractor>();
             var clipboard = new GameObject("Clipboard");
             clipboard.transform.SetParent(player.transform);
@@ -61,6 +61,73 @@ namespace NightPatrol.Tests
             Assert.IsTrue(interactor.IsBlocked);
             holder.enabled = false;
             Assert.IsFalse(interactor.IsBlocked);
+        }
+
+        // ── 15번 실패 후 일지 자동 들기 (기본 꺼짐): 막혀 있거나 메뉴가 열린 동안은 기다린다 ──
+        private NightPatrol.Run.PatrolRun UseRun(bool raiseAfterFailure)
+        {
+            var run = new GameObject("PatrolRun").AddComponent<NightPatrol.Run.PatrolRun>();
+            run.transform.SetParent(player.transform);   // TearDown이 같이 지움
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            holder.enabled = false;                       // Awake 뒤에 만든 진행이라 다시 구독
+            typeof(JournalHolder).GetField("run", flags).SetValue(holder, run);
+            typeof(JournalHolder).GetField("raiseAfterFailure", flags).SetValue(holder, raiseAfterFailure);
+            holder.enabled = true;
+            return run;
+        }
+
+        [UnityTest]
+        public IEnumerator RaiseAfterFailure_WaitsUntilUnblocked()
+        {
+            var run = UseRun(true);
+            yield return null;
+            var transitionLock = new object();
+            holder.SetBlocked(transitionLock, true);       // 깨어나기 연출이 막고 있는 것처럼
+            run.Fail();
+            yield return null;
+            Assert.IsFalse(holder.IsRaised);
+            holder.SetBlocked(transitionLock, false);
+            yield return null;
+            Assert.IsTrue(holder.IsRaised);
+        }
+
+        [UnityTest]
+        public IEnumerator RaiseAfterFailure_WaitsForTheMenuToClose()
+        {
+            var run = UseRun(true);
+            yield return null;
+            holder.SetMenuOpen(true);
+            run.Fail();
+            yield return null;
+            Assert.IsFalse(holder.IsRaised);
+            holder.SetMenuOpen(false);
+            yield return null;
+            Assert.IsTrue(holder.IsRaised);
+        }
+
+        [UnityTest]
+        public IEnumerator RaiseAfterFailure_Off_IsTheOldBehaviour()
+        {
+            var run = UseRun(false);
+            yield return null;
+            run.Fail();
+            yield return null;
+            yield return null;
+            Assert.IsFalse(holder.IsRaised);
+        }
+
+        [UnityTest]
+        public IEnumerator RaiseAfterFailure_PendingIsDroppedWhenDisabled()
+        {
+            var run = UseRun(true);
+            yield return null;
+            holder.SetMenuOpen(true);
+            run.Fail();
+            holder.enabled = false;                        // 기다리는 중에 꺼짐
+            holder.SetMenuOpen(false);
+            holder.enabled = true;
+            yield return null;
+            Assert.IsFalse(holder.IsRaised);
         }
     }
 }

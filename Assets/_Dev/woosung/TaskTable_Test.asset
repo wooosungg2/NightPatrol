@@ -16,14 +16,23 @@ MonoBehaviour:
   - label: "\uBCF5\uB3C4 \uC804\uB4F1 1 \uC18C\uB4F1"
     ids:
     - Corridor.Lamp.01
+    exception: 0
   - label: "\uBCF5\uB3C4 \uC804\uB4F1 2 \uC18C\uB4F1"
     ids:
     - Corridor.Lamp.02
+    exception: 0
   - label: "\uBCF5\uB3C4 \uC804\uB4F1 3 \uC18C\uB4F1"
     ids:
     - Corridor.Lamp.03
+    exception: 0
   - label: "\uBCF5\uB3C4 \uB05D \uC804\uB4F1 \uAD6C\uC5ED \uC18C\uB4F1"
     ids:
     - Corridor.Lamp.04
     - Corridor.Lamp.05
     - Corridor.Lamp.06
+    exception: 0
+  - label: "\uBCF5\uB3C4 \uC804\uB4F1 2\uB294 \uC810\uAC80 \uC911\uC774\uB2C8 \uCF1C
+      \uB458 \uAC83"
+    ids:
+    - Corridor.Lamp.02
+    exception: 1

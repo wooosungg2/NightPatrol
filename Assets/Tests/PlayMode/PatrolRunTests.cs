@@ -162,7 +162,7 @@ namespace NightPatrol.Tests
         public void Fail_ResetsObjects_AndTeleportsPlayerToStartPoint()
         {
             // PlayerMovement logs an error when its input references are empty; that is expected here.
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings and Player/Move"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerMovement에 PlayerSettings와 Player/Move"));
             var player = New("Player").AddComponent<PlayerMovement>();
             player.transform.position = new Vector3(0f, 0f, 15f);
             var start = New("StartPoint").transform;
@@ -183,7 +183,7 @@ namespace NightPatrol.Tests
         public IEnumerator Fail_WithoutStartPoint_ReturnsPlayerToWhereItStarted()
         {
             // SetUp's run already passed its Start (a frame runs before a UnityTest body), so use a new one.
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings and Player/Move"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerMovement에 PlayerSettings와 Player/Move"));
             var player = New("Player").AddComponent<PlayerMovement>();
             player.transform.SetPositionAndRotation(new Vector3(2f, 0f, 4f), Quaternion.Euler(0f, 180f, 0f));
             var other = New("Run2").AddComponent<PatrolRun>();   // Awake finds the player
@@ -200,7 +200,7 @@ namespace NightPatrol.Tests
         public void Fail_BeforeStartPositionIsKnown_DoesNotMovePlayer()
         {
             // Start has not run yet, so there is no remembered position: stay put rather than jump to the origin.
-            LogAssert.Expect(LogType.Error, new Regex("Assign PlayerSettings and Player/Move"));
+            LogAssert.Expect(LogType.Error, new Regex("PlayerMovement에 PlayerSettings와 Player/Move"));
             var player = New("Player").AddComponent<PlayerMovement>();
             player.transform.position = new Vector3(1f, 0f, 7f);
             SetField(run, "player", player);
@@ -222,6 +222,21 @@ namespace NightPatrol.Tests
 
             Assert.AreEqual(4, run.CurrentFloor);
             CollectionAssert.AreEqual(new[] { 4 }, after);
+        }
+
+        [Test]
+        public void ClearedSubscriberException_IsLogged_AndOthersStillHear()
+        {
+            bool after = false;
+            run.Cleared += () => throw new System.InvalidOperationException("ending bug");
+            run.Cleared += () => after = true;
+
+            LogAssert.Expect(LogType.Exception, new Regex("ending bug"));
+            run.JumpBy(4);
+
+            Assert.IsTrue(run.IsCleared);
+            Assert.AreEqual(1, clearedCount);
+            Assert.IsTrue(after);
         }
 
         [Test]
@@ -365,7 +380,7 @@ namespace NightPatrol.Tests
         public void Elevator_FindsRunByItself()
         {
             var elevator = New("Elevator").AddComponent<Elevator>();
-            Assert.AreEqual("E - 아래층으로", elevator.Prompt);
+            Assert.AreEqual("E 길게 - 아래층으로", elevator.Prompt);
             elevator.Interact(null);
             Assert.AreEqual(4, run.CurrentFloor);
         }
@@ -375,13 +390,24 @@ namespace NightPatrol.Tests
         {
             var elevator = New("Elevator").AddComponent<Elevator>();
             SetField(elevator, "run", run);
-            Assert.AreEqual("E - 아래층으로", elevator.Prompt);
+            Assert.AreEqual("E 길게 - 아래층으로", elevator.Prompt);
 
             elevator.Interact(null);
             Assert.AreEqual(4, run.CurrentFloor);
 
             for (int i = 0; i < 3; i++) run.Descend(true);
             Assert.AreEqual(string.Empty, elevator.Prompt);
+        }
+
+        [Test]
+        public void Elevator_NeedsAHold_UnlessHoldIsZero()
+        {
+            var elevator = New("Elevator").AddComponent<Elevator>();
+            Assert.IsInstanceOf<IHoldInteractable>(elevator);
+            Assert.AreEqual(0.7f, elevator.HoldSeconds, 1e-5f);
+
+            SetField(elevator, "holdSeconds", 0f);
+            Assert.AreEqual("E - 아래층으로", elevator.Prompt);
         }
     }
 }

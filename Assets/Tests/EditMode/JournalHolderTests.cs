@@ -113,6 +113,61 @@ namespace NightPatrol.Tests
             Assert.AreEqual(2, events);
         }
 
+        // ── Block (층 이동 연출 등) ──
+        [Test]
+        public void Block_LowersJournal_AndIgnoresRaising()
+        {
+            var transition = new object();
+            holder.SetRaised(true);
+            holder.SetBlocked(transition, true);
+            Assert.IsTrue(holder.IsBlocked);
+            Assert.IsFalse(holder.IsRaised);
+            Assert.IsFalse(interactor.IsBlocked);   // the journal's own E block is released too
+
+            holder.Toggle();
+            holder.SetRaised(true);
+            Assert.IsFalse(holder.IsRaised);
+        }
+
+        [Test]
+        public void Raising_WorksAgain_OnlyAfterEveryOwnerReleases()
+        {
+            var transition = new object();
+            var pause = new object();
+            holder.SetBlocked(transition, true);
+            holder.SetBlocked(pause, true);
+            holder.SetBlocked(transition, false);
+            holder.Toggle();
+            Assert.IsFalse(holder.IsRaised);
+
+            holder.SetBlocked(pause, false);
+            holder.Toggle();
+            Assert.IsTrue(holder.IsRaised);
+        }
+
+        [Test]
+        public void Block_NullOwner_IsIgnored()
+        {
+            holder.SetBlocked(null, true);
+            Assert.IsFalse(holder.IsBlocked);
+        }
+
+        // ── ESC 메뉴가 클립보드를 쓸 때 ──
+        [Test]
+        public void MenuOpen_KeepsJournalState_AndRaisesNoJournalEvent()
+        {
+            int events = 0;
+            holder.RaisedChanged += _ => events++;
+            holder.SetBlocked(new object(), true);   // even during a lock the menu may lift the clipboard
+            holder.SetMenuOpen(true);
+            Assert.IsTrue(holder.IsMenuOpen);
+            Assert.IsFalse(holder.IsRaised);
+            Assert.AreEqual(0, events);
+
+            holder.SetMenuOpen(false);
+            Assert.IsFalse(holder.IsMenuOpen);
+        }
+
         [Test]
         public void MissingInteractor_DoesNotThrow()
         {

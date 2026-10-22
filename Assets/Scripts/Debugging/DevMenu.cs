@@ -6,33 +6,77 @@ using UnityEngine.InputSystem;
 
 namespace NightPatrol.Debugging
 {
+    /// <summary>
+    /// 개발자 키 (에디터·개발 빌드만). F1 개발자 정보 표시(InteractionDebugView)가 켜진 동안에만 동작한다 —
+    /// 플레이테스트 빌드에서 테스터가 F3(강제 실패)·F5(폴더 열기)를 실수로 누르지 않게.
+    /// 키 안내는 F1 패널의 "개발자 키" 구역으로 보인다 (DevInfo)
+    /// </summary>
     [DisallowMultipleComponent]
     public sealed class DevMenu : MonoBehaviour
     {
+#pragma warning disable 0414   // 릴리스 빌드에서는 안 쓰지만 직렬화 구조를 빌드마다 같게 두려고 #if 밖에 둔다
+        [Tooltip("F1 패널에 개발자 키 안내 구역을 넣을지")]
         [SerializeField] private bool showHelp = true;
-        private PatrolRun run;
+#pragma warning restore 0414
+
+        /// <summary>F1 패널의 개발자 키 안내 (PatrolRun이 없으면 F5만)</summary>
+        public static string HelpText(bool hasRun) => hasRun
+            ? "F1 표시 전환 · F2 하행 · F3 실패 · F4 층 재시작\nF5 기록 폴더 · PgUp/PgDn 층 이동"
+            : "F1 표시 전환 · F5 기록 폴더  (PatrolRun 없음)";
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        private void Awake() => run = UnityEngine.Object.FindAnyObjectByType<PatrolRun>();
+        private PatrolRun run;
+        private FloorTransition transition;
+        private PlaytestLog playtest;
+        private InteractionDebugView debugView;
+
+        /// <summary>개발자 키가 동작하는지: F1 디버그 표시가 켜져 있을 때만</summary>
+        public bool KeysActive => debugView != null && debugView.IsVisible;
+
+        private void Awake()
+        {
+            run = UnityEngine.Object.FindAnyObjectByType<PatrolRun>();
+            transition = UnityEngine.Object.FindAnyObjectByType<FloorTransition>();
+            playtest = UnityEngine.Object.FindAnyObjectByType<PlaytestLog>();
+            debugView = GetComponent<InteractionDebugView>();
+            if (debugView == null) debugView = UnityEngine.Object.FindAnyObjectByType<InteractionDebugView>();
+        }
+
+        private void OnEnable()
+        {
+            if (showHelp) DevInfo.Register(this, "개발자 키", () => HelpText(run != null), 200);
+        }
+
+        private void OnDisable() => DevInfo.Unregister(this);
 
         private void Update()
         {
             var keyboard = Keyboard.current;
-            if (run == null || keyboard == null) return;
+            if (keyboard == null || !KeysActive) return;
+            if (keyboard.f5Key.wasPressedThisFrame)
+            {
+                // logs/(게임 로그)와 playtest/(플레이테스트 기록)가 있는 폴더
+                Debug.Log($"[Dev] 기록 폴더 열기: {Application.persistentDataPath}", this);
+                Application.OpenURL("file:///" + Application.persistentDataPath);
+            }
+            if (run == null) return;
+            // 층 이동 연출 중에 층을 바꾸면 연출이 끝날 때 판정이 엉키므로 기다린다.
+            // ESC 메뉴가 열린 동안(시간 정지)도: 실패 연출의 검은 화면이 메뉴를 덮어 버림
+            if ((transition != null && transition.IsBusy) || Time.timeScale == 0f) return;
             if (keyboard.f2Key.wasPressedThisFrame)
             {
                 Debug.Log("[Dev] 판정 무시 하행", this);
-                run.Descend(true);
+                AsDev("F2 하행", () => run.Descend(true));
             }
             if (keyboard.f3Key.wasPressedThisFrame)
             {
                 Debug.Log("[Dev] 강제 실패", this);
-                run.Fail();
+                AsDev("F3 실패", run.Fail);
             }
             if (keyboard.f4Key.wasPressedThisFrame)
             {
                 Debug.Log("[Dev] 현재 층 다시 시작", this);
-                run.RestartFloor();
+                AsDev("F4 재시작", run.RestartFloor);
             }
             if (keyboard.pageUpKey.wasPressedThisFrame) Jump(-1);
             if (keyboard.pageDownKey.wasPressedThisFrame) Jump(1);
@@ -41,16 +85,19 @@ namespace NightPatrol.Debugging
         private void Jump(int steps)
         {
             int before = run.CurrentFloor;
-            run.JumpBy(steps);
+            AsDev("층 이동", () => run.JumpBy(steps));
             if (run.CurrentFloor != before) Debug.Log($"[Dev] 층 이동 → {run.CurrentFloor}층", this);
         }
 
-        private void OnGUI()
+        // 개발자 키로 끝난 층은 플레이테스트 기록에 "통과"·"실패" 대신 키 이름으로 남긴다
+        private void AsDev(string result, System.Action action)
         {
-            if (!showHelp) return;
-            string help = run == null ? "[DEV] PatrolRun 없음"
-                : "[DEV] F2 하행  F3 실패  F4 층 재시작  PgUp/PgDn 층 이동";
-            GUI.Label(new Rect(12f, Screen.height - 30f, Mathf.Max(100f, Screen.width - 24f), 24f), help);
+            if (playtest != null) playtest.ResultOverride = result;
+            try { action(); }
+            finally
+            {
+                if (playtest != null) playtest.ResultOverride = null;
+            }
         }
 #endif
     }
