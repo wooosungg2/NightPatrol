@@ -72,7 +72,7 @@ namespace NightPatrol.Tests
             var first = NewRun("Run A");
             var second = NewRun("Run B", expectSecondWarning: true);
 
-            // 알려진 한계 (가이드 7장): 다른 PatrolRun으로 넘어가지 않음. 씬에는 하나만 둔다
+            // 알려진 한계 (가이드 "3. 층 진행과 이벤트"): 다른 PatrolRun으로 넘어가지 않음. 씬에는 하나만 둔다
             first.enabled = false;
             Assert.IsNull(PatrolRun.Current);
             Assert.IsTrue(second.isActiveAndEnabled);

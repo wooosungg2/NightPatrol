@@ -51,6 +51,11 @@ namespace NightPatrol.Run
         /// </summary>
         public FloorStartReason LastStart { get; private set; }
         /// <summary>
+        /// 층을 시작하는 중(사물 초기화 → FloorReset → FloorStarted → 점검 항목)이면 true.
+        /// 이 동안 사물 상태가 한꺼번에 바뀌므로 소리(SoundEmitter)는 내지 않는다.
+        /// </summary>
+        public bool IsStartingFloor { get; private set; }
+        /// <summary>
         /// 사물 초기화 직후, FloorStarted 전. 점검 사물이 아니면서 층마다 처음 상태로 돌아가야 하는 것(조명 구역 등)은 여기서 되돌린다.
         /// 이상현상은 여기서 켜지 말 것 (FloorStarted에서).
         /// </summary>
@@ -168,6 +173,13 @@ namespace NightPatrol.Run
 
         // 사물 초기화·Id 표 → FloorReset(조명 복구 등) → FloorStarted(이상현상 등) → 점검 항목 → 일지(TasksChanged)
         private void StartFloor()
+        {
+            IsStartingFloor = true;
+            try { StartFloorSteps(); }
+            finally { IsStartingFloor = false; }
+        }
+
+        private void StartFloorSteps()
         {
             PatrolInspection.ResetErrorLog();
             IsCleared = false;
