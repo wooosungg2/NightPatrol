@@ -22,11 +22,18 @@ namespace NightPatrol.Anomalies
         [Header("벽 페인트 이상현상 후보")]
         [SerializeField] private Anomaly[] wallStainAnomalies;
 
+        // [추가] 천장 의자 이상현상 후보
+        [Header("천장 의자 이상현상 후보")]
+        [SerializeField] private Anomaly[] ceilingChairAnomalies;
+
         private Anomaly activeRedMonitor;
         private Anomaly activeGlitchMonitor;
         private Anomaly activeLightFlicker;
         private Anomaly activeLightColor;
         private Anomaly activeWallStain;
+
+        // [추가] 현재 활성화된 천장 의자 이상현상
+        private Anomaly activeCeilingChair;
 
         private PatrolRun patrolRun;
 
@@ -99,6 +106,11 @@ namespace NightPatrol.Anomalies
             activeWallStain = ActivateRandom(
                 wallStainAnomalies, null
             );
+
+            // [추가] 천장 의자 이상현상 활성화
+            activeCeilingChair = ActivateRandom(
+                ceilingChairAnomalies, null
+            );
         }
 
         private Anomaly ActivateRandom(
@@ -168,6 +180,13 @@ namespace NightPatrol.Anomalies
                 activeWallStain.ResetAfterFloorReset();
                 activeWallStain = null;
             }
+
+            // [추가] 천장 의자 이상현상 초기화
+            if (activeCeilingChair != null)
+            {
+                activeCeilingChair.ResetAfterFloorReset();
+                activeCeilingChair = null;
+            }
         }
 
         public void ClearAnomalies()
@@ -200,6 +219,13 @@ namespace NightPatrol.Anomalies
             {
                 activeWallStain.Deactivate();
                 activeWallStain = null;
+            }
+
+            // [추가] 천장 의자 이상현상 해제
+            if (activeCeilingChair != null)
+            {
+                activeCeilingChair.Deactivate();
+                activeCeilingChair = null;
             }
         }
     }
