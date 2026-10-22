@@ -6,7 +6,11 @@ namespace NightPatrol.Player
     public sealed class PlayerSettings : ScriptableObject
     {
         [Tooltip("걷는 속도 (m/s)")]
-        [SerializeField, Min(0f)] private float walkSpeed = 2f;
+        [SerializeField, Min(0f)] private float walkSpeed = 2.6f;
+        [Tooltip("멈춰 있다가 걷는 속도가 될 때까지 걸리는 시간 (초). 0이면 바로 (딱딱하게 출발)")]
+        [SerializeField, Min(0f)] private float accelerationTime = 0.15f;
+        [Tooltip("걷다가 멈출 때까지 걸리는 시간 (초). 0이면 바로 멈춤")]
+        [SerializeField, Min(0f)] private float decelerationTime = 0.1f;
         [Tooltip("중력 (음수)")]
         [SerializeField] private float gravity = -9.81f;
         [Tooltip("땅에 붙어 있을 때 아래로 누르는 속도 (경사·계단에서 뜨지 않게)")]
@@ -21,6 +25,8 @@ namespace NightPatrol.Player
         [SerializeField, Min(0f)] private float aimAssistRadius = 0.05f;
 
         public float WalkSpeed => Mathf.Max(0f, walkSpeed);
+        public float AccelerationTime => Mathf.Max(0f, accelerationTime);
+        public float DecelerationTime => Mathf.Max(0f, decelerationTime);
         public float Gravity => Mathf.Min(0f, gravity);
         public float GroundedVelocity => Mathf.Min(0f, groundedVelocity);
         public float MouseSensitivity => Mathf.Max(0f, mouseSensitivity);

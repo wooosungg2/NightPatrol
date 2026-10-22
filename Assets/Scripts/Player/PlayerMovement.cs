@@ -17,6 +17,7 @@ namespace NightPatrol.Player
         private PlayerLook look;
         private InputAction move;
         private float verticalVelocity;
+        private Vector2 walkVelocity;   // 몸 기준 (x 오른쪽, y 앞), m/s. 몸 기준이라 마우스로 돌아도 미끄러지지 않음
 
         /// <summary>누군가 이동을 막고 있으면 true. 막혀도 중력은 그대로</summary>
         public bool IsBlocked => blockers.Count > 0;
@@ -42,6 +43,7 @@ namespace NightPatrol.Player
         private void OnDisable()
         {
             verticalVelocity = 0f;
+            walkVelocity = Vector2.zero;
         }
 
         /// <summary>막는 주체(owner)별로 이동을 막거나 푼다. 한쪽이 풀어도 다른 쪽이 막고 있으면 계속 막힘</summary>
@@ -65,16 +67,32 @@ namespace NightPatrol.Player
             transform.SetPositionAndRotation(position, Quaternion.Euler(0f, rotation.eulerAngles.y, 0f));
             controller.enabled = true;
             verticalVelocity = 0f;
+            walkVelocity = Vector2.zero;
             if (look != null) look.ResetPitch();
+        }
+
+        /// <summary>
+        /// 걷는 속도를 목표 쪽으로 한 프레임만큼 옮긴다. 목표가 0(멈춤)이면 감속 시간, 아니면 가속 시간 동안
+        /// 0과 최고 속도 사이를 지나는 빠르기로 움직이고, 넘치지 않는다. 시간이 0이면 바로 목표.
+        /// </summary>
+        internal static Vector2 StepWalkVelocity(Vector2 current, Vector2 target, float walkSpeed,
+            float accelerationTime, float decelerationTime, float deltaTime)
+        {
+            float seconds = target == Vector2.zero ? decelerationTime : accelerationTime;
+            if (seconds <= 0f || walkSpeed <= 0f) return target;
+            return Vector2.MoveTowards(current, target, walkSpeed / seconds * deltaTime);
         }
 
         private void Update()
         {
             if (!controller.enabled) return;
 
+            // 막히거나 커서가 풀리면 목표가 0이 되어 감속 시간에 걸쳐 멈춘다 (순간이동은 바로 0)
             Vector2 input = !IsBlocked && Cursor.lockState == CursorLockMode.Locked && Application.isFocused
                 ? Vector2.ClampMagnitude(move.ReadValue<Vector2>(), 1f) : Vector2.zero;
-            Vector3 velocity = (transform.right * input.x + transform.forward * input.y) * settings.WalkSpeed;
+            walkVelocity = StepWalkVelocity(walkVelocity, input * settings.WalkSpeed, settings.WalkSpeed,
+                settings.AccelerationTime, settings.DecelerationTime, Time.deltaTime);
+            Vector3 velocity = transform.right * walkVelocity.x + transform.forward * walkVelocity.y;
             if (controller.isGrounded && verticalVelocity < 0f)
                 verticalVelocity = settings.GroundedVelocity;
             verticalVelocity += settings.Gravity * Time.deltaTime;

@@ -132,6 +132,38 @@ namespace NightPatrol.Tests
             CollectionAssert.AreEqual(new[] { "Descend", "Arrived 4" }, events);
         }
 
+        // 01_10: 엘리베이터에 붙인 SoundEmitter의 "하행 시작"·"도착" 묶음이 연출에 맞춰 저절로 울림 (도착은 층 시작이 끝난 뒤라 조용하지 않음)
+        [UnityTest]
+        public IEnumerator SoundEmitter_PlaysDescendAndArrivalCues()
+        {
+            yield return null;
+            var descendClip = AudioClip.Create("descend", 441, 1, 44100, false);
+            var arriveClip = AudioClip.Create("arrive", 441, 1, 44100, false);
+            var elevator = New("Elevator");
+            elevator.SetActive(false);
+            var emitter = elevator.AddComponent<NightPatrol.Audio.SoundEmitter>();
+            SetField(emitter, "cues", new[]
+            {
+                new NightPatrol.Audio.SoundEmitter.Cue { name = "하행", clips = new[] { descendClip }, playOn = NightPatrol.Audio.SoundEmitter.Moment.DescendStarted },
+                new NightPatrol.Audio.SoundEmitter.Cue { name = "도착", clips = new[] { arriveClip }, playOn = NightPatrol.Audio.SoundEmitter.Moment.Arrived },
+            });
+            elevator.SetActive(true);   // OnEnable에서 FloorTransition을 찾아 구독
+
+            try
+            {
+                transition.Descend();
+                yield return WaitUntilIdle();
+
+                Assert.AreEqual(2, emitter.PlayCount);
+                Assert.AreSame(arriveClip, emitter.LastClip);
+            }
+            finally
+            {
+                Object.DestroyImmediate(descendClip);
+                Object.DestroyImmediate(arriveClip);
+            }
+        }
+
         [UnityTest]
         public IEnumerator SecondDescendWhileBusy_IsIgnored()
         {
