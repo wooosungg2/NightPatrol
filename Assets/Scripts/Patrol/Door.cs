@@ -13,6 +13,9 @@ namespace NightPatrol
 		[Tooltip("문이 달린 방 호수 (예: 521)")] public string roomLabel;
 		public DoorStyle style;
 
+		[Tooltip("잠긴 문을 플레이어가 E로 열 수 있는지. 끄면 잠겨 있을 땐 안 열림 (점검 항목으로 풀린 문은 닫고 잠글 수 있음)")]
+		public bool playerCanUnlock = true;
+
 		[Header("처음 상태 (ResetToDefault)")]
 		public bool defaultLocked = true;
 		public bool defaultOpen;
@@ -35,12 +38,12 @@ namespace NightPatrol
 
 		// ── PatrolObject ──
 		public override bool IsNormal => locked && !open;
-		public override string Prompt => open ? "E - 문 닫기" : locked ? "E - 문 열기" : "E - 문 잠그기";
+		public override string Prompt => open ? "E - 문 닫기" : locked ? (playerCanUnlock ? "E - 문 열기" : "잠겨 있음") : "E - 문 잠그기";
 
 		public override void Interact(PlayerInteractor who)
 		{
 			if (open) Close();
-			else if (locked) { SetLocked(false); TryOpen(); }
+			else if (locked) { if (playerCanUnlock) { SetLocked(false); TryOpen(); } }   // 열쇠 없는 방은 그대로
 			else SetLocked(true);
 		}
 

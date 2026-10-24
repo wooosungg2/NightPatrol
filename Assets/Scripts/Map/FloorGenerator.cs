@@ -211,8 +211,18 @@ namespace NightPatrol
 			foreach (var so in layout.solids)
 				MakeSolid(so);
 
-			foreach (var sk in layout.skylights)
-				FloorDetailBuilder.Skylight(transform, sk, ceilingHeight, glassMaterial, windowFrameMaterial, corridorWallMaterial);
+			// 유리 지붕은 맨 위 층(5층)에만. 아래층은 같은 자리에 평평한 천장을 덮음 (FloorVariants가 층마다 바꿈)
+			var variants = GetComponent<FloorVariants>();
+			if (variants == null) variants = gameObject.AddComponent<FloorVariants>();
+			variants.topFloorOnly.Clear(); variants.belowTopOnly.Clear();
+			for (int k = 0; k < layout.skylights.Count; k++)
+			{
+				var sk = layout.skylights[k];
+				variants.topFloorOnly.Add(FloorDetailBuilder.Skylight(transform, sk, ceilingHeight, glassMaterial, windowFrameMaterial, corridorWallMaterial));
+				var cover = MakeSlab($"Skylight_Cover_{k}", sk, ceilingHeight + 0.05f, corridorCeilingMaterial);
+				cover.SetActive(false);
+				variants.belowTopOnly.Add(cover);
+			}
 
 			// 복도 디테일 (사진 기준)
 			if (details != null && details.enabled)
@@ -221,9 +231,11 @@ namespace NightPatrol
 				det.SetParent(transform, false);
 				det.gameObject.isStatic = true;
 				var zones = FloorDetailBuilder.CeilingLights(det, layout.corridors, ceilingHeight, details, layout.skylights);
+				foreach (var kv in zones) if (kv.Value != null) kv.Value.Id = $"Corridor.Lights.{kv.Key:00}";   // 이상현상이 찾을 이름
 				FloorDetailBuilder.Baseboards(det, layout.corridors, openings, details);
 				FloorDetailBuilder.LightSwitches(det, layout.corridors, openings, zones, details);
 				FloorDetailBuilder.HallProps(det, layout.hallNorth, layout.hallSouth, details);
+				FloorDetailBuilder.Furniture(det, layout.furniture, details);
 			}
 
 			AssignPatrolIds();
@@ -231,6 +243,8 @@ namespace NightPatrol
 			var tiler = GetComponent<TextureTiler>();
 			if (tiler == null) tiler = gameObject.AddComponent<TextureTiler>();
 			tiler.Apply();
+			// 방 표찰 호수를 층에 맞춤 (521 → 421 …)
+			if (GetComponent<RoomNumberSigns>() == null) gameObject.AddComponent<RoomNumberSigns>();
 			LogDoorPairs();
 			MarkDirty();
 		}
@@ -572,8 +586,11 @@ namespace NightPatrol
 
 			// 강의실 천장 조명 + 앞문 옆 스위치
 			if (classroom && FloorDetailBuilder.WantsRoomLights(details, slot.label))
-				FloorDetailBuilder.RoomLights(root, slot.label, W, D, t, ceilingHeight,
+			{
+				var roomZone = FloorDetailBuilder.RoomLights(root, slot.label, W, D, t, ceilingHeight,
 					windowWall ? WindowBuilder.Inset(classroomWindows, slot.label) : 0f, doors, details);
+				if (roomZone != null) roomZone.Id = PatrolIds.Zone(slot.label) + ".Lights";   // 예: R21.Lights
+			}
 
 			// 계단실: U자 계단·참·창
 			if (stairGen)

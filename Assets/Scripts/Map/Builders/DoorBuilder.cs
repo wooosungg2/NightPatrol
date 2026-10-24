@@ -20,6 +20,8 @@ namespace NightPatrol
 		[Tooltip("불투명유리 양문(522 서쪽·523·524호)은 복도 쪽 오목한 칸으로 열림. 안으로 열면 문짝이 책상 쪽 통로를 막음")]
 		public bool glassDoubleOutward = true;
 		[Tooltip("계단실 문은 Swing Inward와 상관없이 계단실 안쪽으로 열림")] public bool stairDoorsInward = true;
+		[Tooltip("플레이어가 열쇠로 열 수 있는 방 (호수). 나머지 방 문은 잠겨 있으면 E로 안 열림 (점검 항목으로 열린 문은 닫고 잠글 수 있음)")]
+		public string[] openableRooms = { "521", "524" };
 
 		[Header("치수")]
 		[Tooltip("문틀 폭(m)")] public float frameWidth = 0.05f;
@@ -121,6 +123,8 @@ namespace NightPatrol
 
 			var door = root.gameObject.AddComponent<Door>();
 			door.roomLabel = label;
+			door.playerCanUnlock = false;
+			if (s.openableRooms != null) foreach (var o in s.openableRooms) if (o == label) door.playerCanUnlock = true;
 			door.style = style;
 			door.leaves = leaves.ToArray();
 			door.swingSigns = signs.ToArray();
@@ -230,18 +234,58 @@ namespace NightPatrol
 			else r.enabled = false;
 		}
 
-		static MaterialPropertyBlock mpb;
 
 		/// <summary>재질이 있으면 그것을, 없으면 기본 재질에 색만 입힘 (재질 파일을 만들지 않음)</summary>
+		/// <summary>
+		/// 재질이 없으면 색만 칠함. 에디터에서는 색마다 재질 파일(Assets/Materials/Generated/Tint_RRGGBB)을 만들어 씀:
+		/// 예전처럼 MaterialPropertyBlock으로 칠하면 씬에 저장되지 않아서 Play나 씬을 다시 열 때 색이 사라졌음
+		/// </summary>
 		public static void Paint(Renderer r, Material mat, Color fallback)
 		{
 			if (r == null) return;
 			if (mat != null) { r.sharedMaterial = mat; return; }
-			if (mpb == null) mpb = new MaterialPropertyBlock();
-			mpb.Clear();
-			mpb.SetColor("_BaseColor", fallback); // URP Lit
-			mpb.SetColor("_Color", fallback);
-			r.SetPropertyBlock(mpb);
+			r.SetPropertyBlock(null);
+			r.sharedMaterial = TintMaterial(fallback, r.sharedMaterial);
+		}
+
+		static readonly System.Collections.Generic.Dictionary<int, Material> editorTints = new System.Collections.Generic.Dictionary<int, Material>();
+		static readonly System.Collections.Generic.Dictionary<int, Material> runtimeTints = new System.Collections.Generic.Dictionary<int, Material>();
+
+		/// <summary>이 색의 재질 (에디터: 에셋으로 저장해서 다시 씀, 실행 중: 메모리에만)</summary>
+		public static Material TintMaterial(Color c, Material template = null)
+		{
+			Color32 c32 = c;
+			string hex = $"{c32.r:X2}{c32.g:X2}{c32.b:X2}";
+#if UNITY_EDITOR
+			if (!Application.isPlaying)
+			{
+				int ek = c32.r << 16 | c32.g << 8 | c32.b;
+				if (editorTints.TryGetValue(ek, out var cached) && cached != null) return cached;   // 생성 한 번에 수천 번 불리므로 캐시
+				const string dir = "Assets/Materials/Generated";
+				string path = $"{dir}/Tint_{hex}.mat";
+				var existing = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(path);
+				if (existing != null) return editorTints[ek] = existing;
+				if (!UnityEditor.AssetDatabase.IsValidFolder("Assets/Materials")) UnityEditor.AssetDatabase.CreateFolder("Assets", "Materials");
+				if (!UnityEditor.AssetDatabase.IsValidFolder(dir)) UnityEditor.AssetDatabase.CreateFolder("Assets/Materials", "Generated");
+				var m = NewTint(c, hex, template);
+				UnityEditor.AssetDatabase.CreateAsset(m, path);
+				return editorTints[ek] = m;
+			}
+#endif
+			int key = c32.r << 16 | c32.g << 8 | c32.b;
+			if (!runtimeTints.TryGetValue(key, out var rm) || rm == null) runtimeTints[key] = rm = NewTint(c, hex, template);
+			return rm;
+		}
+
+		static Material NewTint(Color c, string hex, Material template)
+		{
+			var sh = Shader.Find("Universal Render Pipeline/Lit");
+			if (sh == null && template != null) sh = template.shader;
+			var m = new Material(sh) { name = "Tint_" + hex };
+			m.SetColor("_BaseColor", c);
+			m.SetColor("_Color", c);
+			if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.25f);
+			return m;
 		}
 	}
 }
