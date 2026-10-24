@@ -8,7 +8,7 @@ namespace NightPatrol.Anomalies
         public abstract void Activate();
         public abstract void Deactivate();
 
-        // PatrolRunÀÌ ÀÌ»óÇö»ó Ä«¿îÅÍ¸¦ ÃÊ±âÈ­ÇÑ ÈÄ »ç¿ë
+        // PatrolRunì´ ì´ìƒí˜„ìƒ ì¹´ìš´í„°ë¥¼ ì´ˆê¸°í™”í•œ í›„ ì‚¬ìš©
         public virtual void ResetAfterFloorReset()
         {
             Deactivate();

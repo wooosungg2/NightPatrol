@@ -7,23 +7,34 @@ namespace NightPatrol.Anomalies
 {
     public class AnomalyManager : MonoBehaviour
     {
-        [Header("»¡°£ ¸ğ´ÏÅÍ ÀÌ»óÇö»ó ÈÄº¸")]
+        [Header("ë¹¨ê°„ ëª¨ë‹ˆí„° ì´ìƒí˜„ìƒ í›„ë³´")]
         [SerializeField] private Anomaly[] redMonitorAnomalies;
 
-        [Header("Glitch ¸ğ´ÏÅÍ ÀÌ»óÇö»ó ÈÄº¸")]
+        [Header("Glitch ëª¨ë‹ˆí„° ì´ìƒí˜„ìƒ í›„ë³´")]
         [SerializeField] private Anomaly[] glitchMonitorAnomalies;
 
-        [Header("Á¶¸í ±ôºıÀÓ ÀÌ»óÇö»ó ÈÄº¸")]
+        [Header("ì¡°ëª… ê¹œë¹¡ì„ ì´ìƒí˜„ìƒ í›„ë³´")]
         [SerializeField] private Anomaly[] lightFlickerAnomalies;
 
-        [Header("Á¶¸í »ö»ó º¯°æ ÀÌ»óÇö»ó ÈÄº¸")]
+        [Header("ì¡°ëª… ìƒ‰ìƒ ë³€ê²½ ì´ìƒí˜„ìƒ í›„ë³´")]
         [SerializeField] private Anomaly[] lightColorAnomalies;
 
-        private Anomaly activeLightColor;
-        private Anomaly activeLightFlicker;
+        [Header("ë²½ í˜ì¸íŠ¸ ì´ìƒí˜„ìƒ í›„ë³´")]
+        [SerializeField] private Anomaly[] wallStainAnomalies;
+
+        // [ì¶”ê°€] ì²œì¥ ì˜ì ì´ìƒí˜„ìƒ í›„ë³´
+        [Header("ì²œì¥ ì˜ì ì´ìƒí˜„ìƒ í›„ë³´")]
+        [SerializeField] private Anomaly[] ceilingChairAnomalies;
 
         private Anomaly activeRedMonitor;
         private Anomaly activeGlitchMonitor;
+        private Anomaly activeLightFlicker;
+        private Anomaly activeLightColor;
+        private Anomaly activeWallStain;
+
+        // [ì¶”ê°€] í˜„ì¬ í™œì„±í™”ëœ ì²œì¥ ì˜ì ì´ìƒí˜„ìƒ
+        private Anomaly activeCeilingChair;
+
         private PatrolRun patrolRun;
 
         private void OnEnable()
@@ -33,7 +44,7 @@ namespace NightPatrol.Anomalies
             if (patrolRun == null)
             {
                 Debug.LogWarning(
-                    "[AnomalyManager] PatrolRunÀ» Ã£Áö ¸øÇß½À´Ï´Ù.",
+                    "[AnomalyManager] PatrolRunì„ ì°¾ì§€ ëª»í–ˆìŠµë‹ˆë‹¤.",
                     this
                 );
                 return;
@@ -90,6 +101,15 @@ namespace NightPatrol.Anomalies
 
             activeLightColor = ActivateRandom(
                 lightColorAnomalies, null
+            );
+
+            activeWallStain = ActivateRandom(
+                wallStainAnomalies, null
+            );
+
+            // [ì¶”ê°€] ì²œì¥ ì˜ì ì´ìƒí˜„ìƒ í™œì„±í™”
+            activeCeilingChair = ActivateRandom(
+                ceilingChairAnomalies, null
             );
         }
 
@@ -154,6 +174,19 @@ namespace NightPatrol.Anomalies
                 activeLightColor.ResetAfterFloorReset();
                 activeLightColor = null;
             }
+
+            if (activeWallStain != null)
+            {
+                activeWallStain.ResetAfterFloorReset();
+                activeWallStain = null;
+            }
+
+            // [ì¶”ê°€] ì²œì¥ ì˜ì ì´ìƒí˜„ìƒ ì´ˆê¸°í™”
+            if (activeCeilingChair != null)
+            {
+                activeCeilingChair.ResetAfterFloorReset();
+                activeCeilingChair = null;
+            }
         }
 
         public void ClearAnomalies()
@@ -180,6 +213,19 @@ namespace NightPatrol.Anomalies
             {
                 activeLightColor.Deactivate();
                 activeLightColor = null;
+            }
+
+            if (activeWallStain != null)
+            {
+                activeWallStain.Deactivate();
+                activeWallStain = null;
+            }
+
+            // [ì¶”ê°€] ì²œì¥ ì˜ì ì´ìƒí˜„ìƒ í•´ì œ
+            if (activeCeilingChair != null)
+            {
+                activeCeilingChair.Deactivate();
+                activeCeilingChair = null;
             }
         }
     }
