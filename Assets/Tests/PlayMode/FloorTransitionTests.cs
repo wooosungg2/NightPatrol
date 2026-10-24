@@ -223,6 +223,87 @@ namespace NightPatrol.Tests
             Assert.IsFalse(transition.IsBusy);
         }
 
+        // ── 시작 페이드 (00_12: 이 동안 ESC 메뉴가 안 열림) ──
+        // SetUp에서 만든 연출은 테스트 본문 전에 이미 Start를 마쳐서(시작 페이드 끔) 시작 페이드를 켠 새 연출을 만든다
+        private void UseTransitionWithStartFade()
+        {
+            Object.DestroyImmediate(transition.gameObject);
+            transition = New("Transition").AddComponent<FloorTransition>();   // 시작 페이드 켜짐 (기본). Awake가 run·player·fader를 찾음
+            SetField(transition, "fadeSeconds", 1f);   // 첫 프레임이 길어도(최대 0.33초) 한 번에 끝나지 않게
+        }
+
+        [UnityTest]
+        public IEnumerator StartFade_CoversTheScreen_UntilItEnds()
+        {
+            UseTransitionWithStartFade();
+            yield return null;   // Start: 검은 화면에서 밝아지기 시작
+            Assert.IsTrue(transition.IsScreenCovered);
+            Assert.IsFalse(transition.IsBusy);   // 조작은 안 잠금
+
+            float until = Time.realtimeSinceStartup + 3f;
+            while (transition.IsScreenCovered && Time.realtimeSinceStartup < until) yield return null;
+            Assert.IsFalse(transition.IsScreenCovered, "시작 페이드가 끝났는데 계속 덮여 있음");
+            Assert.AreEqual(0f, fader.Alpha);
+        }
+
+        // ── 퇴근 (1층 도착 뒤, 00_12. 엔딩이 정해지기 전 임시 끝) ──
+        [Test]
+        public void EndShift_BeforeClear_IsIgnored()
+        {
+            transition.EndShift();
+            Assert.IsFalse(transition.IsBusy);
+        }
+
+        [UnityTest]
+        public IEnumerator EndShift_AfterClear_LocksDarkensAndRestarts()
+        {
+            yield return null;
+            run.JumpBy(4);   // 1층 도착 = 클리어
+            SetField(transition, "endSeconds", 0f);
+            int restarts = 0;
+            GameRestart.Override = _ => restarts++;
+            try
+            {
+                transition.EndShift();
+                Assert.IsTrue(transition.IsBusy);
+                Assert.IsTrue(movement.IsBlocked);
+
+                for (int i = 0; i < 60 && restarts == 0; i++) yield return null;
+                Assert.AreEqual(1, restarts, "처음으로 돌아가지 않음");
+                Assert.AreEqual(1f, fader.Alpha);   // 검은 화면인 채로 씬을 다시 부른다
+            }
+            finally
+            {
+                GameRestart.Override = null;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator Elevator_AfterClear_EndsTheShift()
+        {
+            yield return null;
+            run.JumpBy(4);
+            SetField(transition, "endSeconds", 0f);
+            var elevator = New("Elevator").AddComponent<Elevator>();   // Awake finds the run and the transition
+            Assert.AreEqual("E 길게 - 퇴근하기", elevator.Prompt);
+            int restarts = 0;
+            GameRestart.Override = _ => restarts++;
+            try
+            {
+                elevator.Interact(null);
+                Assert.IsTrue(transition.IsBusy);
+                Assert.AreEqual(string.Empty, elevator.Prompt);   // 연출 중에는 문구 없음
+
+                for (int i = 0; i < 60 && restarts == 0; i++) yield return null;
+                Assert.AreEqual(1, restarts);
+                Assert.IsTrue(run.IsCleared);
+            }
+            finally
+            {
+                GameRestart.Override = null;
+            }
+        }
+
         [Test]
         public void Disabling_WhileBusy_UnlocksAndClearsScreen()
         {

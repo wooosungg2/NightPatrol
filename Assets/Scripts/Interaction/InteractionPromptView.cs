@@ -102,7 +102,7 @@ namespace NightPatrol.Interaction
             if (crosshair != null)
             {
                 crosshair.enabled = visible;
-                // 문구가 없는 대상(예: 클리어 뒤 엘리베이터)은 조작할 게 없으므로 흐리게
+                // 문구가 없는 대상(예: 연출 중인 엘리베이터)은 조작할 게 없으므로 흐리게
                 crosshair.alpha = prompt.Length > 0 ? targetAlpha : idleAlpha;
                 // 크기가 그대로면 대입하지 않는다 (매 프레임 Canvas를 다시 그리지 않게)
                 float scale = PulseScale(Time.time - pulseStartTime, pulseSeconds, pulseScale);
@@ -115,7 +115,7 @@ namespace NightPatrol.Interaction
             }
             if (holdRing != null)
             {
-                // 문구가 없는 대상(클리어 뒤 엘리베이터 등)은 눌러도 할 일이 없으므로 링도 안 보인다
+                // 문구가 없는 대상(연출 중인 엘리베이터 등)은 눌러도 할 일이 없으므로 링도 안 보인다
                 float progress = prompt.Length > 0 && interactor != null ? interactor.HoldProgress : 0f;
                 holdRing.Fill = progress;
                 holdRing.enabled = progress > 0f;
