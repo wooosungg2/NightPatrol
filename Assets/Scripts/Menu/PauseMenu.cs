@@ -8,7 +8,6 @@ using NightPatrol.Run;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.SceneManagement;
 
 namespace NightPatrol.Menu
 {
@@ -21,18 +20,21 @@ namespace NightPatrol.Menu
     /// 층 이동 연출(어두운 화면) 중에는 열리지 않는다.
     /// 마우스: 줄에 올리면 선택, 클릭하면 실행, ◀ ▶ 클릭으로 값 조절, 휠로 선택 이동.
     /// 키보드: W/S·↑↓ 선택, A/D·←→ 조절, E·Enter·Space 확인, ESC 닫기(안쪽 장에서는 뒤로).
-    /// "처음으로"·"게임 종료"는 진행을 잃으므로 한 번 더 눌러야 실행. Player 프리팹의 Clipboard(JournalHolder와 같은 오브젝트)에 붙인다
+    /// "처음으로"·"게임 종료"는 진행을 잃으므로 한 번 더 눌러야 실행. Player 프리팹의 Clipboard(JournalHolder와 같은 오브젝트)에 붙인다.
+    /// 시작 화면 씬(Assets/Scenes/Title)도 같은 메뉴를 화면 위 캔버스에 쓴다 (설정·조작 키가 같음): TitleScreen이 OpenTitle로
+    /// "야간순찰" — 근무 시작 · 설정 · 게임 종료를 열고, ESC로는 닫히지 않으며 근무 시작(StartRequested)에 게임 씬을 불러온다
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class PauseMenu : MonoBehaviour
     {
-        public enum Page { Main, Settings, Keys }
+        public enum Page { Main, Settings, Keys, Title }
 
         public enum Row
         {
             Continue, Settings, Restart, Quit,
             Sensitivity, Volume, ScreenMode, Resolution, FrameLimit, Keys, Back,
             KeyBinding, ResetKeys,
+            Start,
         }
 
         /// <summary>메뉴 장에 보이는 값</summary>
@@ -82,6 +84,8 @@ namespace NightPatrol.Menu
         [SerializeField] private Camera pointerCamera;
         [Tooltip("조작 키 장에 나오는 목록. 비어 있으면 설정 장에 조작 키 줄은 있어도 목록이 비어 보임")]
         [SerializeField] private KeyBindingList keyBindings;
+        [Tooltip("창을 벗어나면(Alt+Tab·다른 창 클릭) ESC 메뉴를 연다 — 돌아왔을 때 멈춘 것처럼 보이지 않게 \"계속하기\"가 보임. 에디터에서는 창 전환이 잦아 빌드에서만")]
+        [SerializeField] private bool openOnFocusLoss = true;
 
         private readonly float[] lineTops = new float[MaxRows];
         private readonly float[] lineBottoms = new float[MaxRows];
@@ -103,6 +107,7 @@ namespace NightPatrol.Menu
         private int screenLogFrame = -1;          // 화면을 바꾼 프레임 (로그 대기 없으면 −1)
         private Vector2Int requestedSize;
         private bool requestedFullScreen;
+        private Page homePage = Page.Main;        // 설정에서 돌아갈 장 (시작 화면으로 열었으면 Title)
 
         /// <summary>메뉴가 열려 있는지 (이 동안 Time.timeScale = 0)</summary>
         public bool IsOpen { get; private set; }
@@ -118,8 +123,12 @@ namespace NightPatrol.Menu
         public bool QuitArmed => quitArmed;
         /// <summary>키 입력을 기다리는 조작 키 줄 (없으면 −1)</summary>
         public int WaitingKey => waitingKey;
+        /// <summary>시작 화면으로 열려 있는지 (시작 화면과 거기서 연 설정 장 포함)</summary>
+        public bool IsTitle => IsOpen && homePage == Page.Title;
         /// <summary>열거나 닫을 때 (true = 열림). 메뉴 소리 등</summary>
         public event Action<bool> OpenChanged;
+        /// <summary>시작 화면에서 근무 시작을 골랐을 때 (시작 화면 씬의 TitleScreen이 게임 씬을 불러옴). 메뉴는 열린 채로</summary>
+        public event Action StartRequested;
 
         private int KeyCount => keyBindings != null ? Mathf.Min(keyBindings.Entries.Count, MaxRows - 2) : 0;
 
@@ -175,6 +184,16 @@ namespace NightPatrol.Menu
             if (look != null) look.EscapeReleasesCursor = true;
         }
 
+        // 창을 벗어나면 커서가 풀려(PlayerLook) 돌아와도 클릭 전까지 아무것도 안 됨 → 메뉴를 열어 두면 "계속하기"가 보인다
+        private void OnApplicationFocus(bool focused)
+        {
+            if (OpensOnFocusLoss(focused, openOnFocusLoss, Application.isEditor, IsOpen)) Open();
+        }
+
+        /// <summary>창을 벗어날 때 메뉴를 열지: 옵션이 켜져 있고, 빌드이고, 아직 안 열렸을 때 (연출 중이면 Open이 무시)</summary>
+        internal static bool OpensOnFocusLoss(bool focused, bool option, bool inEditor, bool isOpen) =>
+            !focused && option && !inEditor && !isOpen;
+
         private void Update()
         {
             LogScreenChange();
@@ -202,12 +221,18 @@ namespace NightPatrol.Menu
             else if (Pressed(keyboard, ConfirmKeys)) Confirm();
         }
 
-        /// <summary>메뉴 열기 (첫 장). 이미 열렸거나 층 이동 연출 중이면 무시</summary>
-        public void Open()
+        /// <summary>메뉴 열기 (첫 장). 이미 열렸거나 화면이 어둡게 덮인 동안(층 이동 연출·게임 시작 페이드)이면 무시</summary>
+        public void Open() => OpenAt(Page.Main);
+
+        /// <summary>시작 화면 열기 (근무 시작·설정·게임 종료, 시작 화면 씬의 TitleScreen이 부름). ESC로는 안 닫힌다. 무시하는 때는 Open과 같음</summary>
+        public void OpenTitle() => OpenAt(Page.Title);
+
+        private void OpenAt(Page home)
         {
             if (IsOpen || !isActiveAndEnabled) return;
-            if (transition != null && transition.IsBusy) return;   // 어두운 화면 아래라 메뉴가 안 보임
+            if (transition != null && transition.IsScreenCovered) return;   // 어두운 화면 아래라 메뉴가 안 보임
             IsOpen = true;
+            homePage = home;
             pausedTimeScale = Time.timeScale;
             Time.timeScale = 0f;
             AudioListener.pause = true;
@@ -220,7 +245,7 @@ namespace NightPatrol.Menu
             Cursor.lockState = CursorLockMode.None;   // 마우스로 고를 수 있게
             Cursor.visible = true;
             lastPointer = Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
-            ShowPage(Page.Main, 0);
+            ShowPage(home, 0);
             SafeEvent.Raise(OpenChanged, true, this);
         }
 
@@ -231,6 +256,7 @@ namespace NightPatrol.Menu
             CancelKeyWait();
             IsOpen = false;
             CurrentPage = Page.Main;
+            homePage = Page.Main;
             rows = MainRows;
             selected = 0;
             Disarm();
@@ -244,14 +270,17 @@ namespace NightPatrol.Menu
             SafeEvent.Raise(OpenChanged, false, this);
         }
 
-        /// <summary>ESC·"뒤로": 조작 키 장 → 설정 장(조작 키 줄), 설정 장 → 첫 장(설정 줄), 첫 장이면 닫기</summary>
+        /// <summary>
+        /// ESC·"뒤로": 조작 키 장 → 설정 장(조작 키 줄), 설정 장 → 연 장(첫 장 또는 시작 화면, 설정 줄), 첫 장이면 닫기.
+        /// 시작 화면은 닫지 않는다 (근무 시작으로만)
+        /// </summary>
         public void Back()
         {
             if (!IsOpen) return;
             CancelKeyWait();
             if (CurrentPage == Page.Keys) ShowPage(Page.Settings, Array.IndexOf(SettingsRows, Row.Keys));
-            else if (CurrentPage == Page.Settings) ShowPage(Page.Main, Array.IndexOf(MainRows, Row.Settings));
-            else Close();
+            else if (CurrentPage == Page.Settings) ShowPage(homePage, Array.IndexOf(RowsOf(homePage), Row.Settings));
+            else if (CurrentPage != Page.Title) Close();
         }
 
         /// <summary>고른 줄을 위(−)·아래(+)로. 끝에서는 반대쪽 끝으로</summary>
@@ -310,7 +339,8 @@ namespace NightPatrol.Menu
 
         /// <summary>
         /// 고른 줄 실행: 계속하기 = 닫기, 설정·조작 키 = 그 장으로, 뒤로 = 앞 장, 값 줄 = 한 칸 올림,
-        /// 키 줄 = 새 키 기다리기, 기본값으로 = 모든 키 되돌림, 처음으로·게임 종료 = 한 번 더 누르면 실행 (실수로 진행을 잃지 않게)
+        /// 키 줄 = 새 키 기다리기, 기본값으로 = 모든 키 되돌림, 처음으로·게임 종료 = 한 번 더 누르면 실행 (실수로 진행을 잃지 않게),
+        /// 근무 시작 = StartRequested (시작 화면 씬이 게임 씬을 불러옴)
         /// </summary>
         public void Confirm()
         {
@@ -319,6 +349,9 @@ namespace NightPatrol.Menu
             {
                 case Row.Continue:
                     Close();
+                    break;
+                case Row.Start:
+                    SafeEvent.Raise(StartRequested, this);
                     break;
                 case Row.Settings:
                     ShowPage(Page.Settings, 0);
@@ -352,15 +385,17 @@ namespace NightPatrol.Menu
 
         /// <summary>
         /// 화면 좌표가 메뉴 장의 몇 번째 줄 위인지. arrow는 ◀ 위면 −1, ▶ 위면 +1, 아니면 0.
-        /// 클립보드가 기울어져 있어도 맞도록 글자 상자의 로컬 좌표로 판단한다
+        /// 클립보드가 기울어져 있어도 맞도록 글자 상자의 로컬 좌표로 판단한다. 화면 위 캔버스(Screen Space - Overlay, 시작 화면 씬)는 카메라 없이
         /// </summary>
         public bool TryHit(Vector2 screenPosition, out int row, out int arrow)
         {
             row = -1;
             arrow = 0;
-            if (bodyText == null || pointerCamera == null || !bodyText.isActiveAndEnabled) return false;
+            if (bodyText == null || !bodyText.isActiveAndEnabled) return false;
+            bool overlay = bodyText.canvas != null && bodyText.canvas.renderMode == RenderMode.ScreenSpaceOverlay;
+            if (!overlay && pointerCamera == null) return false;
             var rect = bodyText.rectTransform;
-            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(rect, screenPosition, pointerCamera, out Vector2 local))
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(rect, screenPosition, overlay ? null : pointerCamera, out Vector2 local))
                 return false;
             if (local.x < rect.rect.xMin || local.x > rect.rect.xMax) return false;
 
@@ -603,22 +638,16 @@ namespace NightPatrol.Menu
             if (interactor != null) interactor.SetBlocked(this, locked);
         }
 
-        // 처음으로: 지금 씬을 다시 불러 5층 1회차부터 (사물·이상현상·일지·기록이 전부 처음 상태로)
+        // 처음으로: 시작 화면 씬에서 들어왔으면 시작 화면으로, 아니면 지금 씬을 다시 불러 5층 1회차부터
         private void RestartGame()
         {
             Close();   // 시간·소리·커서를 먼저 되돌린다
-            var scene = SceneManager.GetActiveScene();
-#if UNITY_EDITOR
-            // 에디터에서는 Build Settings에 없는 테스트 씬도 다시 불러야 하므로 경로로
-            UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(
-                scene.path, new LoadSceneParameters(LoadSceneMode.Single));
-#else
-            SceneManager.LoadScene(scene.buildIndex);
-#endif
+            GameRestart.Restart();
         }
 
         private static void QuitGame()
         {
+            GameSettings.Save();   // 설정은 메뉴를 닫을 때 저장하므로, 메뉴에서 바꾸고 바로 게임 종료해도 남게
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
 #else

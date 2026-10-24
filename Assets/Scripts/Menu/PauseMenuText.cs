@@ -22,12 +22,14 @@ namespace NightPatrol.Menu
         internal static readonly Row[] MainRows = { Row.Continue, Row.Settings, Row.Restart, Row.Quit };
         internal static readonly Row[] SettingsRows =
             { Row.Sensitivity, Row.Volume, Row.ScreenMode, Row.Resolution, Row.FrameLimit, Row.Keys, Row.Back };
+        internal static readonly Row[] TitleRows = { Row.Start, Row.Settings, Row.Quit };
 
         /// <summary>그 장의 줄 순서 (조작 키 장은 키 줄 keyCount개 + 기본값으로 + 뒤로)</summary>
         public static Row[] RowsOf(Page page, int keyCount = 0)
         {
             if (page == Page.Main) return MainRows;
             if (page == Page.Settings) return SettingsRows;
+            if (page == Page.Title) return TitleRows;
             keyCount = Mathf.Clamp(keyCount, 0, MaxRows - 2);
             var keys = new Row[keyCount + 2];
             for (int i = 0; i < keyCount; i++) keys[i] = Row.KeyBinding;
@@ -53,8 +55,16 @@ namespace NightPatrol.Menu
         }
 
         /// <summary>장 제목</summary>
-        public static string TitleText(Page page) =>
-            page == Page.Settings ? "설정" : page == Page.Keys ? "조작 키" : "일시정지";
+        public static string TitleText(Page page)
+        {
+            switch (page)
+            {
+                case Page.Settings: return "설정";
+                case Page.Keys: return "조작 키";
+                case Page.Title: return "야간순찰";
+                default: return "일시정지";
+            }
+        }
 
         /// <summary>메뉴 장 본문. 고른 줄 앞에 ▶, 값은 오른쪽에 ◀ 값 ▶ (마우스 판정용 link 태그 포함)</summary>
         public static string BodyText(Page page, int selected, Values values)
@@ -83,7 +93,8 @@ namespace NightPatrol.Menu
                 }
                 text.Append('\n');
             }
-            text.Append("\n<size=70%>").Append(Footer(page, values.WaitingKey.HasValue)).Append("</size>");
+            string footer = Footer(page, values.WaitingKey.HasValue);
+            if (footer.Length > 0) text.Append("\n<size=70%>").Append(footer).Append("</size>");
             return text.ToString();
         }
 
@@ -97,6 +108,7 @@ namespace NightPatrol.Menu
             {
                 case Page.Settings: return "클릭 · W/S 선택 · A/D 조절 · ESC 뒤로";
                 case Page.Keys: return "클릭·E 키 바꾸기 · 겹치면 서로 바뀜 · ESC 뒤로";
+                case Page.Title: return string.Empty;   // 시작 화면은 일반 게임의 첫 화면처럼 안내 글 없이
                 default: return "클릭 · W/S 선택 · E 확인 · ESC 닫기";
             }
         }
@@ -117,6 +129,7 @@ namespace NightPatrol.Menu
                 case Row.Keys: return "조작 키";
                 case Row.KeyBinding: return At(values.KeyLabels, index, "?");
                 case Row.ResetKeys: return "기본값으로";
+                case Row.Start: return "근무 시작";
                 default: return "뒤로";
             }
         }
