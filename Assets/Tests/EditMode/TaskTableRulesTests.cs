@@ -87,6 +87,19 @@ namespace NightPatrol.Tests
             Assert.IsEmpty(problems, "모르는 자리표시 (문구는 {room}·{floor}, 구역 이름은 {floor}만): " + string.Join(" / ", problems));
         }
 
+        // 00_12: 예외 지시는 "이것만은 그대로 둘 것"이라 일지 한 줄이 사물 하나를 가리켜야 한다.
+        // 패턴이면 고른 사물이 매번 달라 플레이어가 어느 것인지 알 수 없다
+        [Test]
+        public void ExceptionEntries_UseExactIds()
+        {
+            var problems = new List<string>();
+            foreach (var (path, table) in Tables())
+                foreach (var entry in table.Entries.Where(e => e != null && e.exception && e.ids != null))
+                    foreach (var id in entry.ids.Where(TaskIds.IsPattern))
+                        problems.Add($"{path}: '{entry.label}' {id}");
+            Assert.IsEmpty(problems, "예외 지시 줄에 패턴 Id (정확한 Id 하나로 쓸 것): " + string.Join(" / ", problems));
+        }
+
         [Test]
         public void AreaNames_HaveOneRowPerArea()
         {

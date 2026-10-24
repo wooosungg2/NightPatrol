@@ -45,6 +45,19 @@ MonoBehaviour:
     ids:
     - R05~R19.Door.*
     exception: 0
+  - label: "{room} \uCD9C\uC785\uBB38 \uC7A0\uAE08 \uD655\uC778"
+    ids:
+    - R01~R04.Door.*
+    - R20.Door.*
+    - R22~R23.Door.*
+    - R25~R28.Door.*
+    exception: 0
+  - label: "{room} \uBB38 \uC7A0\uAE08 \uD655\uC778"
+    ids:
+    - WCFE.Door.*
+    - WCME.Door.*
+    - BalconyW.Door.*
+    exception: 0
   - label: "{room} \uBAA8\uB2C8\uD130 \uB044\uAE30"
     ids:
     - R21.Monitor.*
@@ -53,9 +66,19 @@ MonoBehaviour:
     ids:
     - R24.TV.*
     exception: 0
+  - label: "{room} \uAD50\uD0C1 \uBAA8\uB2C8\uD130\uB294 \uCF1C \uB458 \uAC83"
+    ids:
+    - R21.Monitor.31
+    exception: 1
   areaNames:
   - area: StairW
     name: "\uC11C\uCABD \uACC4\uB2E8\uC2E4"
   - area: StairE
     name: "\uB3D9\uCABD \uACC4\uB2E8\uC2E4"
-  roomFloor: 0
+  - area: WCFE
+    name: "\uB3D9\uCABD \uC5EC\uC790 \uD654\uC7A5\uC2E4"
+  - area: WCME
+    name: "\uB3D9\uCABD \uB0A8\uC790 \uD654\uC7A5\uC2E4"
+  - area: BalconyW
+    name: "\uC11C\uCABD \uBC1C\uCF54\uB2C8"
+  roomFloor: 5
