@@ -75,6 +75,15 @@ namespace NightPatrol.Anomalies
 
         private void OnFloorStarted(int floor)
         {
+            // 첫 회차 5층에서는 이상현상 발생하지 않음
+            if (patrolRun != null &&
+                patrolRun.Attempt == 1 &&
+                floor == 5)
+            {
+                ClearAnomalies();
+                return;
+            }
+
             SpawnAnomalies();
         }
 
