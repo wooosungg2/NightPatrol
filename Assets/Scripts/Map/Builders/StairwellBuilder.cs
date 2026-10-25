@@ -215,21 +215,10 @@ namespace NightPatrol
 			// 계단 판과 난간 재질을 따로 (서브메시 0 = 계단, 1 = 난간)
 			var r = go.GetComponent<Renderer>();
 			var mats = r.sharedMaterials;
-			if (s.stairMaterial != null) mats[0] = s.stairMaterial;
-			if (mats.Length > 1 && s.railMaterial != null) mats[1] = s.railMaterial;
+			mats[0] = s.stairMaterial != null ? s.stairMaterial : DoorBuilder.TintMaterial(StairColor, mats[0]);
+			if (mats.Length > 1) mats[1] = s.railMaterial != null ? s.railMaterial : DoorBuilder.TintMaterial(RailColor, mats[1]);
 			r.sharedMaterials = mats;
-			var mpb = new MaterialPropertyBlock();
-			if (s.stairMaterial == null)
-			{
-				mpb.SetColor("_BaseColor", StairColor); mpb.SetColor("_Color", StairColor);
-				r.SetPropertyBlock(mpb, 0);
-			}
-			if (mats.Length > 1 && s.railMaterial == null)
-			{
-				mpb.Clear();
-				mpb.SetColor("_BaseColor", RailColor); mpb.SetColor("_Color", RailColor);
-				r.SetPropertyBlock(mpb, 1);
-			}
+			r.SetPropertyBlock(null);
 			go.isStatic = true;
 		}
 

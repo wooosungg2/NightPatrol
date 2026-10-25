@@ -117,6 +117,7 @@ namespace NightPatrol
 			float X(float sDist) => f * (xin - sDist);            // 앞벽에서 거리 → 로컬 X
 			var faceFront = Quaternion.Euler(0f, f < 0f ? -90f : 90f, 0f);
 			float zc0 = t, zc1 = D - t - Mathf.Max(0f, backInset);
+			float zWall = D - t;                                   // 단은 창문 벽(창 사이 기둥 아래)까지 채움
 
 			// ── 열 (Z) ──
 			int nc = Mathf.Max(1, s.columns != null ? s.columns.Length : 1);
@@ -239,11 +240,11 @@ namespace NightPatrol
 					float h = lv * s.stepRise;
 					if (hasRamp && rs1 > a && rs0 < b)
 					{
-						PlatformBox(plat, $"Tier{lv}_A", X, a, Mathf.Max(a, rs0), zc0, zc1, h, s);
-						PlatformBox(plat, $"Tier{lv}_B", X, Mathf.Min(b, rs1), b, zc0, zc1, h, s);
-						PlatformBox(plat, $"Tier{lv}_Ramp", X, Mathf.Max(a, rs0), Mathf.Min(b, rs1), rampEnd, zc1, h, s);
+						PlatformBox(plat, $"Tier{lv}_A", X, a, Mathf.Max(a, rs0), zc0, zWall, h, s);
+						PlatformBox(plat, $"Tier{lv}_B", X, Mathf.Min(b, rs1), b, zc0, zWall, h, s);
+						PlatformBox(plat, $"Tier{lv}_Ramp", X, Mathf.Max(a, rs0), Mathf.Min(b, rs1), rampEnd, zWall, h, s);
 					}
-					else PlatformBox(plat, $"Tier{lv}", X, a, b, zc0, zc1, h, s);
+					else PlatformBox(plat, $"Tier{lv}", X, a, b, zc0, zWall, h, s);
 				}
 				r = r1;
 			}
