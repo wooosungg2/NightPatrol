@@ -4,6 +4,7 @@
     "references": [
         "NightPatrol",
         "Unity.InputSystem",
+        "Unity.TextMeshPro",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

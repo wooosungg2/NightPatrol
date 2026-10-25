@@ -15,12 +15,14 @@ namespace NightPatrol.Controls
         public const string PrefsKey = "NightPatrol.KeyBindings";
         public const string KeyboardMouse = "Keyboard&Mouse";
 
-        // 다시 지정할 때 받지 않는 키: 메뉴·취소, 개발자 키, 실제 키가 아닌 것
+        // 다시 지정할 때 받지 않는 키: 메뉴·취소, 개발자 키, 실제 키가 아닌 것,
+        // 이동의 고정 보조 키(방향키 — 목록에 없어서 다른 줄에 주면 겹침 맞바꿈에 안 잡히고 이동과 같이 눌림)
         private static readonly string[] Reserved =
         {
             "<Keyboard>/escape", "<Keyboard>/anyKey",
             "<Keyboard>/f1", "<Keyboard>/f2", "<Keyboard>/f3", "<Keyboard>/f4", "<Keyboard>/f5",
             "<Keyboard>/pageUp", "<Keyboard>/pageDown",
+            "<Keyboard>/upArrow", "<Keyboard>/downArrow", "<Keyboard>/leftArrow", "<Keyboard>/rightArrow",
         };
 
         // 마우스는 이 버튼만 (왼쪽 버튼은 메뉴를 누르는 버튼이라 받으면 누르자마자 지정돼 버림)

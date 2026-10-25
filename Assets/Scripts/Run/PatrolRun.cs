@@ -37,6 +37,8 @@ namespace NightPatrol.Run
         public static PatrolRun Current { get; private set; }
         /// <summary>지금 층 번호</summary>
         public int CurrentFloor => floors[step];
+        /// <summary>실패하면 돌아오는 자리 (비어 있으면 null — 플레이어가 처음 서 있던 자리로). 씬 점검이 읽는다</summary>
+        public Transform StartPoint => startPoint;
         /// <summary>회차 (1부터, 실패할 때마다 +1)</summary>
         public int Attempt { get; private set; } = 1;
         /// <summary>마지막 층(1층)에 도착했는지</summary>
@@ -45,6 +47,11 @@ namespace NightPatrol.Run
         public IReadOnlyList<int> FailedFloors => failedFloors;
         /// <summary>지금 첫 층(보통 5층)인지 — 일지 첫 장 표시용</summary>
         public bool IsFirstFloor => step == 0;
+        /// <summary>
+        /// 이번 층에 이상현상을 켜도 되는지. 첫 회차의 첫 층(5층)은 이상 없이 점검 항목만 있다 (기획서 3.4: 점검 대상을 익히는 구간).
+        /// 이상현상 쪽은 FloorStarted에서 if (!run.AnomaliesAllowed) return; 처럼 쓴다
+        /// </summary>
+        public bool AnomaliesAllowed => !(Attempt == 1 && IsFirstFloor);
         /// <summary>
         /// 이번 층을 시작한 이유. FloorReset·FloorStarted에서 읽는다.
         /// 예: 하행 성공 때만 다음 이상을 켜려면 LastStart == FloorStartReason.Descend.

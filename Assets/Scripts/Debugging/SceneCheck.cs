@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NightPatrol.Interaction;
+using NightPatrol.Journal;
+using NightPatrol.Menu;
 using NightPatrol.Patrol;
 using NightPatrol.Player;
 using NightPatrol.Run;
@@ -43,6 +45,15 @@ namespace NightPatrol.Debugging
         public bool HasControl;
         /// <summary>PlayerInteractor의 조준 레이어 (없으면 기본 레이어)</summary>
         public int RaycastMask = Physics.DefaultRaycastLayers;
+        /// <summary>공용 Player 프리팹에 있는데 이 플레이어에 없는 것 (예: "일지(JournalHolder)"). 다 있으면 빈 글</summary>
+        public string MissingParts = string.Empty;
+    }
+
+    /// <summary>층 진행 (PatrolRun)</summary>
+    public sealed class RunFact : ComponentFact
+    {
+        /// <summary>Start Point가 비어 있는지 (실패하면 플레이어가 처음 서 있던 자리로)</summary>
+        public bool NoStartPoint;
     }
 
     public sealed class TasksFact : ComponentFact
@@ -77,6 +88,8 @@ namespace NightPatrol.Debugging
         public readonly List<ComponentFact> MainCameras = new List<ComponentFact>();
         public readonly List<ComponentFact> Listeners = new List<ComponentFact>();
         public readonly List<PatrolFact> Objects = new List<PatrolFact>();
+        /// <summary>엘리베이터 문(송지우님 ElevatorDoors)이 하나도 없는지 — 층 이동 때 문 연출이 빠짐</summary>
+        public bool NoElevatorDoors;
     }
 
     /// <summary>점검 항목 표 한 줄을 씬에 대 본 결과 (씬 점검·표 미리보기가 같이 씀)</summary>
@@ -115,6 +128,7 @@ namespace NightPatrol.Debugging
         {
             var facts = new SceneFacts { SceneName = sceneName ?? string.Empty };
             if (roots == null) return facts;
+            bool anyDoors = false;
             foreach (var root in roots)
             {
                 if (root == null) continue;
@@ -126,10 +140,15 @@ namespace NightPatrol.Debugging
                         Path = PathOf(player.transform), Active = IsOn(player), Target = player,
                         HasControl = player.GetComponent<PlayerControl>() != null,
                         RaycastMask = interactor != null ? interactor.RaycastMask.value : Physics.DefaultRaycastLayers,
+                        MissingParts = MissingPlayerParts(player),
                     });
                 }
                 foreach (var run in root.GetComponentsInChildren<PatrolRun>(true))
-                    facts.Runs.Add(Fact(run));
+                    facts.Runs.Add(new RunFact
+                    {
+                        Path = PathOf(run.transform), Active = IsOn(run), Target = run, NoStartPoint = run.StartPoint == null,
+                    });
+                if (root.GetComponentsInChildren<NightPatrol.ElevatorDoors>(true).Length > 0) anyDoors = true;
                 foreach (var tasks in root.GetComponentsInChildren<FloorTasks>(true))
                 {
                     var table = tasks.Table;
@@ -162,7 +181,22 @@ namespace NightPatrol.Debugging
                 foreach (var obj in root.GetComponentsInChildren<PatrolObject>(true))
                     facts.Objects.Add(new PatrolFact { Path = PathOf(obj.transform), Active = IsOn(obj), Target = obj, Id = obj.Id ?? string.Empty });
             }
+            facts.NoElevatorDoors = !anyDoors;
             return facts;
+        }
+
+        /// <summary>
+        /// 공용 Player 프리팹에 있는데 이 플레이어(PlayerMovement 오브젝트와 그 자식)에 없는 것. 다 있으면 빈 글.
+        /// 예: 송지우님 테스트 플레이어처럼 이동만 있는 플레이어 → 일지·ESC 메뉴·층 이동 연출이 없음
+        /// </summary>
+        public static string MissingPlayerParts(Component player)
+        {
+            if (player == null) return string.Empty;
+            var missing = new List<string>();
+            if (player.GetComponentInChildren<JournalHolder>(true) == null) missing.Add("일지(JournalHolder)");
+            if (player.GetComponentInChildren<PauseMenu>(true) == null) missing.Add("ESC 메뉴(PauseMenu)");
+            if (player.GetComponentInChildren<FloorTransition>(true) == null) missing.Add("층 이동 연출(FloorTransition)");
+            return string.Join(", ", missing);
         }
 
         /// <summary>모은 사실로 점검한다 (순수 함수). 결과는 오류 → 경고 → 정보 순, 같은 수준은 나온 순서</summary>
@@ -179,6 +213,8 @@ namespace NightPatrol.Debugging
                 issues.Add(Error($"켜진 플레이어가 {players.Count}개 — 진행·연출·메뉴가 엉뚱한 플레이어를 잡을 수 있음: {Paths(players)}", players[1].Target));
             foreach (var player in players.Where(p => !p.HasControl))
                 issues.Add(Warning($"플레이어에 PlayerControl이 없음 — 메뉴·층 이동 연출 중에 조작이 안 잠김 (Player.prefab에는 있음): {player.Path}", player.Target));
+            foreach (var player in players.Where(p => !string.IsNullOrEmpty(p.MissingParts)))
+                issues.Add(Warning($"공용 Player 프리팹이 아닌 플레이어 — 없는 것: {player.MissingParts} (Assets/Prefabs/Player.prefab을 놓을 것): {player.Path}", player.Target));
 
             // 층 진행
             var runs = facts.Runs.Where(r => r.Active).ToList();
@@ -186,6 +222,8 @@ namespace NightPatrol.Debugging
                 issues.Add(Warning("PatrolRun이 없음 — 층 진행·실패·클리어와 점검 항목이 동작 안 함"));
             else if (runs.Count > 1)
                 issues.Add(Error($"PatrolRun이 {runs.Count}개 — 하나만 둘 것: {Paths(runs)}", runs[1].Target));
+            foreach (var run in runs.OfType<RunFact>().Where(r => r.NoStartPoint))
+                issues.Add(Info($"PatrolRun의 Start Point가 비어 있음 — 실패하면 경비 데스크가 아니라 플레이어가 처음 서 있던 자리로 돌아감: {run.Path}", run.Target));
 
             var tasks = facts.Tasks.Where(t => t.Active).ToList();
             if (runs.Count > 0 && tasks.Count == 0)
@@ -206,6 +244,8 @@ namespace NightPatrol.Debugging
                 else if (!e.ColliderLayers.Any(layer => InMask(mask, layer)))
                     issues.Add(Error($"Elevator 콜라이더가 조준 레이어 밖 (Ignore Raycast 등) — E로 누를 수 없음: {e.Path}", e.Target));
             }
+            if (elevators.Count > 0 && facts.NoElevatorDoors)
+                issues.Add(Info("엘리베이터 문(ElevatorDoors)이 없음 — 층 이동 때 문 연출 없이 진행"));
 
             // 카메라·소리
             var cameras = facts.MainCameras.Where(c => c.Active).ToList();

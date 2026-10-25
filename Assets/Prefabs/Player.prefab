@@ -2359,7 +2359,7 @@ MonoBehaviour:
     \uAC83 (\uACC4\uB2E8\uC2E4 \uBC29\uD654\uBB38 \uD3EC\uD568)"
   - "\uC81C4\uC870. \uCE35\uAC04 \uC774\uB3D9\uC740 \uC5D8\uB9AC\uBCA0\uC774\uD130\uB97C
     \uC774\uC6A9\uD560 \uAC83"
-  failureRecord: 0
+  failureRecord: 1
   displays:
   - floor: 5
     display: 0
@@ -2368,7 +2368,7 @@ MonoBehaviour:
   - floor: 3
     display: 1
   - floor: 2
-    display: 1
-  reveal: 1
+    display: 2
+  reveal: 0
   strikeSolved: 1
   interactor: {fileID: 0}
