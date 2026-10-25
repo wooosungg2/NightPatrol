@@ -76,6 +76,8 @@ namespace NightPatrol
 
 		[Header("프리팹 (앞면이 +Z. 모니터는 자식에 'Screen'을 둘 것)")]
 		[Tooltip("기준점 = 바닥 가운데, 앉는 사람이 +Z를 봄")] public GameObject chairPrefab;
+		[Tooltip("일반 책상 자리 의자 (비우면 파란 의자 모양)")] public GameObject plainChairPrefab;
+		[Tooltip("교수님 의자 (비우면 청록 사무용 의자 모양)")] public GameObject professorChairPrefab;
 		[Tooltip("기준점 = 받침 아랫면 가운데 (책상 윗면에 놓임)")] public GameObject monitorPrefab;
 		[Tooltip("기준점 = 바닥 가운데")] public GameObject pcPrefab;
 		[Tooltip("기준점 = 아랫면 가운데 (책상 윗면에 놓임)")] public GameObject keyboardPrefab;
@@ -186,8 +188,8 @@ namespace NightPatrol
 					if (i0 != skip)
 					{
 						float xa = SeatX(i0) - s.seatPitch * 0.5f, xb = SeatX(i1) + s.seatPitch * 0.5f;
-						Desk(row, i0 == plain ? "Desk_Plain" : $"Desk_{di++}", (xa + xb) * 0.5f, zc, xb - xa, dd, H, -u, s,
-							panel: i0 != plain);
+						if (i0 == plain) PlainDesk(row, "Desk_Plain", (xa + xb) * 0.5f, zc, xb - xa, dd, H, -u, s);
+						else Desk(row, $"Desk_{di++}", (xa + xb) * 0.5f, zc, xb - xa, dd, H, -u, s);
 					}
 					i0 = i1 + 1;
 				}
@@ -219,7 +221,7 @@ namespace NightPatrol
 			}
 			var lectern = Group(root, "Lectern");
 			Desk(lectern, "Desk", lx, lz, lw, dd, H + 0.03f, u, s, panel: false);
-			Seat(lectern, "Seat_Prof", new Vector3(lx, 0f, lz), faceStudents, s, H + 0.03f);
+			Seat(lectern, "Seat_Prof", new Vector3(lx, 0f, lz), faceStudents, s, H + 0.03f, chair: ChairKind.Professor);
 
 			// ── 빔 스크린·프로젝터 ──
 			float sb = Mathf.Clamp(s.screenBottom, 0f, ceilingHeight - 0.3f);
@@ -419,8 +421,10 @@ namespace NightPatrol
 		}
 
 		// 한 자리: 기준점 = 책상 가운데 바닥, +Z = 앉은 사람이 보는 방향
+		enum ChairKind { White, Blue, Professor }
+
 		static void Seat(Transform parent, string name, Vector3 pos, Quaternion rot, ClassroomInteriorSettings s,
-						 float deskTop = -1f, bool? computers = null)
+						 float deskTop = -1f, bool? computers = null, ChairKind? chair = null)
 		{
 			float H = deskTop > 0f ? deskTop : s.deskHeight;
 			var seat = new GameObject(name).transform;
@@ -435,14 +439,150 @@ namespace NightPatrol
 				Place(seat, s.keyboardPrefab, "Keyboard", new Vector3(0f, H, -0.15f), flip,
 					go => Box(go, "Placeholder", new Vector3(0f, 0.01f, 0f), new Vector3(0.44f, 0.02f, 0.14f), s.placeholderMaterial));
 				Place(seat, s.pcPrefab, "PC", new Vector3(Mathf.Min(0.2f, s.seatPitch * 0.5f - 0.13f), 0f, 0.05f), flip,
-					go => Box(go, "Placeholder", new Vector3(0f, 0.21f, 0f), new Vector3(0.19f, 0.42f, 0.45f), s.placeholderMaterial));
+					go => PCPH(go, H, s));
 			}
-			Place(seat, s.chairPrefab, "Chair", new Vector3(0f, 0f, -s.chairOffset), Quaternion.identity, go =>
+			// 의자: 컴퓨터 자리 = 흰 플라스틱, 일반 책상 = 파란 의자, 교수님 = 청록 사무용 (사진)
+			var kind = chair ?? ((computers ?? s.computers) ? ChairKind.White : ChairKind.Blue);
+			GameObject prefab = kind == ChairKind.White ? s.chairPrefab : kind == ChairKind.Blue ? s.plainChairPrefab : s.professorChairPrefab;
+			Place(seat, prefab, "Chair", new Vector3(0f, 0f, -s.chairOffset), Quaternion.identity, go => ChairPH(go, kind, s));
+		}
+
+		static readonly Color ChairWhite = new Color(0.93f, 0.93f, 0.92f), Chrome = new Color(0.78f, 0.79f, 0.80f),
+			ChairNavy = new Color(0.12f, 0.17f, 0.36f), FrameGrey = new Color(0.62f, 0.63f, 0.65f),
+			ChairTeal = new Color(0.22f, 0.42f, 0.45f), BaseBlack = new Color(0.10f, 0.10f, 0.11f),
+			PCDark = new Color(0.16f, 0.17f, 0.18f), EdgeGrey = new Color(0.30f, 0.31f, 0.32f);
+
+		// 의자 자리 표시. 앞 = +Z (책상 쪽)
+		static void ChairPH(Transform go, ChairKind kind, ClassroomInteriorSettings s)
+		{
+			var pm = s.placeholderMaterial;
+			switch (kind)
 			{
-				Box(go, "Seat", new Vector3(0f, 0.45f, 0f), new Vector3(0.45f, 0.05f, 0.45f), s.placeholderMaterial);
-				Box(go, "Back", new Vector3(0f, 0.72f, -0.21f), new Vector3(0.45f, 0.45f, 0.04f), s.placeholderMaterial);
-				Box(go, "Stem", new Vector3(0f, 0.21f, 0f), new Vector3(0.05f, 0.42f, 0.05f), s.placeholderMaterial);
-			});
+				case ChairKind.White:   // 흰 플라스틱 셸 + 크롬 다리 4개
+					BoxC(go, "Seat", new Vector3(0f, 0.46f, 0.01f), new Vector3(0.44f, 0.03f, 0.42f), pm, ChairWhite);
+					BoxC(go, "Back", new Vector3(0f, 0.74f, -0.2f), new Vector3(0.42f, 0.44f, 0.025f), pm, ChairWhite).transform.localRotation = Quaternion.Euler(-10f, 0f, 0f);
+					foreach (float lx in new[] { -0.18f, 0.18f })
+						foreach (float lz in new[] { -0.17f, 0.17f })
+							BoxC(go, "Leg", new Vector3(lx, 0.225f, lz), new Vector3(0.02f, 0.45f, 0.02f), null, Chrome);
+					break;
+				case ChairKind.Blue:    // 남색 플라스틱 (등받이 세로 홈) + 회색 썰매 다리
+					BoxC(go, "Seat", new Vector3(0f, 0.46f, 0.01f), new Vector3(0.46f, 0.04f, 0.44f), pm, ChairNavy);
+					BoxC(go, "Back", new Vector3(0f, 0.76f, -0.21f), new Vector3(0.46f, 0.38f, 0.03f), pm, ChairNavy).transform.localRotation = Quaternion.Euler(-8f, 0f, 0f);
+					for (int k = 0; k < 9; k++)
+						BoxC(go, "Slot", new Vector3(-0.16f + k * 0.04f, 0.8f, -0.236f), new Vector3(0.008f, 0.14f, 0.004f), null, BaseBlack);
+					foreach (float lx in new[] { -0.22f, 0.22f })
+					{
+						BoxC(go, "Runner", new Vector3(lx, 0.015f, 0f), new Vector3(0.022f, 0.022f, 0.48f), null, FrameGrey);
+						BoxC(go, "Upright", new Vector3(lx, 0.24f, 0.2f), new Vector3(0.022f, 0.44f, 0.022f), null, FrameGrey);
+						BoxC(go, "BackPost", new Vector3(lx, 0.55f, -0.2f), new Vector3(0.022f, 0.5f, 0.022f), null, FrameGrey);
+					}
+					break;
+				default:                // 교수님: 청록 천 사무용 의자 + 검은 다섯 발
+					BoxC(go, "Seat", new Vector3(0f, 0.47f, 0f), new Vector3(0.5f, 0.08f, 0.48f), pm, ChairTeal);
+					BoxC(go, "Back", new Vector3(0f, 0.82f, -0.24f), new Vector3(0.46f, 0.55f, 0.07f), pm, ChairTeal);
+					BoxC(go, "Stem", new Vector3(0f, 0.24f, 0f), new Vector3(0.05f, 0.4f, 0.05f), null, BaseBlack);
+					BoxC(go, "Base_A", new Vector3(0f, 0.04f, 0f), new Vector3(0.6f, 0.04f, 0.05f), null, BaseBlack);
+					BoxC(go, "Base_B", new Vector3(0f, 0.04f, 0f), new Vector3(0.05f, 0.04f, 0.6f), null, BaseBlack);
+					break;
+			}
+		}
+
+		// 본체: 책상 밑에 회색 거치대로 매달린 슬림 PC (사진). 앞 = +Z
+		static void PCPH(Transform go, float deskH, ClassroomInteriorSettings s)
+		{
+			float top = deskH - 0.04f, bottom = 0.14f, hgt = top - bottom;
+			BoxC(go, "Tower", new Vector3(0f, bottom + 0.01f + 0.18f, 0f), new Vector3(0.1f, 0.36f, 0.33f), s.placeholderMaterial, PCDark);
+			BoxC(go, "Holder_Top", new Vector3(0f, top - 0.003f, 0f), new Vector3(0.14f, 0.006f, 0.3f), null, FrameGrey);
+			BoxC(go, "Holder_Side", new Vector3(0.056f, bottom + hgt * 0.5f, 0f), new Vector3(0.006f, hgt, 0.28f), null, FrameGrey);
+			BoxC(go, "Holder_Bottom", new Vector3(0f, bottom, 0f), new Vector3(0.14f, 0.006f, 0.36f), null, FrameGrey);
+			BoxC(go, "Power", new Vector3(-0.02f, bottom + 0.33f, 0.166f), new Vector3(0.02f, 0.02f, 0.002f), null, new Color(0.5f, 0.5f, 0.52f));
+		}
+
+		// 일반 책상: 앉는 쪽이 오목하게 휜 나무 상판 + 짙은 회색 테두리 + 회색 앞판 (사진)
+		static void PlainDesk(Transform parent, string name, float cx, float cz, float w, float d, float h,
+							  float panelDir, ClassroomInteriorSettings s)
+		{
+			var g = new GameObject(name).transform;
+			g.SetParent(parent, false);
+			g.localPosition = new Vector3(cx, 0f, cz);
+			g.gameObject.isStatic = true;
+			float chairSide = -panelDir, sag = Mathf.Min(0.08f, d * 0.15f);
+			Vector2[] Outline(float grow)
+			{
+				var pts = new System.Collections.Generic.List<Vector2>();
+				float hw = w * 0.5f + grow, hd = d * 0.5f + grow;
+				pts.Add(new Vector2(-hw, panelDir * hd));
+				pts.Add(new Vector2(hw, panelDir * hd));
+				const int seg = 12;
+				for (int i = 0; i <= seg; i++)                     // 앉는 쪽 오목한 곡선 (오른쪽 → 왼쪽)
+				{
+					float x = Mathf.Lerp(hw, -hw, i / (float)seg), q = x / hw;
+					pts.Add(new Vector2(x, chairSide * (hd - sag * (1f - q * q))));
+				}
+				return pts.ToArray();
+			}
+			var edge = Extrude(g, "Edge", Outline(0.012f), h - 0.035f, h - 0.002f);
+			DoorBuilder.Paint(edge.GetComponent<Renderer>(), null, EdgeGrey);
+			var top = Extrude(g, "Top", Outline(0f), h - 0.03f, h);
+			if (s.deskMaterial != null) top.GetComponent<Renderer>().sharedMaterial = s.deskMaterial;
+			else DoorBuilder.Paint(top.GetComponent<Renderer>(), null, new Color(0.86f, 0.70f, 0.48f));
+			BoxC(g, "Panel", new Vector3(0f, (0.08f + h - 0.04f) * 0.5f, panelDir * (d * 0.5f - 0.03f)), new Vector3(w - 0.04f, h - 0.12f, 0.015f), null, FrameGrey);
+			for (int k = 0; k < 8; k++)
+				BoxC(g, "Slot", new Vector3(-w * 0.35f + k * w * 0.1f, 0.3f, panelDir * (d * 0.5f - 0.02f)), new Vector3(0.012f, 0.12f, 0.004f), null, BaseBlack);
+			BoxC(g, "Side_L", new Vector3(-w * 0.5f + 0.02f, (h - 0.04f) * 0.5f, 0f), new Vector3(0.03f, h - 0.04f, d - 0.12f), null, FrameGrey);
+			BoxC(g, "Side_R", new Vector3(w * 0.5f - 0.02f, (h - 0.04f) * 0.5f, 0f), new Vector3(0.03f, h - 0.04f, d - 0.12f), null, FrameGrey);
+		}
+
+		// 평면 외곽선을 위아래로 뽑은 메시 (중심에서 외곽선이 다 보이는 모양이면 됨)
+		static GameObject Extrude(Transform parent, string name, Vector2[] o, float y0, float y1)
+		{
+			var go = new GameObject(name, typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider));
+			go.transform.SetParent(parent, false);
+			go.isStatic = true;
+			int n = o.Length;
+			var v = new System.Collections.Generic.List<Vector3>();
+			var tri = new System.Collections.Generic.List<int>();
+			Vector2 c = Vector2.zero; foreach (var p in o) c += p; c /= n;
+			// 윗면 (위를 봄)
+			int topC = v.Count; v.Add(new Vector3(c.x, y1, c.y)); foreach (var p in o) v.Add(new Vector3(p.x, y1, p.y));
+			int botC = v.Count; v.Add(new Vector3(c.x, y0, c.y)); foreach (var p in o) v.Add(new Vector3(p.x, y0, p.y));
+			// 외곽선 방향 (부호 있는 면적)으로 감는 방향 결정
+			float area = 0f; for (int i = 0; i < n; i++) { var p = o[i]; var q2 = o[(i + 1) % n]; area += p.x * q2.y - q2.x * p.y; }
+			bool ccw = area > 0f;   // XZ 평면에서 반시계면 위에서 볼 때 시계 방향 → 윗면 감기를 뒤집어야 함
+			for (int i = 0; i < n; i++)
+			{
+				int a = i + 1, b = (i + 1) % n + 1;
+				if (ccw) { tri.AddRange(new[] { topC, topC + b, topC + a }); tri.AddRange(new[] { botC, botC + a, botC + b }); }
+				else { tri.AddRange(new[] { topC, topC + a, topC + b }); tri.AddRange(new[] { botC, botC + b, botC + a }); }
+			}
+			// 옆면 (바깥을 봄)
+			for (int i = 0; i < n; i++)
+			{
+				Vector2 p = o[i], q2 = o[(i + 1) % n];
+				int k = v.Count;
+				v.Add(new Vector3(p.x, y0, p.y)); v.Add(new Vector3(q2.x, y0, q2.y));
+				v.Add(new Vector3(q2.x, y1, q2.y)); v.Add(new Vector3(p.x, y1, p.y));
+				if (ccw) tri.AddRange(new[] { k, k + 2, k + 1, k, k + 3, k + 2 });
+				else tri.AddRange(new[] { k, k + 1, k + 2, k, k + 2, k + 3 });
+			}
+			var m = new Mesh { name = name };
+			m.SetVertices(v); m.SetTriangles(tri, 0);
+			var uv = new Vector2[v.Count]; for (int i = 0; i < v.Count; i++) uv[i] = new Vector2(v[i].x, v[i].z);   // 위에서 본 UV (1 = 1m)
+			m.uv = uv;
+			m.RecalculateNormals(); m.RecalculateBounds();
+			go.GetComponent<MeshFilter>().sharedMesh = m;
+			go.GetComponent<MeshCollider>().sharedMesh = m;
+			var tmp = GameObject.CreatePrimitive(PrimitiveType.Cube);
+			go.GetComponent<MeshRenderer>().sharedMaterial = tmp.GetComponent<Renderer>().sharedMaterial;
+			Object.DestroyImmediate(tmp);
+			return go;
+		}
+
+		static GameObject BoxC(Transform parent, string name, Vector3 c, Vector3 size, Material mat, Color color)
+		{
+			var go = Box(parent, name, c, size, mat);
+			if (mat == null) DoorBuilder.Paint(go.GetComponent<Renderer>(), null, color);
+			return go;
 		}
 
 		// 모니터 자리 표시: 받침 + 목 + 본체 + 화면(Screen). 앞면 +Z

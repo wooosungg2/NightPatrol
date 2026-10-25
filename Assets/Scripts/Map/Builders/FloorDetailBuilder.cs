@@ -394,20 +394,23 @@ namespace NightPatrol
 		// ── 소화전 (스테인리스 함 + 비상벨 + 앞 바닥 노랑·검정 빗금). 함 뒷면 = 벽면, 앞 = 로컬 +Z ──
 		public static void Hydrant(Transform parent, Vector3 pos, Quaternion rot)
 		{
+			// 벽 속에 매입 (앞면이 벽면과 거의 같음, 사진). 로컬 z = 0이 벽면, +Z = 복도
 			var g = Group(parent, "Hydrant");
 			g.localPosition = pos; g.localRotation = rot;
-			Box(g, "Cabinet", new Vector3(0f, 0.95f, 0.08f), new Vector3(0.75f, 1.7f, 0.16f), null, Stainless);
-			NoCol(Box(g, "Door_Line", new Vector3(0f, 0.75f, 0.161f), new Vector3(0.005f, 1.1f, 0.002f), null, PlateGrey));
-			NoCol(Box(g, "Panel", new Vector3(0f, 1.55f, 0.162f), new Vector3(0.6f, 0.4f, 0.002f), null, PlateWhite));
+			Box(g, "Cabinet", new Vector3(0f, 0.95f, -0.05f), new Vector3(0.75f, 1.4f, 0.12f), null, Stainless);
+			NoCol(Box(g, "Frame", new Vector3(0f, 0.95f, 0.008f), new Vector3(0.79f, 1.44f, 0.004f), null, new Color(0.62f, 0.63f, 0.64f)));
+			NoCol(Box(g, "Front", new Vector3(0f, 0.95f, 0.011f), new Vector3(0.73f, 1.38f, 0.003f), null, Stainless));
+			NoCol(Box(g, "Top_Panel", new Vector3(0f, 1.52f, 0.014f), new Vector3(0.7f, 0.2f, 0.003f), null, new Color(0.70f, 0.71f, 0.72f)));
+			NoCol(Box(g, "Handle", new Vector3(-0.28f, 0.95f, 0.016f), new Vector3(0.02f, 0.12f, 0.006f), null, BaseBlack));
 			var bell = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
 			bell.name = "Bell";
 			bell.transform.SetParent(g, false);
-			bell.transform.localPosition = new Vector3(-0.15f, 1.55f, 0.175f);
+			bell.transform.localPosition = new Vector3(-0.1f, 1.52f, 0.022f);
 			bell.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-			bell.transform.localScale = new Vector3(0.16f, 0.015f, 0.16f);
-			DoorBuilder.Paint(bell.GetComponent<Renderer>(), null, FireRed);
+			bell.transform.localScale = new Vector3(0.14f, 0.008f, 0.14f);
+			DoorBuilder.Paint(bell.GetComponent<Renderer>(), null, new Color(0.85f, 0.55f, 0.58f));
 			NoCol(bell);
-			NoCol(Box(g, "Lamp", new Vector3(0.15f, 1.6f, 0.17f), new Vector3(0.06f, 0.06f, 0.02f), null, FireRed));
+			NoCol(Box(g, "Lamp", new Vector3(0.12f, 1.54f, 0.02f), new Vector3(0.08f, 0.04f, 0.01f), null, FireRed));
 			// 앞 바닥 빗금 (노랑 바탕 + 검은 줄)
 			NoCol(Box(g, "Hazard", new Vector3(0f, 0.002f, 0.55f), new Vector3(0.9f, 0.004f, 0.7f), null, HazardYellow));
 			for (int k = 0; k < 5; k++)
@@ -418,13 +421,66 @@ namespace NightPatrol
 			}
 		}
 
+		// ── 복도 가구 (사물함·벤치). 앞 = 로컬 +Z ──
+		public static void Furniture(Transform parent, IList<FloorLayoutData.Furniture> items, FloorDetailSettings s)
+		{
+			if (s == null || !s.enabled || !s.hallProps || items == null || items.Count == 0) return;
+			var root = Group(parent, "Furniture");
+			int k = 0;
+			foreach (var it in items)
+			{
+				var g = Group(root, $"{it.kind}_{++k}");
+				g.localPosition = new Vector3(it.pos.x, 0f, it.pos.y);
+				g.localRotation = Quaternion.Euler(0f, it.yaw, 0f);
+				if (it.kind == "Locker") LockerBank(g, Mathf.Max(1, it.cols), Mathf.Max(1, it.rows),
+					it.colWidth > 0.1f ? it.colWidth : 0.32f, it.height > 0.5f ? it.height : 1.85f);
+				else if (it.kind == "Bench") Bench(g, it.length > 0.3f ? it.length : 1.8f);
+			}
+		}
+
+		static readonly Color LockerBody = new Color(0.80f, 0.81f, 0.82f), LockerDoor = new Color(0.24f, 0.50f, 0.82f),
+			LockerHandle = new Color(0.78f, 0.74f, 0.62f), BenchSeat = new Color(0.22f, 0.22f, 0.25f), BenchLeg = new Color(0.70f, 0.71f, 0.73f);
+
+		// 철제 사물함 (회색 몸통 + 파란 문짝, 문마다 손잡이와 이름표). 가운데 바닥 기준, 앞 = +Z, 등은 벽
+		static void LockerBank(Transform g, int cols, int rows, float colW, float height)
+		{
+			const float depth = 0.5f, baseH = 0.08f;
+			float len = cols * colW;
+			Box(g, "Body", new Vector3(0f, height * 0.5f, 0f), new Vector3(len, height, depth), null, LockerBody);
+			float doorH = (height - baseH - 0.05f) / rows;
+			for (int c = 0; c < cols; c++)
+				for (int r = 0; r < rows; r++)
+				{
+					float x = -len * 0.5f + (c + 0.5f) * colW;
+					float y = baseH + (r + 0.5f) * doorH;
+					NoCol(Box(g, "Door", new Vector3(x, y, depth * 0.5f + 0.003f), new Vector3(colW - 0.025f, doorH - 0.025f, 0.006f), null, LockerDoor));
+					NoCol(Box(g, "Handle", new Vector3(x - colW * 0.28f, y - doorH * 0.05f, depth * 0.5f + 0.012f), new Vector3(0.035f, 0.08f, 0.012f), null, LockerHandle));
+					NoCol(Box(g, "Tag", new Vector3(x - colW * 0.2f, y + doorH * 0.3f, depth * 0.5f + 0.008f), new Vector3(0.05f, 0.025f, 0.003f), null, PlateWhite));
+				}
+		}
+
+		// 벤치 (짙은 회색 쿠션 + 은색 다리). 앞 = +Z
+		static void Bench(Transform g, float len)
+		{
+			Box(g, "Seat", new Vector3(0f, 0.42f, 0f), new Vector3(len, 0.09f, 0.45f), null, BenchSeat);
+			foreach (float lx in new[] { -len * 0.5f + 0.15f, len * 0.5f - 0.15f })
+			{
+				NoCol(Box(g, "Leg_F", new Vector3(lx, 0.19f, 0.15f), new Vector3(0.03f, 0.38f, 0.03f), null, BenchLeg));
+				NoCol(Box(g, "Leg_B", new Vector3(lx, 0.19f, -0.15f), new Vector3(0.03f, 0.38f, 0.03f), null, BenchLeg));
+				NoCol(Box(g, "Foot", new Vector3(lx, 0.015f, 0f), new Vector3(0.04f, 0.03f, 0.42f), null, BenchLeg));
+			}
+		}
+
 		// ── 방수용기구함 (스테인리스 함, 비상벨 없음). 앞 = 로컬 +Z ──
 		public static void HoseBox(Transform parent, Vector3 pos, Quaternion rot)
 		{
 			var g = Group(parent, "HoseBox");
 			g.localPosition = pos; g.localRotation = rot;
-			Box(g, "Cabinet", new Vector3(0f, 0.95f, 0.05f), new Vector3(0.6f, 1.2f, 0.1f), null, Stainless);
-			NoCol(Box(g, "Handle", new Vector3(-0.2f, 0.95f, 0.103f), new Vector3(0.02f, 0.12f, 0.006f), null, BaseBlack));
+			// 벽 속에 매입 (앞면이 벽면과 거의 같음)
+			Box(g, "Cabinet", new Vector3(0f, 0.95f, -0.04f), new Vector3(0.6f, 1.2f, 0.1f), null, Stainless);
+			NoCol(Box(g, "Frame", new Vector3(0f, 0.95f, 0.012f), new Vector3(0.64f, 1.24f, 0.004f), null, new Color(0.62f, 0.63f, 0.64f)));
+			NoCol(Box(g, "Front", new Vector3(0f, 0.95f, 0.015f), new Vector3(0.58f, 1.18f, 0.003f), null, Stainless));
+			NoCol(Box(g, "Handle", new Vector3(-0.2f, 0.95f, 0.02f), new Vector3(0.02f, 0.12f, 0.006f), null, BaseBlack));
 			NoCol(Box(g, "Hazard", new Vector3(0f, 0.002f, 0.5f), new Vector3(0.7f, 0.004f, 0.7f), null, HazardYellow));
 		}
 
@@ -542,7 +598,7 @@ namespace NightPatrol
 		}
 
 		// ── 천장 유리 지붕 (512·513호 사이 파노라마 사진): 천장 구멍 둘레 벽 + 길이 방향 용마루의 박공 유리 지붕 ──
-		public static void Skylight(Transform parent, Rect r, float ceilingH, Material glass, Material frameMat, Material wallMat)
+		public static GameObject Skylight(Transform parent, Rect r, float ceilingH, Material glass, Material frameMat, Material wallMat)
 		{
 			var g = Group(parent, "Skylight");
 			const float shaft = 0.5f, rise = 0.8f, wt = 0.15f;
@@ -583,6 +639,7 @@ namespace NightPatrol
 					new Vector3(-hx, ye, e * hz), new Vector3(hx, ye, e * hz), new Vector3(0f, yr, e * hz), glass);
 				if (glass == null) tri.GetComponent<Renderer>().enabled = false;
 			}
+			return g.gameObject;
 		}
 
 		// ── 게시판 (짙은 테두리 + 코르크 + 게시물). room 로컬, 복도 쪽 면 z = zFace, 가운데 x ──

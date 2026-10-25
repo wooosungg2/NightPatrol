@@ -56,12 +56,18 @@ namespace NightPatrol
 		void OnEnable()
 		{
 			run = FindAnyObjectByType<NightPatrol.Run.PatrolRun>();
-			if (run != null) run.FloorStarted += SetFloor;
+			if (run != null) { run.FloorStarted += SetFloor; run.Cleared += OnCleared; }
+		}
+
+		// 마지막 층(1층) 도착 = 클리어. 이때는 FloorStarted가 없어서 따로 층 표시를 바꿈
+		void OnCleared()
+		{
+			if (run != null) SetFloor(run.CurrentFloor);
 		}
 
 		void OnDisable()
 		{
-			if (run != null) run.FloorStarted -= SetFloor;
+			if (run != null) { run.FloorStarted -= SetFloor; run.Cleared -= OnCleared; }
 		}
 
 		public void Open() => target = 1f;

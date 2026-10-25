@@ -124,6 +124,9 @@ namespace NightPatrol
 		const float WIN_MARGIN = 0.2f;       // 창 양 끝 막힌 벽 길이
 		// 메인 복도 동쪽 끝 (512·513호 사이, 2026-10 파노라마 사진): 끝벽 통창 + 그 앞 천장 유리 지붕
 		const float HALL_WIN_MULLION = 1.1f; // 동쪽 홀 통창 세로 창살 간격
+		const float LOCKER_DEPTH = 0.5f;     // 복도 사물함 깊이
+		const float LOCKER_COL = 0.41f;      // 사물함 한 열 폭 (4열 = 1.64m, 528호 앞 벽 1.68m에 거의 꽉 참)
+		const float LOCKER_HEIGHT = 2.05f;   // 사물함 높이
 		const float END_WIN_HEAD = 2.7f;     // 끝 창 윗선 (위는 흰 보)
 		const float END_WIN_MULLION = 1.2f;  // 2열
 		static readonly float[] END_WIN_TRANSOMS = { 1.1f, 2.0f };
@@ -209,6 +212,7 @@ namespace NightPatrol
 			public List<Solid> solids = new List<Solid>();                // 그 밖의 상자 (발코니 난간벽·바닥 등)
 			public List<Rect> skylights = new List<Rect>();               // 천장이 뚫리고 유리 지붕이 있는 곳 (x, z, 폭, 깊이)
 			public Rect hallNorth, hallSouth;                             // 동쪽 홀 (자판기 쪽 / 학습공간 쪽). 크기 0이면 없음
+			public List<Furniture> furniture = new List<Furniture>();     // 사물함·벤치 등 (사진 기준 위치)
 		}
 
 		/// <summary>
@@ -236,6 +240,22 @@ namespace NightPatrol
 
 		static void Wall(FloorLayout f, float x1, float z1, float x2, float z2, Vector2 thick, float thickness = 0f)
 			=> f.walls.Add(new WallSeg(x1, z1, x2, z2, thick.x, thick.y, thickness));
+
+		/// <summary>복도에 놓는 가구 하나. pos = (x, z) 바닥 가운데, yaw = 앞면 방향 (0 = +Z, 90 = +X)</summary>
+		public class Furniture
+		{
+			public string kind;        // "Locker" | "Bench"
+			public Vector2 pos;
+			public float yaw;
+			public int cols, rows;     // 사물함 칸 (가로 × 세로)
+			public float length;       // 벤치 길이
+			public float colWidth, height; // 사물함 한 열 폭·높이 (0이면 기본)
+
+			public static Furniture Locker(float x, float z, float yaw, int cols, int rows, float colWidth = 0f, float height = 0f) =>
+				new Furniture { kind = "Locker", pos = new Vector2(x, z), yaw = yaw, cols = cols, rows = rows, colWidth = colWidth, height = height };
+			public static Furniture Bench(float x, float z, float yaw, float length) =>
+				new Furniture { kind = "Bench", pos = new Vector2(x, z), yaw = yaw, length = length };
+		}
 
 		/// <summary>a→b 벽에 문 구멍 하나. doorCenter = a에서 문 중심까지 거리</summary>
 		public class DoorWall
@@ -481,6 +501,20 @@ namespace NightPatrol
 			// 창문 북쪽 ~ 528호·523호: 막힌 벽. 서쪽은 528호 앞 회색 벽과 이어지는 두꺼운 벽(세로 복도 벽선까지)
 			Wall(f, f.wingX, loungeZ1, f.wingX, C + WING_ROOMS, W, RECESS);
 			Wall(f, wingEastX, loungeZ1, wingEastX, C + WING_ROOMS, E);
+
+			// 서쪽 계단 ~ 522호 사이 넓은 복도 (2026-10 사진)
+			// 계단실 쪽 벽과 522호 쪽 벽에 5단 16열 사물함이 마주 봄 (창문 앞까지), 양쪽 창문 앞에 벤치,
+			// 창문 북쪽 끝의 튀어나온 벽(528호 앞)에 5단 4열 사물함
+			{
+				const float lkD = LOCKER_DEPTH, lkLen = 16f * LOCKER_COL;
+				float lkZ = loungeZ0 - lkLen * 0.5f - 0.05f;
+				f.furniture.Add(Furniture.Locker(STAIR_W + lkD * 0.5f, lkZ, 90f, 16, 5, LOCKER_COL, LOCKER_HEIGHT));      // 계단실 쪽, 동쪽을 봄
+				f.furniture.Add(Furniture.Locker(wingEastX - lkD * 0.5f, lkZ, -90f, 16, 5, LOCKER_COL, LOCKER_HEIGHT));  // 522호 쪽, 서쪽을 봄
+				float bz = (loungeZ0 + loungeZ1) * 0.5f;
+				f.furniture.Add(Furniture.Bench(STAIR_W + 0.6f, bz, 90f, 1.8f));
+				f.furniture.Add(Furniture.Bench(wingEastX - 0.6f, bz, -90f, 1.8f));
+				f.furniture.Add(Furniture.Locker((STAIR_W + f.wingX) * 0.5f, loungeZ1 - lkD * 0.5f, 180f, 4, 5, LOCKER_COL, LOCKER_HEIGHT)); // 남쪽을 봄
+			}
 			// 동쪽 홀 (2026-10 사진): 북쪽(518호~동쪽 계단) = 자판기·분리수거, 남쪽(508호~동쪽 여자화장실) = 학습공간. 바깥쪽은 통창 + 난간
 			f.windowWalls.Add(new WindowWall("Window_Hall_N", hallN, C + HALL_N_DEPTH, hallN + HALL, C + HALL_N_DEPTH, N,
 				WIN_SILL, WIN_HEAD, WIN_MARGIN).Frame(HALL_WIN_MULLION, WIN_TRANSOMS, WIN_RAIL));
