@@ -1,17 +1,31 @@
 
 using UnityEngine;
+using NightPatrol.Patrol;
 
 namespace NightPatrol.Anomalies
 {
     public class MonitorGlitchAnomaly : Anomaly
     {
-        [SerializeField] private MonitorDevice monitor;
+        [SerializeField] private string monitorId;
         [SerializeField] private Material glitchMaterial;
+
+        private MonitorDevice monitor;
 
         public override void Activate()
         {
-            if (IsActive || monitor == null || glitchMaterial == null)
+            if (IsActive || glitchMaterial == null)
                 return;
+
+            monitor = PatrolInspection.FindById(monitorId) as MonitorDevice;
+
+            if (monitor == null)
+            {
+                Debug.LogWarning(
+                    $"[MonitorGlitchAnomaly] Monitor not found: {monitorId}",
+                    this
+                );
+                return;
+            }
 
             monitor.OverrideScreen(glitchMaterial);
             monitor.AddAnomaly();
@@ -30,6 +44,7 @@ namespace NightPatrol.Anomalies
                 monitor.RemoveAnomaly();
             }
 
+            monitor = null;
             IsActive = false;
         }
 
@@ -38,6 +53,10 @@ namespace NightPatrol.Anomalies
             if (monitor != null)
                 monitor.ClearScreenOverride();
 
+            // FloorReset 이전에 PatrolObject의
+            // anomalyCount가 초기화되므로
+            // RemoveAnomaly()는 호출하지 않는다.
+            monitor = null;
             IsActive = false;
         }
     }
