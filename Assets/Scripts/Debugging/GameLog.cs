@@ -137,6 +137,7 @@ namespace NightPatrol.Debugging
             return "=== 야간순찰 게임 로그 ===\n" +
                    $"게임: {Application.productName} {Application.version}\n" +
                    $"Unity: {Application.unityVersion} ({build})\n" +
+                   BuildStampLine() +
                    $"OS: {SystemInfo.operatingSystem}\n" +
                    $"CPU: {SystemInfo.processorType} ({SystemInfo.processorCount}코어)\n" +
                    $"GPU: {SystemInfo.graphicsDeviceName} ({SystemInfo.graphicsMemorySize} MB)\n" +
@@ -144,6 +145,22 @@ namespace NightPatrol.Debugging
                    $"화면: {Screen.width}×{Screen.height}\n" +
                    $"시작: {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)}\n" +
                    "==========================\n";
+        }
+
+        // 빌드 메뉴가 실행 파일 옆에 남긴 build.txt의 첫 줄 (어느 빌드의 로그인지). 에디터이거나 파일이 없으면 줄 없음
+        private static string BuildStampLine()
+        {
+            if (Application.isEditor) return string.Empty;
+            try
+            {
+                string path = Path.Combine(Path.GetDirectoryName(Application.dataPath) ?? string.Empty, DevBuildPlan.InfoFileName);
+                string stamp = File.Exists(path) ? DevBuildPlan.StampFromInfo(File.ReadAllText(path)) : string.Empty;
+                return stamp.Length > 0 ? $"빌드: {stamp}\n" : string.Empty;
+            }
+            catch (Exception)
+            {
+                return string.Empty;
+            }
         }
 
         /// <summary>

@@ -385,8 +385,9 @@ namespace NightPatrol.Tests
             Assert.AreEqual(4, run.CurrentFloor);
         }
 
+        // 00_12: 1층 도착(클리어) 뒤에는 퇴근 — 문구가 비어 할 일이 없던 것을 임시 끝(처음으로)으로
         [Test]
-        public void Elevator_Interact_Descends_AndPromptEmptiesAfterClear()
+        public void Elevator_Interact_Descends_AndOffersToEndTheShiftAfterClear()
         {
             var elevator = New("Elevator").AddComponent<Elevator>();
             SetField(elevator, "run", run);
@@ -396,7 +397,21 @@ namespace NightPatrol.Tests
             Assert.AreEqual(4, run.CurrentFloor);
 
             for (int i = 0; i < 3; i++) run.Descend(true);
-            Assert.AreEqual(string.Empty, elevator.Prompt);
+            Assert.IsTrue(run.IsCleared);
+            Assert.AreEqual("E 길게 - 퇴근하기", elevator.Prompt);
+
+            // 층 이동 연출이 없으면 바로 처음으로 (씬을 다시 부름)
+            int restarts = 0;
+            GameRestart.Override = _ => restarts++;
+            try
+            {
+                elevator.Interact(null);
+                Assert.AreEqual(1, restarts);
+            }
+            finally
+            {
+                GameRestart.Override = null;
+            }
         }
 
         [Test]
@@ -408,6 +423,24 @@ namespace NightPatrol.Tests
 
             SetField(elevator, "holdSeconds", 0f);
             Assert.AreEqual("E - 아래층으로", elevator.Prompt);
+            run.JumpBy(4);
+            Assert.AreEqual("E - 퇴근하기", elevator.Prompt);
+        }
+
+        // 00_12: 첫 회차의 첫 층(5층)만 이상현상 없음 (기획서 3.4). 이상현상 쪽은 FloorStarted에서 읽는다
+        [Test]
+        public void AnomaliesAllowed_ExceptOnTheFirstFloorOfTheFirstAttempt()
+        {
+            var seen = new List<bool>();
+            run.FloorStarted += _ => seen.Add(run.AnomaliesAllowed);
+            Assert.IsFalse(run.AnomaliesAllowed);   // 1회차 5층
+
+            run.Descend(true);   // 1회차 4층
+            run.Fail();          // 2회차 5층
+            CollectionAssert.AreEqual(new[] { true, true }, seen);
+            Assert.AreEqual(5, run.CurrentFloor);
+            Assert.AreEqual(2, run.Attempt);
+            Assert.IsTrue(run.AnomaliesAllowed);
         }
     }
 }

@@ -502,6 +502,98 @@ namespace NightPatrol.Tests
             Assert.AreEqual(1f, Time.timeScale);
         }
 
+        // 00_12: 게임 시작 페이드 중에도 열지 않는다 — 메뉴가 시간을 멈추면 페이드도 멈춰 검은 화면 아래 메뉴가 안 보였음
+        [UnityTest]
+        public IEnumerator Open_IsIgnoredDuringStartFade()
+        {
+            var faderObject = New("Fader");
+            faderObject.AddComponent<CanvasGroup>();
+            var fader = faderObject.AddComponent<ScreenFader>();
+            var transition = New("Transition").AddComponent<FloorTransition>();   // Awake finds the player and the fader
+            SetField(transition, "fadeSeconds", 5f);   // 이 테스트 동안 끝나지 않게
+            SetField(menu, "transition", transition);
+            yield return null;   // Start: 검은 화면에서 밝아지기 시작
+
+            Assert.IsTrue(transition.IsScreenCovered);
+            Assert.IsFalse(transition.IsBusy);
+            Assert.Greater(fader.Alpha, 0.5f);
+            menu.Open();
+            Assert.IsFalse(menu.IsOpen);
+            Assert.AreEqual(1f, Time.timeScale);
+        }
+
+        // ── 시작 화면 (00_16: 시작 화면 씬의 메뉴, TitleScreen이 OpenTitle을 부름) ──
+        [Test]
+        public void Title_OpensPausedOnTheStartRow()
+        {
+            menu.OpenTitle();
+            Assert.IsTrue(menu.IsTitle);
+            Assert.AreEqual(PauseMenu.Page.Title, menu.CurrentPage);
+            Assert.AreEqual(PauseMenu.Row.Start, menu.Selected);
+            Assert.AreEqual(0f, Time.timeScale);
+        }
+
+        [Test]
+        public void Title_IsNotClosedByEsc()
+        {
+            menu.OpenTitle();
+            menu.Back();
+            Assert.IsTrue(menu.IsOpen);
+            Assert.AreEqual(PauseMenu.Page.Title, menu.CurrentPage);
+        }
+
+        // 근무 시작은 알리기만 하고 열린 채로 (TitleScreen이 화면을 덮은 뒤 닫고 게임 씬을 불러옴)
+        [Test]
+        public void Title_Start_RaisesStartRequested_AndStaysOpen()
+        {
+            int requested = 0;
+            menu.StartRequested += () => requested++;
+            menu.OpenTitle();
+            menu.Confirm();
+            Assert.AreEqual(1, requested);
+            Assert.IsTrue(menu.IsTitle);
+        }
+
+        [Test]
+        public void Title_Settings_BackReturnsToTheTitle()
+        {
+            menu.OpenTitle();
+            menu.Select(1);   // 설정
+            menu.Confirm();
+            Assert.AreEqual(PauseMenu.Page.Settings, menu.CurrentPage);
+            menu.Back();
+            Assert.AreEqual(PauseMenu.Page.Title, menu.CurrentPage);
+            Assert.AreEqual(PauseMenu.Row.Settings, menu.Selected);
+            Assert.IsTrue(menu.IsOpen);
+        }
+
+        // 시작 화면 씬은 화면 위 캔버스(Screen Space - Overlay)라 카메라 없이 마우스 판정
+        [Test]
+        public void Pointer_WorksOnAScreenOverlayCanvas_WithoutACamera()
+        {
+            var canvasObject = New("Canvas");
+            canvasObject.AddComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
+            var page = new GameObject("MenuPanel", typeof(RectTransform));
+            page.transform.SetParent(canvasObject.transform, false);
+            var bodyObject = new GameObject("MenuBody", typeof(RectTransform));
+            bodyObject.transform.SetParent(page.transform, false);
+            var body = bodyObject.AddComponent<TextMeshProUGUI>();
+            body.rectTransform.sizeDelta = new Vector2(600f, 400f);
+            body.fontSize = 32f;
+            body.textWrappingMode = TextWrappingModes.NoWrap;
+            SetField(menu, "menuPage", page);
+            SetField(menu, "bodyText", body);
+            SetField(menu, "pointerCamera", null);
+            menu.OpenTitle();
+
+            var line = body.textInfo.lineInfo[2];   // 게임 종료
+            var onLabel = new Vector3(body.rectTransform.rect.xMin + 80f, (line.ascender + line.descender) * 0.5f, 0f);
+            Vector2 screen = RectTransformUtility.WorldToScreenPoint(null, body.rectTransform.TransformPoint(onLabel));
+            Assert.IsTrue(menu.TryHit(screen, out int row, out int arrow));
+            Assert.AreEqual(2, row);
+            Assert.AreEqual(0, arrow);
+        }
+
         // 00_08d: 조작 키 목록 설정 실수는 경고 (메뉴에서 눌러도 안 바뀌는 줄, 10줄 초과)
         [Test]
         public void KeyListMistakes_AreWarned()

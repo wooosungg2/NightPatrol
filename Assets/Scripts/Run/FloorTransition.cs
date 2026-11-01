@@ -11,6 +11,7 @@ namespace NightPatrol.Run
     /// <summary>
     /// 층 이동 연출. 엘리베이터 E → 조작 잠금 → 문 닫힘 → 화면 어두워짐 → (어두운 동안) 판정·층 바꾸기 → "N층" →
     /// 화면 밝아짐 → 문 열림 → 잠금 해제. 실패하면 어두운 동안 시작 자리로 옮겨진 뒤 졸다 깨는 연출(기획서 3.3).
+    /// 1층 도착(클리어) 뒤 엘리베이터를 한 번 더 타면 퇴근: 어두워짐 → "근무 종료" → 처음으로 (엔딩이 정해지기 전 임시 끝).
     /// 잠그는 것: 이동·시점·E·일지(들고 있었으면 내림). Player 프리팹의 HUD에 붙는다.
     /// 판정·층 진행 규칙은 PatrolRun 그대로 — 여기는 그 바깥을 감싸기만 한다.
     /// </summary>
@@ -39,6 +40,10 @@ namespace NightPatrol.Run
         [SerializeField] private float wakeStartPitch = 35f;
         [Tooltip("게임 시작 때 검은 화면에서 밝아짐")]
         [SerializeField] private bool fadeInOnStart = true;
+        [Tooltip("1층 도착(클리어) 뒤 엘리베이터로 퇴근할 때 검은 화면에 띄울 글")]
+        [SerializeField] private string endCaption = "근무 종료";
+        [Tooltip("퇴근 글을 보여 주는 시간(초). 끝나면 처음(5층 1회차)으로")]
+        [SerializeField] private float endSeconds = 3f;
         private PlayerLook look;
         private PlayerControl control;
         private PlayerInteractor interactor;
@@ -48,6 +53,11 @@ namespace NightPatrol.Run
 
         /// <summary>연출 중인지 (이 동안 엘리베이터는 다시 안 눌림)</summary>
         public bool IsBusy { get; private set; }
+        /// <summary>
+        /// 화면이 어둡게 덮인 동안인지: 연출 중이거나 게임 시작 페이드 중. ESC 메뉴는 이때 열리지 않는다
+        /// (메뉴가 시간을 멈추면 페이드도 멈춰 검은 화면 아래 메뉴가 안 보임)
+        /// </summary>
+        public bool IsScreenCovered => IsBusy || startFade != null;
         /// <summary>하행 연출 시작 (예: 문 닫히는 소리, 버튼음)</summary>
         public event Action DescendStarted;
         /// <summary>하행 성공 후 "N층"을 띄우기 직전, 도착한 층 번호 (예: "띵" 소리)</summary>
@@ -97,7 +107,14 @@ namespace NightPatrol.Run
         {
             if (!fadeInOnStart || fader == null) return;
             fader.SetAlpha(1f);
-            startFade = StartCoroutine(fader.FadeTo(0f, fadeSeconds));
+            startFade = StartCoroutine(StartFadeRoutine());
+        }
+
+        // 끝나면 비운다 (IsScreenCovered가 시작 페이드 동안만 true)
+        private IEnumerator StartFadeRoutine()
+        {
+            yield return fader.FadeTo(0f, fadeSeconds);
+            startFade = null;
         }
 
         /// <summary>엘리베이터 하행 연출 (엘리베이터가 부름). 연출 중·클리어 뒤·이 컴포넌트가 꺼져 있으면 무시</summary>
@@ -105,6 +122,26 @@ namespace NightPatrol.Run
         {
             if (IsBusy || !isActiveAndEnabled || run == null || run.IsCleared) return;
             StartCoroutine(DescendRoutine());
+        }
+
+        /// <summary>
+        /// 퇴근 (1층 도착 뒤 엘리베이터가 부름): 잠금 → 문 닫힘 → 어두워짐 → "근무 종료" → 처음(5층 1회차)으로.
+        /// 엔딩(기획서 1층 마지막 장면)이 정해지기 전의 임시 끝. 클리어 전·연출 중·이 컴포넌트가 꺼져 있으면 무시
+        /// </summary>
+        public void EndShift()
+        {
+            if (IsBusy || !isActiveAndEnabled || run == null || !run.IsCleared) return;
+            StartCoroutine(EndShiftRoutine());
+        }
+
+        private IEnumerator EndShiftRoutine()
+        {
+            Begin();
+            yield return WaitDoors(false);
+            if (fader != null) yield return fader.FadeTo(1f, fadeSeconds);
+            SetCaption(endCaption);
+            yield return new WaitForSeconds(endSeconds);
+            GameRestart.Restart();
         }
 
         private IEnumerator DescendRoutine()
