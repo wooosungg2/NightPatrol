@@ -20,6 +20,10 @@ namespace NightPatrol.Anomalies
 
         private LightZone zone;
 
+        // ========================================
+        // 이상현상 활성화
+        // ========================================
+
         public override void Activate()
         {
             if (IsActive)
@@ -36,31 +40,46 @@ namespace NightPatrol.Anomalies
                 return;
             }
 
+            // 지정한 조명의 색상 변경
             zone.SetSingleLightAnomalyColor(
                 lightIndex,
                 anomalyColor
             );
 
             IsActive = true;
+
+            // 점검 판정 등록
+            RegisterAnomaly();
         }
+
+        // ========================================
+        // 이상현상 비활성화
+        // ========================================
 
         public override void Deactivate()
         {
-            if (!IsActive)
-                return;
-
-            if (zone != null)
+            if (IsActive && zone != null)
+            {
                 zone.ClearSingleLightAnomalyColor();
+            }
 
             IsActive = false;
             zone = null;
+
+            UnregisterAnomaly();
         }
+
+        // ========================================
+        // 층 초기화
+        // ========================================
 
         public override void ResetAfterFloorReset()
         {
-            // LightZone이 FloorReset에서 이미 초기화됨
+            // LightZone은 FloorReset에서 초기화됨
             IsActive = false;
             zone = null;
+
+            ForgetRegistrationAfterFloorReset();
         }
 
         private void OnDisable()

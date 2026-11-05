@@ -16,6 +16,10 @@ namespace NightPatrol.Anomalies
 
         private LightZone zone;
 
+        // ========================================
+        // 이상현상 활성화
+        // ========================================
+
         public override void Activate()
         {
             if (IsActive)
@@ -32,29 +36,43 @@ namespace NightPatrol.Anomalies
                 return;
             }
 
-            // 지정한 조명 하나만 깜빡임
+            // 지정한 조명 깜빡임 시작
             zone.StartSingleLightFlicker(lightIndex);
 
             IsActive = true;
+
+            // 점검 판정 등록
+            RegisterAnomaly();
         }
+
+        // ========================================
+        // 이상현상 비활성화
+        // ========================================
 
         public override void Deactivate()
         {
-            if (!IsActive)
-                return;
-
-            if (zone != null)
+            if (IsActive && zone != null)
+            {
                 zone.StopSingleLightFlicker();
+            }
 
             zone = null;
             IsActive = false;
+
+            UnregisterAnomaly();
         }
+
+        // ========================================
+        // 층 초기화
+        // ========================================
 
         public override void ResetAfterFloorReset()
         {
             // LightZone에서 이미 초기화됨
             zone = null;
             IsActive = false;
+
+            ForgetRegistrationAfterFloorReset();
         }
 
         private void OnDisable()
