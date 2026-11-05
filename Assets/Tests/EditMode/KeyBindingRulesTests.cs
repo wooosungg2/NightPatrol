@@ -84,6 +84,24 @@ namespace NightPatrol.Tests
             Assert.IsEmpty(bad, "개발자·메뉴 키는 기본 키로 못 씀: " + string.Join(", ", bad));
         }
 
+        // 10/24 (00_15 검사): 목록에 없는 고정 키(이동의 방향키)를 다른 줄에 지정하면 겹침 맞바꿈에 안 잡혀
+        // 두 동작이 같이 눌림 (뒤로를 ↑로 → 전진·후진이 겹침). 그래서 다시 지정할 때 받지 않는다
+        [Test]
+        public void FixedKeys_NotInTheList_CannotBeChosenWhenRebinding()
+        {
+            var reserved = (string[])typeof(KeyBindings).GetField("Reserved", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            var listed = new HashSet<string>(DefaultKeys().Select(k => k.path), System.StringComparer.OrdinalIgnoreCase);
+            var open = new List<string>();
+            foreach (var action in player.actions)
+                foreach (var b in action.bindings)
+                {
+                    if (b.isComposite || !IsKey(b.path) || !InKeyboardMouse(b) || listed.Contains(b.path)) continue;
+                    if (!reserved.Contains(b.path, System.StringComparer.OrdinalIgnoreCase)) open.Add($"{action.name} ({b.path})");
+                }
+            Assert.IsEmpty(open, "목록에 없는 고정 키는 다시 지정할 때 막아야 함 (KeyBindings.Reserved): " + string.Join(", ", open));
+            Assert.IsTrue(reserved.Contains("<Keyboard>/upArrow"), "방향키는 이동의 고정 보조 키");
+        }
+
         // 목록 에셋을 탐색기에서 옮기거나 복사하면 GUID가 바뀌어 메뉴 연결이 끊긴다 (10/11 실제로 있었음)
         [Test]
         public void EveryPauseMenuPrefab_UsesTheKeyList()

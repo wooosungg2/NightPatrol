@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using NightPatrol.Debugging;
+using NightPatrol.Journal;
+using NightPatrol.Menu;
 using NightPatrol.Patrol;
 using NightPatrol.Player;
 using NightPatrol.Run;
@@ -92,6 +94,23 @@ namespace NightPatrol.Tests
             AssertHas(facts, CheckLevel.Warning, "PlayerControl이 없음");
         }
 
+        // 00_13 P5: 이동만 있는 플레이어(테스트용 플레이어 등)는 공용 Player 프리팹이 아니라고 알려 줌
+        [Test]
+        public void PlayerMissingJournalMenuOrTransition_Warns()
+        {
+            var facts = Good();
+            facts.Players[0].MissingParts = "일지(JournalHolder), ESC 메뉴(PauseMenu)";
+            AssertHas(facts, CheckLevel.Warning, "공용 Player 프리팹이 아닌 플레이어 — 없는 것: 일지(JournalHolder), ESC 메뉴(PauseMenu)");
+        }
+
+        [Test]
+        public void InactivePlayerMissingParts_IsFine()
+        {
+            var facts = Good();
+            facts.Players.Add(new PlayerFact { Path = "OldPlayer", Active = false, MissingParts = "일지(JournalHolder)" });
+            Assert.IsEmpty(Problems(facts), Text(Problems(facts)));
+        }
+
         // ── 층 진행 ──
         [Test]
         public void NoRun_Warns_AndSkipsTasksAndElevatorWarnings()
@@ -120,6 +139,27 @@ namespace NightPatrol.Tests
             var facts = Good();
             facts.Tasks.Clear();
             AssertHas(facts, CheckLevel.Warning, "FloorTasks가 없음");
+        }
+
+        // 00_13 P5: 시작 자리가 비면 처음 서 있던 자리로 돌아감 — 동작은 하므로 정보만
+        [Test]
+        public void RunWithoutStartPoint_IsOnlyInfo()
+        {
+            var facts = Good();
+            facts.Runs.Clear();
+            facts.Runs.Add(new RunFact { Path = "PatrolSystems", Active = true, NoStartPoint = true });
+            Assert.IsEmpty(Problems(facts), Text(Problems(facts)));
+            AssertHas(facts, CheckLevel.Info, "Start Point가 비어 있음");
+        }
+
+        [Test]
+        public void NoElevatorDoors_IsInfo_OnlyWhenThereIsAnElevator()
+        {
+            var facts = Good();
+            facts.NoElevatorDoors = true;
+            AssertHas(facts, CheckLevel.Info, "엘리베이터 문(ElevatorDoors)이 없음");
+            facts.Elevators.Clear();
+            Assert.IsFalse(SceneCheck.Check(facts).Any(i => i.Message.Contains("엘리베이터 문")));
         }
 
         [Test]
@@ -479,6 +519,36 @@ namespace NightPatrol.Tests
             {
                 Object.DestroyImmediate(table);
             }
+        }
+
+        // 00_13 P5: 실제 오브젝트에서 빠진 부품·시작 자리·엘리베이터 문을 모은다
+        [Test]
+        public void Gather_MissingPlayerParts_StartPoint_AndDoors()
+        {
+            var root = New("Level");
+            New("Player", root.transform).AddComponent<PlayerMovement>();   // 이동만 있는 플레이어
+            var run = New("Systems", root.transform).AddComponent<PatrolRun>();
+
+            var facts = SceneCheck.Gather(new[] { root }, "Test");
+            Assert.AreEqual("일지(JournalHolder), ESC 메뉴(PauseMenu), 층 이동 연출(FloorTransition)", facts.Players[0].MissingParts);
+            Assert.IsTrue(((RunFact)facts.Runs[0]).NoStartPoint);
+            Assert.IsTrue(facts.NoElevatorDoors);
+
+            var desk = New("Desk", root.transform).transform;
+            typeof(PatrolRun).GetField("startPoint", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(run, desk);
+            Assert.IsFalse(((RunFact)SceneCheck.Gather(new[] { root }, "Test").Runs[0]).NoStartPoint);
+        }
+
+        [Test]
+        public void MissingPlayerParts_FullPlayer_HasNothingMissing()
+        {
+            var player = New("Player");
+            var movement = player.AddComponent<PlayerMovement>();
+            var clipboard = New("Clipboard", player.transform);
+            clipboard.AddComponent<JournalHolder>();
+            clipboard.AddComponent<PauseMenu>();
+            New("HUD", player.transform).AddComponent<FloorTransition>();
+            Assert.AreEqual(string.Empty, SceneCheck.MissingPlayerParts(movement));
         }
     }
 }

@@ -21,6 +21,7 @@ namespace NightPatrol.Interaction
         private readonly HashSet<object> blockers = new HashSet<object>();
         private readonly HoldTracker hold = new HoldTracker();
         private InputAction interact;
+        private bool wasAvailable;   // 지난 프레임에 조작할 수 있었는지 (막혔다 풀린 첫 프레임의 누름을 쓰지 않으려고)
 
         /// <summary>지금 조준 중인 대상. 없으면 null</summary>
         public IInteractable CurrentTarget { get; private set; }
@@ -52,10 +53,15 @@ namespace NightPatrol.Interaction
             interact = interactAction.action;
         }
 
-        private void OnEnable() => interact?.Enable();
+        private void OnEnable()
+        {
+            interact?.Enable();
+            wasAvailable = false;
+        }
         private void OnDisable()
         {
             Release();
+            wasAvailable = false;
         }
 
         /// <summary>
@@ -83,20 +89,29 @@ namespace NightPatrol.Interaction
                 Time.timeScale == 0f || playerCamera == null || !playerCamera.isActiveAndEnabled)
             {
                 Release();
+                wasAvailable = false;
                 return;
             }
 
             SetTarget(FindTarget(AimRay(), settings.InteractionDistance, settings.AimAssistRadius, raycastMask));
             // 누르는 순간 반응한다 (Input 에셋의 Interact에 Hold가 있어도 performed를 기다리지 않음).
             // IHoldInteractable(엘리베이터 등)만 HoldSeconds 동안 누르고 있어야 발동
+            bool freshPress = AcceptsPress(wasAvailable, interact.WasPressedThisFrame());
+            wasAvailable = true;
             float holdSeconds = CurrentTarget is IHoldInteractable needsHold ? needsHold.HoldSeconds : 0f;
-            if (hold.Update(CurrentTarget, interact.WasPressedThisFrame(), interact.IsPressed(), holdSeconds, Time.deltaTime))
+            if (hold.Update(CurrentTarget, freshPress, interact.IsPressed(), holdSeconds, Time.deltaTime))
             {
                 var pressed = CurrentTarget;
                 pressed.Interact(this);
                 SafeEvent.Raise(Interacted, pressed, this);
             }
         }
+
+        /// <summary>
+        /// 이번 프레임의 누름을 쓸지. 지난 프레임에 막혀 있었으면(ESC 메뉴·연출·일지·창 밖) 그 누름은 막고 있던 쪽이 쓴 것으로 보고 무시한다 —
+        /// 메뉴의 "계속하기"를 E로 고른 그 누름이 뒤에 조준한 사물까지 조작하지 않게. 길게 누르기도 새 누름이 있어야 시작한다
+        /// </summary>
+        internal static bool AcceptsPress(bool availableLastFrame, bool pressedThisFrame) => availableLastFrame && pressedThisFrame;
 
         /// <summary>
         /// 조준 대상 찾기: 가는 조준선으로 먼저 찾고, 못 찾으면 반지름 assistRadius 구로 한 번 더 (작은 스위치 등).
