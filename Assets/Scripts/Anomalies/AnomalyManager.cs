@@ -43,6 +43,10 @@ namespace NightPatrol.Anomalies
         [SerializeField]
         private Anomaly[] bellColorAnomalies;
 
+        [Header("우는 아이 이상현상 후보")]
+        [SerializeField]
+        private Anomaly[] cryingChildAnomalies;
+
         // ========================================
         // 2. 층별 랜덤 이상현상 개수 설정
         // ========================================
@@ -239,6 +243,13 @@ namespace NightPatrol.Anomalies
             // 8. 벨 색상 변경
             AddCandidates(
                 bellColorAnomalies,
+                candidates,
+                visited
+            );
+
+            // 9. 우는 아이 
+            AddCandidates(
+                cryingChildAnomalies,
                 candidates,
                 visited
             );
