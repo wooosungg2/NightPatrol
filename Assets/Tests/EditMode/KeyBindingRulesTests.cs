@@ -9,7 +9,7 @@ using UnityEngine.InputSystem;
 namespace NightPatrol.Tests
 {
     // 01_06c: 실제 입력 에셋·조작 키 목록 검사. 팀원이 키 동작을 추가하고 목록에 안 넣으면 여기서 실패한다.
-    // 키 배정 원칙 (10/11): 기본 키끼리 겹치지 않고, 개발자 키(ESC·F1~F5·PgUp/PgDn)를 쓰지 않는다.
+    // 키 배정 원칙 (10/11): 기본 키끼리 겹치지 않고, 개발자 키(ESC·F1~F7·PgUp/PgDn)를 쓰지 않는다.
     public class KeyBindingRulesTests
     {
         private KeyBindingList list;
@@ -125,7 +125,7 @@ namespace NightPatrol.Tests
         public void KeyList_HasTheCurrentGameKeys()
         {
             var labels = list.Entries.Select(e => e.label).ToList();
-            CollectionAssert.IsSubsetOf(new[] { "앞으로", "뒤로", "왼쪽", "오른쪽", "상호작용", "근무일지", "손전등" }, labels);
+            CollectionAssert.IsSubsetOf(new[] { "앞으로", "뒤로", "왼쪽", "오른쪽", "상호작용", "근무일지", "손전등", "전화" }, labels);
         }
     }
 }

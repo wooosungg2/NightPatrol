@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using NightPatrol.Phone;
 using NightPatrol.Run;
 using UnityEngine;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -23,7 +24,7 @@ namespace NightPatrol.Debugging
 
         /// <summary>F1 패널의 개발자 키 안내 (PatrolRun이 없으면 F5만)</summary>
         public static string HelpText(bool hasRun) => hasRun
-            ? "F1 표시 전환 · F2 하행 · F3 실패 · F4 층 재시작\nF5 기록 폴더 · F6 예약 바로 실행 · PgUp/PgDn 층 이동"
+            ? "F1 표시 전환 · F2 하행 · F3 실패 · F4 층 재시작\nF5 기록 폴더 · F6 예약 바로 실행 · F7 시험 전화 · PgUp/PgDn 층 이동"
             : "F1 표시 전환 · F5 기록 폴더  (PatrolRun 없음)";
 
         private const int MaxScheduleLines = 5;
@@ -47,10 +48,18 @@ namespace NightPatrol.Debugging
         }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        // F7 시험 전화: 손에 드는 전화가 받기·자막·끊기까지 되는지 (통화 표 없이)
+        private static readonly PhoneCall TestCall = new PhoneCall
+        {
+            id = "시험",
+            lines = new[] { new PhoneLine { text = "시험 전화입니다." }, new PhoneLine { text = "Q로 끊을 수 있어요." } },
+        };
+
         private PatrolRun run;
         private FloorTransition transition;
         private PlaytestLog playtest;
         private InteractionDebugView debugView;
+        private PhoneHolder phone;
 
         /// <summary>개발자 키가 동작하는지: F1 디버그 표시가 켜져 있을 때만</summary>
         public bool KeysActive => debugView != null && debugView.IsVisible;
@@ -62,6 +71,7 @@ namespace NightPatrol.Debugging
             playtest = UnityEngine.Object.FindAnyObjectByType<PlaytestLog>();
             debugView = GetComponent<InteractionDebugView>();
             if (debugView == null) debugView = UnityEngine.Object.FindAnyObjectByType<InteractionDebugView>();
+            phone = UnityEngine.Object.FindAnyObjectByType<PhoneHolder>();
         }
 
         private void OnEnable()
@@ -106,6 +116,11 @@ namespace NightPatrol.Debugging
                 // 실행한 예약은 지워져 두 번 돌지 않는다. 이 로그가 게임 로그에 개발 개입으로 남는다
                 string label = run.Schedule.RunNext();
                 Debug.Log(label != null ? $"[Dev] 예약 바로 실행: {label}" : "[Dev] 남은 예약 없음", this);
+            }
+            if (keyboard.f7Key.wasPressedThisFrame)
+            {
+                if (phone == null) Debug.Log("[Dev] 전화 없음 (Player 프리팹에 PhoneHolder)", this);
+                else Debug.Log(phone.Ring(TestCall) ? "[Dev] 시험 전화" : "[Dev] 시험 전화 못 함 (통화 중·막힘)", this);
             }
             if (keyboard.pageUpKey.wasPressedThisFrame) Jump(-1);
             if (keyboard.pageDownKey.wasPressedThisFrame) Jump(1);

@@ -4,6 +4,7 @@ using NightPatrol.Audio;
 using NightPatrol.Interaction;
 using NightPatrol.Journal;
 using NightPatrol.Menu;
+using NightPatrol.Phone;
 using NightPatrol.Player;
 using NightPatrol.Run;
 using NUnit.Framework;
@@ -38,6 +39,7 @@ namespace NightPatrol.Tests
             (typeof(PauseMenu), "bodyText"), (typeof(PauseMenu), "keyBindings"),
             (typeof(FloorTransition), "fader"), (typeof(FloorTransition), "floorCaption"),
             (typeof(InteractionPromptView), "crosshair"), (typeof(InteractionPromptView), "promptText"), (typeof(InteractionPromptView), "holdRing"),
+            (typeof(PhoneHolder), "phoneAction"), (typeof(PhoneHolder), "interactAction"),
         };
 
         [Test]
@@ -71,6 +73,7 @@ namespace NightPatrol.Tests
                 typeof(PlayerMovement), typeof(PlayerLook), typeof(PlayerInteractor), typeof(PlayerControl), typeof(JournalHolder),
                 typeof(JournalView), typeof(PauseMenu), typeof(FloorTransition), typeof(ScreenFader), typeof(InteractionPromptView),
                 typeof(PlayerSounds), typeof(CharacterController),
+                typeof(PhoneHolder), typeof(PhoneCalls), typeof(SubtitleView), typeof(PhoneScreen),
             };
             var problems = new List<string>();
             foreach (var type in types)
@@ -106,6 +109,56 @@ namespace NightPatrol.Tests
             else if (viewModel.cullingMask != bit) problems.Add("ViewModelCamera가 FirstPerson만 그리지 않음");
 
             Assert.IsEmpty(problems, "클립보드·카메라 레이어: " + string.Join(" / ", problems));
+        }
+
+        // 06_01: 전화도 클립보드처럼 FirstPerson 레이어 (임시 모델은 실행할 때 이 레이어로 만든다).
+        // 통화 표(PhoneCalls)·소리(이름 6개, 파일은 유연주님)는 같은 오브젝트에
+        [Test]
+        public void Phone_IsOnTheFirstPersonLayer_WithItsCallsAndSoundNames()
+        {
+            int layer = LayerMask.NameToLayer("FirstPerson");
+            var phone = prefab.GetComponentInChildren<PhoneHolder>(true);
+            Assert.IsNotNull(phone, "PhoneHolder 없음 (세팅 .ai/setup/06_01-phone.md)");
+            var problems = new List<string>();
+            foreach (var t in phone.GetComponentsInChildren<Transform>(true))
+                if (t.gameObject.layer != layer) problems.Add($"{t.name} 레이어 {LayerMask.LayerToName(t.gameObject.layer)}");
+            if (phone.transform.parent == null || phone.transform.parent.name != "PlayerCamera") problems.Add("Phone이 PlayerCamera 아래가 아님");
+            if (phone.GetComponent<PhoneCalls>() == null) problems.Add("PhoneCalls가 같은 오브젝트에 없음");
+            var sounds = phone.GetComponent<SoundEmitter>();
+            if (sounds == null) problems.Add("SoundEmitter가 같은 오브젝트에 없음");
+            else
+                foreach (var name in new[] { PhoneHolder.VibrateSound, PhoneHolder.BellSound, PhoneHolder.RingbackSound,
+                             PhoneHolder.AnswerSound, PhoneHolder.HangUpSound, PhoneHolder.StaticSound })
+                    if (!sounds.Has(name)) problems.Add($"소리 묶음 '{name}' 없음");
+            Assert.IsEmpty(problems, "전화 배치: " + string.Join(" / ", problems));
+        }
+
+        // 06_03: 홈 화면(PhoneScreen)이 전화 옆에, 독 앱(전화·메시지·인터넷)은 Apps 아래 — 인스펙터에서 앱을 더하고 뺄 수 있게
+        [Test]
+        public void Phone_HasItsHomeScreen_AndTheDockApps()
+        {
+            var phone = prefab.GetComponentInChildren<PhoneHolder>(true);
+            Assert.IsNotNull(phone, "PhoneHolder 없음");
+            var problems = new List<string>();
+            if (phone.GetComponent<PhoneScreen>() == null) problems.Add("PhoneScreen이 같은 오브젝트에 없음 (세팅 .ai/setup/06_03-phone-home.md)");
+            var apps = phone.transform.Find("Apps");
+            if (apps == null) problems.Add("Phone/Apps 없음");
+            else
+            {
+                if (apps.GetComponent<CallApp>() == null) problems.Add("CallApp 없음");
+                if (apps.GetComponent<MessagesApp>() == null) problems.Add("MessagesApp 없음");
+                if (apps.GetComponent<BrowserApp>() == null) problems.Add("BrowserApp 없음");
+            }
+            Assert.IsEmpty(problems, "전화 화면: " + string.Join(" / ", problems));
+        }
+
+        // 06_03: 프리팹에서 들기 자세를 바꿔도 전화 전체가 화면 안·가운데 왼쪽, 앞면이 눈을 향해야 한다
+        [Test]
+        public void Phone_HeldPoseInThePrefab_KeepsItOnScreen()
+        {
+            var phone = prefab.GetComponentInChildren<PhoneHolder>(true);
+            Assert.IsNotNull(phone, "PhoneHolder 없음");
+            PhoneHomeTests.AssertOnScreen((Vector3)PhoneHomeTests.Field(phone, "heldPosition"), (Vector3)PhoneHomeTests.Field(phone, "heldEuler"));
         }
     }
 }

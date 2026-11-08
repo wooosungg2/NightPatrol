@@ -71,6 +71,7 @@ Transform:
   m_Children:
   - {fileID: 8635187186926633900}
   - {fileID: 2653175690377623366}
+  - {fileID: 6446850996086292874}
   m_Father: {fileID: 2418165205720185247}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!20 &3840670182781271830
@@ -391,6 +392,7 @@ MonoBehaviour:
   bodyText: {fileID: 1175393216888236884}
   pointerCamera: {fileID: 7903758895214047317}
   keyBindings: {fileID: 11400000, guid: 2b7063aa0eae3264e96fc0700192b96f, type: 2}
+  openOnFocusLoss: 1
 --- !u!1 &2250382643417042813
 GameObject:
   m_ObjectHideFlags: 0
@@ -1353,6 +1355,80 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &5150852765128670805
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5448226228564237982}
+  - component: {fileID: 748472758127996045}
+  - component: {fileID: 2030619317700011511}
+  - component: {fileID: 5989702605482249954}
+  m_Layer: 6
+  m_Name: Apps
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5448226228564237982
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5150852765128670805}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6446850996086292874}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &748472758127996045
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5150852765128670805}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f522864514b1bd14a8f3df59052461da, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NightPatrol::NightPatrol.Phone.CallApp
+  icon: {fileID: 0}
+--- !u!114 &2030619317700011511
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5150852765128670805}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31117c925f464d041b0b12ab45554451, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NightPatrol::NightPatrol.Phone.MessagesApp
+  icon: {fileID: 0}
+  schedule: []
+--- !u!114 &5989702605482249954
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5150852765128670805}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 183abf0bd738bc04d92a1c0e066929ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NightPatrol::NightPatrol.Phone.BrowserApp
+  icon: {fileID: 0}
 --- !u!1 &5613635196623789360
 GameObject:
   m_ObjectHideFlags: 0
@@ -1366,6 +1442,7 @@ GameObject:
   - component: {fileID: 8182736937167815947}
   - component: {fileID: 7284690424041931708}
   - component: {fileID: 7814258073009374606}
+  - component: {fileID: 168504351861157368}
   m_Layer: 5
   m_Name: HUD
   m_TagString: Untagged
@@ -1488,6 +1565,22 @@ MonoBehaviour:
   wakeSeconds: 1.6
   wakeStartPitch: 35
   fadeInOnStart: 1
+  endCaption: "\uADFC\uBB34 \uC885\uB8CC"
+  endSeconds: 3
+--- !u!114 &168504351861157368
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5613635196623789360}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b20e4e846ef8dba4cb634c2da8721467, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NightPatrol::NightPatrol.Phone.SubtitleView
+  text: {fileID: 0}
+  fontSize: 30
 --- !u!1 &5973051484366748110
 GameObject:
   m_ObjectHideFlags: 0
@@ -1998,6 +2091,146 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!1 &7841072705676930088
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6446850996086292874}
+  - component: {fileID: 1233151339034486204}
+  - component: {fileID: 1901657587741560279}
+  - component: {fileID: 5792616090195755345}
+  - component: {fileID: 6532279076165638973}
+  m_Layer: 6
+  m_Name: Phone
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6446850996086292874
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7841072705676930088}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.49572244, y: 0.113039, z: -0.0652631, w: 0.8586165}
+  m_LocalPosition: {x: -0.12, y: -0.42, z: 0.22}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 5448226228564237982}
+  m_Father: {fileID: 2676594603800104805}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1233151339034486204
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7841072705676930088}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3a801e4476960134290117c2ee9da8db, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NightPatrol::NightPatrol.Audio.SoundEmitter
+  cues:
+  - name: "\uC9C4\uB3D9"
+    clips: []
+    volume: 1
+    pitchJitter: 0
+    playOn: 0
+  - name: "\uBCA8"
+    clips: []
+    volume: 1
+    pitchJitter: 0
+    playOn: 0
+  - name: "\uC5F0\uACB0\uC74C"
+    clips: []
+    volume: 1
+    pitchJitter: 0
+    playOn: 0
+  - name: "\uBC1B\uAE30"
+    clips: []
+    volume: 1
+    pitchJitter: 0
+    playOn: 0
+  - name: "\uB04A\uAE30"
+    clips: []
+    volume: 1
+    pitchJitter: 0
+    playOn: 0
+  - name: "\uC7A1\uC74C"
+    clips: []
+    volume: 1
+    pitchJitter: 0
+    playOn: 0
+  fullVolumeDistance: 1
+  silentDistance: 20
+--- !u!114 &1901657587741560279
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7841072705676930088}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b48a6c564e77a4c419ecd46bd5475205, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NightPatrol::NightPatrol.Phone.PhoneHolder
+  phoneAction: {fileID: -2470428455532515359, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  interactAction: {fileID: -5548793354506133487, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  interactor: {fileID: 0}
+  journal: {fileID: 0}
+  subtitles: {fileID: 0}
+  sounds: {fileID: 0}
+  missSeconds: 10
+  ringInterval: 2
+  ringbackInterval: 3
+  stowedPosition: {x: -0.12, y: -0.42, z: 0.22}
+  stowedEuler: {x: 60, y: 15, z: 0}
+  heldPosition: {x: -0.095, y: -0.06, z: 0.25}
+  heldEuler: {x: 12, y: -14, z: 0}
+  transitionSeconds: 0.2
+--- !u!114 &5792616090195755345
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7841072705676930088}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9386d83da1909c45b828e273c1d96ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NightPatrol::NightPatrol.Phone.PhoneCalls
+  table: {fileID: 0}
+  phone: {fileID: 0}
+  retrySeconds: 5
+  maxRetries: 3
+--- !u!114 &6532279076165638973
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7841072705676930088}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21e09c9f8d3cfc4468367452fa3afdff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NightPatrol::NightPatrol.Phone.PhoneScreen
+  phone: {fileID: 0}
+  model: {fileID: 0}
+  display: {fileID: 0}
+  createDefaultApps: 1
+  brightness: 0.9
 --- !u!1 &8164797716064805361
 GameObject:
   m_ObjectHideFlags: 0

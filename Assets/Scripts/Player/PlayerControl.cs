@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using NightPatrol.Interaction;
 using NightPatrol.Journal;
+using NightPatrol.Phone;
 using UnityEngine;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
 using NightPatrol.Debugging;
@@ -17,6 +18,7 @@ namespace NightPatrol.Player
         private PlayerLook look;
         private PlayerInteractor interactor;
         private JournalHolder journal;
+        private PhoneHolder phone;
         private readonly HashSet<object> owners = new HashSet<object>();
 
         public static PlayerControl Current { get; private set; }
@@ -35,6 +37,7 @@ namespace NightPatrol.Player
             look = GetComponent<PlayerLook>();
             interactor = GetComponent<PlayerInteractor>();
             journal = GetComponentInChildren<JournalHolder>(true);
+            phone = GetComponentInChildren<PhoneHolder>(true);
         }
 
         private void OnEnable()
@@ -55,7 +58,10 @@ namespace NightPatrol.Player
 #endif
         }
 
-        /// <summary>같은 owner로 이동·시점·E·일지를 잠그거나 푼다. 메뉴는 includeJournal을 false로 사용한다.</summary>
+        /// <summary>
+        /// 같은 owner로 이동·시점·E·일지·전화를 잠그거나 푼다 (전화는 넣고 통화를 끊음).
+        /// 메뉴는 includeJournal을 false로 사용한다 (일지·전화는 그대로 — 메뉴가 클립보드를 쓰고, 전화는 메뉴 동안 스스로 숨고 멈춤)
+        /// </summary>
         public void Lock(object owner, bool locked, bool includeJournal = true)
         {
             if (owner == null) return;
@@ -65,6 +71,7 @@ namespace NightPatrol.Player
             if (look != null) look.SetBlocked(owner, locked);
             if (interactor != null) interactor.SetBlocked(owner, locked);
             if (includeJournal && journal != null) journal.SetBlocked(owner, locked);
+            if (includeJournal && phone != null) phone.SetBlocked(owner, locked);
         }
 
         /// <summary>전달된 주체만 읽어 이름 목록을 만든다. 씬 검색이나 잠금 상태 변경 없이 이름순으로 정렬한다.</summary>
@@ -89,7 +96,8 @@ namespace NightPatrol.Player
             "\n이동: " + BlockerText(movement != null ? movement.Blockers : null) +
             "\n시점: " + BlockerText(look != null ? look.Blockers : null) +
             "\nE: " + BlockerText(interactor != null ? interactor.Blockers : null) +
-            "\n일지: " + BlockerText(journal != null ? journal.Blockers : null);
+            "\n일지: " + BlockerText(journal != null ? journal.Blockers : null) +
+            "\n전화: " + BlockerText(phone != null ? phone.Blockers : null);
 
         private static string BlockerText(IEnumerable<object> blockers)
         {
