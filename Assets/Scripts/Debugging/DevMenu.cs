@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using NightPatrol.Run;
 using UnityEngine;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -21,8 +23,28 @@ namespace NightPatrol.Debugging
 
         /// <summary>F1 패널의 개발자 키 안내 (PatrolRun이 없으면 F5만)</summary>
         public static string HelpText(bool hasRun) => hasRun
-            ? "F1 표시 전환 · F2 하행 · F3 실패 · F4 층 재시작\nF5 기록 폴더 · PgUp/PgDn 층 이동"
+            ? "F1 표시 전환 · F2 하행 · F3 실패 · F4 층 재시작\nF5 기록 폴더 · F6 예약 바로 실행 · PgUp/PgDn 층 이동"
             : "F1 표시 전환 · F5 기록 폴더  (PatrolRun 없음)";
+
+        private const int MaxScheduleLines = 5;
+
+        /// <summary>F1 "예약" 구역: 구간·이번 구간에서 흐른 시간, 남은 예약을 남은 시간 순으로 5줄까지</summary>
+        public static string ScheduleText(FloorSchedule schedule)
+        {
+            if (schedule == null) return "PatrolRun 없음";
+            var text = new StringBuilder($"구간 {schedule.Segment} · {PlaytestLog.Clock(schedule.Elapsed)}");
+            var pending = schedule.Snapshot();
+            if (pending.Count == 0) return text.Append("\n없음").ToString();
+            int shown = Mathf.Min(MaxScheduleLines, pending.Count);
+            for (int i = 0; i < shown; i++)
+            {
+                string label = string.IsNullOrEmpty(pending[i].Label) ? "이름 없음" : pending[i].Label;
+                text.Append('\n').Append(label).Append(' ')
+                    .Append(pending[i].Remaining.ToString("F1", CultureInfo.InvariantCulture)).Append('초');
+            }
+            if (pending.Count > shown) text.Append($"\n외 {pending.Count - shown}개");
+            return text.ToString();
+        }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private PatrolRun run;
@@ -45,6 +67,7 @@ namespace NightPatrol.Debugging
         private void OnEnable()
         {
             if (showHelp) DevInfo.Register(this, "개발자 키", () => HelpText(run != null), 200);
+            if (run != null) DevInfo.Register(this, "예약", () => ScheduleText(run != null ? run.Schedule : null), 210);
         }
 
         private void OnDisable() => DevInfo.Unregister(this);
@@ -77,6 +100,12 @@ namespace NightPatrol.Debugging
             {
                 Debug.Log("[Dev] 현재 층 다시 시작", this);
                 AsDev("F4 재시작", run.RestartFloor);
+            }
+            if (keyboard.f6Key.wasPressedThisFrame)
+            {
+                // 실행한 예약은 지워져 두 번 돌지 않는다. 이 로그가 게임 로그에 개발 개입으로 남는다
+                string label = run.Schedule.RunNext();
+                Debug.Log(label != null ? $"[Dev] 예약 바로 실행: {label}" : "[Dev] 남은 예약 없음", this);
             }
             if (keyboard.pageUpKey.wasPressedThisFrame) Jump(-1);
             if (keyboard.pageDownKey.wasPressedThisFrame) Jump(1);

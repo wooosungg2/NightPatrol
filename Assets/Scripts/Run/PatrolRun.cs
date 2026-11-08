@@ -22,6 +22,7 @@ namespace NightPatrol.Run
         [Tooltip("비어 있으면 씬에서 찾는다")]
         [SerializeField] private FloorTasks tasks;
 
+        private static readonly Func<bool> CanAct = () => PlayerControl.CanAct;
         private readonly List<int> failedFloors = new List<int>();
         private int step;
         private Pose? spawn;
@@ -63,6 +64,16 @@ namespace NightPatrol.Run
         /// </summary>
         public bool IsStartingFloor { get; private set; }
         /// <summary>
+        /// 이번 층에서 N초 뒤 한 번 실행 (예: PatrolRun.Current.Schedule.After(15f, Ring, this, "C01 전화")).
+        /// 층이 바뀌면(실패·재시작·층 이동·1층 도착 포함) 남은 예약은 버려진다. 시간은 조작할 수 있는 동안만 간다.
+        /// FloorStarted·Cleared 안에서 예약하면 새 층에 남는다
+        /// </summary>
+        public FloorSchedule Schedule { get; } = new FloorSchedule();
+        /// <summary>근무 시간(초): 첫 층부터 흐른 시간. 일시정지 중에는 멈추고, 1층에 도착하면 더 가지 않는다</summary>
+        public float PlaySeconds { get; private set; }
+        /// <summary>자정부터 흐른 시각(분) — 근무 시간 + 실패마다 30분 ("졸았다", 재미 보강 기획 07 5.2). 전화 상태 표시줄, 일지 제목(나중)</summary>
+        public int ClockMinutes => ClockMinutesOf(PlaySeconds, Attempt);
+        /// <summary>
         /// 사물 초기화 직후, FloorStarted 전. 점검 사물이 아니면서 층마다 처음 상태로 돌아가야 하는 것(조명 구역 등)은 여기서 되돌린다.
         /// 이상현상은 여기서 켜지 말 것 (FloorStarted에서).
         /// </summary>
@@ -98,6 +109,25 @@ namespace NightPatrol.Run
         private void OnDisable()
         {
             if (Current == this) Current = null;
+            Schedule.Reset();
+        }
+
+        // ESC 메뉴(시간 정지)·층 이동 연출(조작 잠금)·창 밖이면 예약 시간이 안 간다. 근무 시간은 연출 중에도 간다
+        private void Update()
+        {
+            if (!IsCleared) PlaySeconds += Time.deltaTime;
+            Schedule.Tick(Time.deltaTime, CanAct);
+        }
+
+        /// <summary>근무 시간(초)과 회차로 시각(분): 흐른 분 + 실패한 회차마다 30분</summary>
+        public static int ClockMinutesOf(float playSeconds, int attempt) =>
+            Mathf.FloorToInt(Mathf.Max(0f, playSeconds) / 60f) + 30 * Mathf.Max(0, attempt - 1);
+
+        /// <summary>"00:31" (24시간, 하루를 넘기면 다시 00시)</summary>
+        public static string ClockText(int minutes)
+        {
+            minutes = (minutes % 1440 + 1440) % 1440;
+            return $"{minutes / 60:00}:{minutes % 60:00}";
         }
 
         private void Start()
@@ -188,6 +218,7 @@ namespace NightPatrol.Run
 
         private void StartFloorSteps()
         {
+            Schedule.Reset();   // 이벤트 전에 비워야 구독자가 FloorStarted에서 한 예약이 남는다 (구독 순서와 상관없이)
             PatrolInspection.ResetErrorLog();
             IsCleared = false;
             ResetAllObjects();
@@ -205,6 +236,7 @@ namespace NightPatrol.Run
 
         private void Clear()
         {
+            Schedule.Reset();
             IsCleared = true;
             Debug.Log($"[Run] {CurrentFloor}층 도착 — 클리어", this);
             SafeEvent.Raise(Cleared, this);
