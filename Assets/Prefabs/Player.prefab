@@ -1443,6 +1443,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NightPatrol::NightPatrol.Phone.CameraApp
   icon: {fileID: 0}
+  defaultShots: 12
 --- !u!1 &5613635196623789360
 GameObject:
   m_ObjectHideFlags: 0
