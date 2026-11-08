@@ -43,8 +43,8 @@ namespace NightPatrol.Phone
         [SerializeField] private ShotLimit limit = ShotLimit.PerFloor;
         [Tooltip("PerFloor: 층별 장수. 표에 없는 층은 Default Shots")]
         [SerializeField] private FloorShots[] perFloor = new FloorShots[0];
-        [Tooltip("PerFloor에서 표에 없는 층, Fixed에서는 모든 층의 장수 (임시값, 팀이 정함)")]
-        [SerializeField, Min(0)] private int defaultShots = 6;
+        [Tooltip("PerFloor에서 표에 없는 층, Fixed에서는 모든 층의 장수. 임시값 12 = 한 층 이상현상 최대 10개 + 여유 2 (못 깨는 층이 없게, 플레이테스트 뒤 팀이 정함)")]
+        [SerializeField, Min(0)] private int defaultShots = 12;
         [Tooltip("CountPlusSlack: 그 층 이상현상 수에 더할 여유")]
         [SerializeField, Min(0)] private int slack = 2;
         [Tooltip("셔터 번쩍임 시간(초)")]
