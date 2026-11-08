@@ -9,10 +9,10 @@ using UnityEngine.UI;
 namespace NightPatrol.Phone
 {
     /// <summary>
-    /// 카메라 앱 (06_04, 기획서 v3 04): 이상현상은 고치지 않고 찍는다. 뷰파인더 가운데 조준 박스에 대상을 넣고 E로 찍는다.
+    /// 카메라 앱: 이상현상은 고치지 않고 찍는다. 가운데 조준 박스에 대상을 넣고 좌클릭 또는 E로 찍는다.
     /// 무엇이 찍혔는지는 보여 주지 않는다 — 엘리베이터 판정 때만 안다 (찍는 순간 알려 주면 탐지기가 된다).
     /// 한 층에 찍을 수 있는 장수가 정해져 있고, 이상현상이 아닌 것을 찍어도 장수만 준다.
-    /// 독 첫 칸이라 휴대폰을 꺼내면 골라져 있다 (Q → E 열기 → E 찍기). 휠로 이번 층 사진첩(넘겨 보기만, 지우기 없음)
+    /// 전화·메시지 다음 독 세 번째 칸. 휠로 이번 층 사진첩(넘겨 보기만, 지우기 없음).
     /// </summary>
     public sealed class CameraApp : PhoneApp
     {
@@ -35,7 +35,7 @@ namespace NightPatrol.Phone
             public int Minutes;
         }
 
-        public const int Width = 240, Height = 180;
+        public const int Width = 360, Height = 240;
 
         [Tooltip("촬영 판정 (조준 박스·인정 거리·가림)")]
         [SerializeField] private PhotoRules rules = new PhotoRules();
@@ -53,8 +53,6 @@ namespace NightPatrol.Phone
         [SerializeField, Min(0f)] private float retakeSeconds = 0.3f;
         [Tooltip("눈(찍는 위치·방향). 비어 있으면 휴대폰이 달린 카메라(PlayerCamera)")]
         [SerializeField] private Camera eye;
-        [Tooltip("독 첫 칸 (휴대폰을 꺼내면 카메라가 골라져 있음). 끄면 독 마지막 칸")]
-        [SerializeField] private bool firstInDock = true;
 
         private readonly List<Picture> pictures = new List<Picture>();
         private PatrolRun run;
@@ -70,7 +68,7 @@ namespace NightPatrol.Phone
 
         public override string Title => "카메라";
         public override bool InDock => true;
-        public override int Order => firstInDock ? -1 : 3;   // 독 첫 칸 = 꺼낼 때 골라져 있음 (전화 0, 메시지 1, 인터넷 2)
+        public override int Order => 2;
         public override Color IconTop => new Color(0.7f, 0.72f, 0.76f);
         public override Color IconBottom => new Color(0.24f, 0.25f, 0.29f);
         public override bool HasSymbol => true;
@@ -167,25 +165,32 @@ namespace NightPatrol.Phone
 
         protected override void Build(RectTransform root)
         {
-            title = PhoneUI.NavBar(root, Screen.Art, Title);
-            var content = PhoneUI.Content(root, "Camera");
-            content.GetComponent<Image>().color = new Color(0.08f, 0.08f, 0.09f);   // Content가 붙인 종이 색 대신 어두운 바탕
-            float height = PhoneUI.AppHeight - PhoneUI.NavHeight - PhoneUI.FooterHeight;
-            viewfinder = PhoneUI.Box(content, "Viewfinder", 0f, 0f, PhoneUI.AppWidth, height);
+            var content = PhoneUI.Rect(root, "LandscapeCamera");
+            content.anchorMin = content.anchorMax = new Vector2(0.5f, 0.5f);
+            content.pivot = new Vector2(0.5f, 0.5f);
+            content.sizeDelta = new Vector2(Width, Height);
+            content.anchoredPosition = new Vector2(0f, PhoneScreen.StatusHeight / 2f);
+            content.localRotation = Quaternion.Euler(0f, 0f, -90f);
+            PhoneUI.Image(content, null, new Color(0.08f, 0.08f, 0.09f));
+            title = PhoneUI.Label(content, "Title", 8f, 2f, 120f, 22f, Title, 13f, Color.white, TextAlignmentOptions.Left);
+            viewfinder = PhoneUI.Box(content, "Viewfinder", 0f, 0f, Width, Height);
             live = PictureBox(viewfinder, "Live");
             AimBox(viewfinder);
-            count = PhoneUI.Label(viewfinder, "Count", 10f, 200f, 220f, 20f, "", 14f, Color.white, TextAlignmentOptions.Center);
-            album = PhoneUI.Box(content, "Album", 0f, 0f, PhoneUI.AppWidth, height);
+            count = PhoneUI.Label(content, "Count", 198f, 2f, 154f, 22f, "", 13f, Color.white, TextAlignmentOptions.Right);
+            album = PhoneUI.Box(content, "Album", 0f, 0f, Width, Height);
             shown = PictureBox(album, "Photo");
-            caption = PhoneUI.Label(album, "Caption", 10f, 196f, 220f, 40f, "", 13f, Color.white, TextAlignmentOptions.Top, wrap: true);
-            var flashRect = PhoneUI.Box(content, "Flash", 0f, 0f, PhoneUI.AppWidth, PhoneUI.AppHeight);
+            caption = PhoneUI.Label(album, "Caption", 8f, 184f, 344f, 24f, "", 12f, Color.white, TextAlignmentOptions.BottomRight);
+            PhoneUI.Image(PhoneUI.Box(content, "TopShade", 0f, 0f, Width, 26f), null, new Color(0f, 0f, 0f, 0.55f));
+            PhoneUI.Image(PhoneUI.Box(content, "BottomShade", 0f, 212f, Width, 28f), null, new Color(0f, 0f, 0f, 0.55f));
+            title.transform.SetAsLastSibling();
+            count.transform.SetAsLastSibling();
+            var flashRect = PhoneUI.Fill(content, "Flash");
             flash = PhoneUI.Image(flashRect, null, new Color(1f, 1f, 1f, 0f));
-            footer = PhoneUI.Footer(root, Screen.Art, "");
+            footer = PhoneUI.Label(content, "Footer", 4f, 214f, 352f, 24f, "", 12f, Color.white, TextAlignmentOptions.Center);
         }
-
         private static RawImage PictureBox(RectTransform parent, string name)
         {
-            var rect = PhoneUI.Box(parent, name, 0f, 10f, Width, Height);
+            var rect = PhoneUI.Box(parent, name, 0f, 0f, Width, Height);
             var image = rect.gameObject.AddComponent<RawImage>();
             image.raycastTarget = false;
             image.color = Color.white;
@@ -195,7 +200,7 @@ namespace NightPatrol.Phone
         // 조준 박스: 판정과 같은 비율(rules.aimBox)로 뷰파인더 가운데에 얇은 테두리 네 줄
         private void AimBox(RectTransform parent)
         {
-            float w = Width * rules.aimBox, h = Height * rules.aimBox, x = (Width - w) / 2f, y = 10f + (Height - h) / 2f, t = 1.5f;
+            float w = Width * rules.aimBox, h = Height * rules.aimBox, x = (Width - w) / 2f, y = (Height - h) / 2f, t = 1.5f;
             var color = new Color(1f, 1f, 1f, 0.85f);
             PhoneUI.Image(PhoneUI.Box(parent, "AimTop", x, y, w, t), null, color);
             PhoneUI.Image(PhoneUI.Box(parent, "AimBottom", x, y + h - t, w, t), null, color);
@@ -350,7 +355,7 @@ namespace NightPatrol.Phone
         private void Redraw()
         {
             if (footer == null) return;   // 아직 한 번도 안 열어 봄
-            string interact = Phone != null ? Phone.InteractKey : "E", back = Phone != null ? Phone.PhoneKey : "Q";
+            string interact = "좌클릭", back = "우클릭";
             viewfinder.gameObject.SetActive(!browsing);
             album.gameObject.SetActive(browsing);
             if (!browsing)

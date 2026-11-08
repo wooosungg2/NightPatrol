@@ -55,7 +55,7 @@ namespace NightPatrol.Phone
         private readonly Dictionary<PhoneApp, RectTransform> appRoots = new Dictionary<PhoneApp, RectTransform>();
         private readonly Image[] bars = new Image[4];
         private PhoneArt art;
-        private RectTransform home, iconLayer, appLayer, call;
+        private RectTransform home, iconLayer, appLayer, call, statusBar;
         private TextMeshProUGUI hint, clock, service, callName, callStatus, callAction, bigClock, floorLabel;
         private Image callButton, callPicture;
         private PhoneHolder subscribed;
@@ -153,6 +153,7 @@ namespace NightPatrol.Phone
             ShowClock();
             ShowBadges();
             ShowCall();
+            if (statusBar != null) statusBar.gameObject.SetActive(!(OpenApp is CameraApp) || IsCallShown);
         }
 
         // ── 앱 설치 ──
@@ -369,6 +370,7 @@ namespace NightPatrol.Phone
         private void BuildStatusBar()
         {
             var bar = PhoneUI.Box(display, "StatusBar", 0f, 0f, Width, StatusHeight);
+            statusBar = bar;
             PhoneUI.Image(bar, art.Gradient(new Color(0.17f, 0.18f, 0.21f, 0.94f), new Color(0f, 0f, 0f, 0.94f)), Color.white);
             for (int i = 0; i < bars.Length; i++)
             {
@@ -461,7 +463,7 @@ namespace NightPatrol.Phone
                 icon.Label.fontStyle = picked ? FontStyles.Bold : FontStyles.Normal;
                 icon.Label.color = picked ? Color.white : LabelColor;
             }
-            if (hint != null) hint.text = $"휠 고르기 · {InteractKey} 열기 · {PhoneKey} 넣기";
+            if (hint != null) hint.text = "휠 고르기 · 좌클릭 열기 · 우클릭 넣기";
         }
 
         private string PhoneKey => phone != null ? phone.PhoneKey : "Q";

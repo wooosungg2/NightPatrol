@@ -73,6 +73,10 @@ namespace NightPatrol.Phone
         private InputAction phoneInput;
         private InputAction interactInput;
         private PhoneScreen screen;
+        [SerializeField] private Vector3 cameraPosition = new Vector3(0f, 0f, 0.14f);
+        [SerializeField] private Vector3 cameraEuler = new Vector3(0f, 0f, 90f);
+        [SerializeField, Min(0.01f)] private float cameraTransitionSeconds = 0.25f;
+        private float cameraProgress;
         private float progress;              // 자세 (0 = 넣음, 1 = 듦)
         private bool inHand;                 // 손에 들고 있는지 (울릴 때는 손일 수도 주머니일 수도)
         private bool menuWasOpen;            // 지난 프레임에 메뉴가 열려 있었는지
@@ -171,9 +175,34 @@ namespace NightPatrol.Phone
         internal static bool AcceptsInput(bool blocked, bool timeRunning, bool menuOpen, bool menuWasOpen) =>
             !blocked && timeRunning && !menuOpen && !menuWasOpen;
 
-        private void HandleInput() =>
+        private void HandleInput()
+        {
+            var mouse = Mouse.current;
+            if (HandlePointerInput(mouse != null && mouse.leftButton.wasPressedThisFrame,
+                                   mouse != null && mouse.rightButton.wasPressedThisFrame)) return;
             Route(Pressed(phoneInput, Key.Q), Pressed(interactInput, Key.E),
-                Mouse.current != null ? Mouse.current.scroll.ReadValue().y : 0f, Time.unscaledTime);
+                mouse != null ? mouse.scroll.ReadValue().y : 0f, Time.unscaledTime);
+        }
+
+        /// <summary>좌클릭은 홈에서 앱 열기 또는 카메라 촬영, 우클릭은 앱 뒤로/폰 넣기. 폰을 넣은 동안은 무시.</summary>
+        public bool HandlePointerInput(bool leftPressed, bool rightPressed)
+        {
+            if (!inHand || !AcceptsInput(IsBlocked, Time.timeScale > 0f,
+                    journal != null && journal.IsMenuOpen, menuWasOpen)) return false;
+            if (rightPressed)
+            {
+                if (State == PhoneState.Held && screen != null && screen.Back()) return true;
+                Stow();
+                return true;
+            }
+            if (leftPressed && State == PhoneState.Held && screen != null &&
+                (screen.OpenApp == null || screen.OpenApp is CameraApp))
+            {
+                if (takenOutFrame != Time.frameCount) screen.Confirm();
+                return true;
+            }
+            return false;
+        }
 
         /// <summary>
         /// 이번 프레임 입력을 지금 상태에 맞게 넘긴다 (키 장치 없이 테스트할 수 있게 나눔). 동시에 들어오면 전화 키 → 조작 키 → 휠 중 하나만.
@@ -505,9 +534,16 @@ namespace NightPatrol.Phone
 
         private void ApplyPose()
         {
+            bool aiming = inHand && State == PhoneState.Held && screen != null &&
+                          screen.OpenApp is CameraApp && !screen.IsCallShown &&
+                          (journal == null || !journal.IsMenuOpen);
+            cameraProgress = JournalHolder.Step(cameraProgress, aiming, Time.unscaledDeltaTime, cameraTransitionSeconds);
+            float cameraEase = Mathf.SmoothStep(0f, 1f, cameraProgress);
             float eased = Mathf.SmoothStep(0f, 1f, progress);
-            transform.localPosition = Vector3.Lerp(stowedPosition, heldPosition, eased);
-            transform.localRotation = Quaternion.Slerp(Quaternion.Euler(stowedEuler), Quaternion.Euler(heldEuler), eased);
+            var position = Vector3.Lerp(heldPosition, cameraPosition, cameraEase);
+            var rotation = Quaternion.Slerp(Quaternion.Euler(heldEuler), Quaternion.Euler(cameraEuler), cameraEase);
+            transform.localPosition = Vector3.Lerp(stowedPosition, position, eased);
+            transform.localRotation = Quaternion.Slerp(Quaternion.Euler(stowedEuler), rotation, eased);
         }
 
         // 잡음 자막의 seed (실행마다 같은 결과 — string.GetHashCode는 환경마다 다를 수 있음)
