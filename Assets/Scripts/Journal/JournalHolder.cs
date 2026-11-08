@@ -34,6 +34,7 @@ namespace NightPatrol.Journal
         private PatrolRun run;
         private PatrolRun subscribedRun;
         private bool raisePending;
+        private int menuClosedFrame = -1;   // 메뉴가 닫힌 프레임 (그 프레임의 누름은 메뉴가 쓴 것)
 
         /// <summary>일지를 눈앞에 들고 있는지</summary>
         public bool IsRaised { get; private set; }
@@ -80,7 +81,7 @@ namespace NightPatrol.Journal
         }
         private void Update()
         {
-            if (!IsMenuOpen) HandleInput();
+            if (AcceptsToggle(IsMenuOpen, menuClosedFrame, Time.frameCount)) HandleInput();
             if (raisePending && !IsBlocked && !IsMenuOpen)
             {
                 raisePending = false;
@@ -97,6 +98,11 @@ namespace NightPatrol.Journal
                 : Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame;
             if (pressed) Toggle();
         }
+        /// <summary>
+        /// 이번 프레임에 일지 키를 받을지. 메뉴가 열려 있거나 이번 프레임에 닫혔으면 받지 않는다 —
+        /// 일지 키를 메뉴 확인 키(E·Enter·Space)로 바꾼 뒤 그 키로 "계속하기"를 고른 누름이 일지까지 들지 않게 (Update 순서와 상관없이)
+        /// </summary>
+        internal static bool AcceptsToggle(bool menuOpen, int menuClosedFrame, int frame) => !menuOpen && frame != menuClosedFrame;
         public void Toggle() => SetRaised(!IsRaised);
         /// <summary>일지를 들거나 내린다. 막혀 있으면(IsBlocked) 들기만 무시</summary>
         public void SetRaised(bool raised)
@@ -126,7 +132,11 @@ namespace NightPatrol.Journal
         /// 일시정지 메뉴용: 일지 상태(IsRaised)와 상관없이 클립보드를 들어 올리거나 원래대로 둔다.
         /// 막혀 있어도 들리고, RaisedChanged는 내지 않는다 (일지를 본 것이 아님)
         /// </summary>
-        public void SetMenuOpen(bool open) => IsMenuOpen = open;
+        public void SetMenuOpen(bool open)
+        {
+            if (IsMenuOpen && !open) menuClosedFrame = Time.frameCount;
+            IsMenuOpen = open;
+        }
         private void ApplyPose()
         {
             float eased = Mathf.SmoothStep(0f, 1f, progress);
