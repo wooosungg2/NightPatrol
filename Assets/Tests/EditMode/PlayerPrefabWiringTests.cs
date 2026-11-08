@@ -112,7 +112,7 @@ namespace NightPatrol.Tests
         }
 
         // 06_01: 전화도 클립보드처럼 FirstPerson 레이어 (임시 모델은 실행할 때 이 레이어로 만든다).
-        // 통화 표(PhoneCalls)·소리(이름 6개, 파일은 유연주님)는 같은 오브젝트에
+        // 통화 표(PhoneCalls)·소리(이름 7개 — 06_04 셔터 포함, 파일은 유연주님)는 같은 오브젝트에
         [Test]
         public void Phone_IsOnTheFirstPersonLayer_WithItsCallsAndSoundNames()
         {
@@ -128,12 +128,12 @@ namespace NightPatrol.Tests
             if (sounds == null) problems.Add("SoundEmitter가 같은 오브젝트에 없음");
             else
                 foreach (var name in new[] { PhoneHolder.VibrateSound, PhoneHolder.BellSound, PhoneHolder.RingbackSound,
-                             PhoneHolder.AnswerSound, PhoneHolder.HangUpSound, PhoneHolder.StaticSound })
+                             PhoneHolder.AnswerSound, PhoneHolder.HangUpSound, PhoneHolder.StaticSound, PhoneHolder.ShutterSound })
                     if (!sounds.Has(name)) problems.Add($"소리 묶음 '{name}' 없음");
             Assert.IsEmpty(problems, "전화 배치: " + string.Join(" / ", problems));
         }
 
-        // 06_03: 홈 화면(PhoneScreen)이 전화 옆에, 독 앱(전화·메시지·인터넷)은 Apps 아래 — 인스펙터에서 앱을 더하고 뺄 수 있게
+        // 06_03: 홈 화면(PhoneScreen)이 전화 옆에, 독 앱(06_04 카메라·전화·메시지·인터넷)은 Apps 아래 — 인스펙터에서 앱을 더하고 뺄 수 있게
         [Test]
         public void Phone_HasItsHomeScreen_AndTheDockApps()
         {
@@ -148,6 +148,7 @@ namespace NightPatrol.Tests
                 if (apps.GetComponent<CallApp>() == null) problems.Add("CallApp 없음");
                 if (apps.GetComponent<MessagesApp>() == null) problems.Add("MessagesApp 없음");
                 if (apps.GetComponent<BrowserApp>() == null) problems.Add("BrowserApp 없음");
+                if (apps.GetComponent<CameraApp>() == null) problems.Add("CameraApp 없음 (06_04)");
             }
             Assert.IsEmpty(problems, "전화 화면: " + string.Join(" / ", problems));
         }

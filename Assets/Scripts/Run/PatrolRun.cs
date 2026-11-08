@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using NightPatrol.Patrol;
+using NightPatrol.Photo;
 using NightPatrol.Player;
 using UnityEngine;
 
@@ -69,6 +70,12 @@ namespace NightPatrol.Run
         /// FloorStarted·Cleared 안에서 예약하면 새 층에 남는다
         /// </summary>
         public FloorSchedule Schedule { get; } = new FloorSchedule();
+        /// <summary>
+        /// 이번 층 사진 기록 (카메라 앱이 쓰고 엘리베이터 판정이 읽는다). 층이 시작될 때와 1층에 도착할 때 비운다
+        /// </summary>
+        public FloorPhotos Photos { get; } = new FloorPhotos();
+        /// <summary>마지막 엘리베이터 판정 (판정 없이 바뀐 층이면 그 전 층의 것 — Floor·Attempt로 확인)</summary>
+        public FloorJudgment LastJudgment { get; private set; }
         /// <summary>근무 시간(초): 첫 층부터 흐른 시간. 일시정지 중에는 멈추고, 1층에 도착하면 더 가지 않는다</summary>
         public float PlaySeconds { get; private set; }
         /// <summary>자정부터 흐른 시각(분) — 근무 시간 + 실패마다 30분 ("졸았다", 재미 보강 기획 07 5.2). 전화 상태 표시줄, 일지 제목(나중)</summary>
@@ -84,6 +91,8 @@ namespace NightPatrol.Run
         public event Action<int> Failed;
         /// <summary>마지막 층 도착. 이때는 FloorStarted가 오지 않는다</summary>
         public event Action Cleared;
+        /// <summary>엘리베이터 판정을 고정했을 때 (하행 연출 시작, 층이 바뀌기 전). 플레이 기록이 그 층 결과를 받아 둔다</summary>
+        public event Action<FloorJudgment> Judged;
 
         private void Awake()
         {
@@ -137,10 +146,42 @@ namespace NightPatrol.Run
             StartFloor();
         }
 
-        /// <summary>판정 후 하행 또는 실패 (엘리베이터가 부름)</summary>
+        /// <summary>판정 후 바로 하행 또는 실패 (연출 없이. 연출이 있으면 FloorTransition이 Judge → Apply로 나눠 부름)</summary>
         public void TryDescend()
         {
-            if (!IsCleared) Descend(PatrolInspection.IsAllClear());
+            if (!IsCleared) Apply(Judge());
+        }
+
+        /// <summary>
+        /// 엘리베이터 판정을 지금 상태로 계산해 고정한다 (층은 아직 안 바뀜): 남은 업무(이상현상이 걸린 사물은 빠짐) +
+        /// 안 찍은 이상현상(지금 켜진 것만). LastJudgment에 두고 Judged를 알린다
+        /// </summary>
+        public FloorJudgment Judge()
+        {
+            var judgment = new FloorJudgment { Floor = CurrentFloor, Attempt = Attempt };
+            foreach (var obj in PatrolInspection.FindUnfinished()) judgment.Unfinished.Add(obj.Id);
+            var subjects = PhotoSubjects.Active();
+            judgment.Required = subjects.Count;
+            foreach (var subject in subjects)
+                if (!Photos.IsCaptured(subject.Source)) judgment.Unphotographed.Add(subject.Name);
+            judgment.Shots = Photos.Shots;
+            judgment.EmptyShots = Photos.EmptyShots;
+            judgment.RepeatShots = Photos.RepeatShots;
+            judgment.FirstShotSeconds = Photos.FirstShotSeconds;
+            LastJudgment = judgment;
+            SafeEvent.Raise(Judged, judgment, this);
+            return judgment;
+        }
+
+        /// <summary>고정한 판정대로 하행 또는 실패. 그 사이 층이 바뀌었으면(개발자 키 등) 지금 다시 판정한다</summary>
+        public void Apply(FloorJudgment judgment)
+        {
+            if (IsCleared) return;
+            if (judgment == null || judgment.Floor != CurrentFloor || judgment.Attempt != Attempt) judgment = Judge();
+            if (!judgment.Passed)
+                Debug.Log($"[Run] {CurrentFloor}층 판정 — {judgment.Reason}" +
+                          (judgment.Unphotographed.Count > 0 ? $" (안 찍음: {string.Join(", ", judgment.Unphotographed)})" : ""), this);
+            Descend(judgment.Passed);
         }
 
         /// <summary>판정 결과를 직접 넣어 하행(true) 또는 실패(false). 테스트·개발자 메뉴용</summary>
@@ -219,6 +260,7 @@ namespace NightPatrol.Run
         private void StartFloorSteps()
         {
             Schedule.Reset();   // 이벤트 전에 비워야 구독자가 FloorStarted에서 한 예약이 남는다 (구독 순서와 상관없이)
+            Photos.Begin(PlaySeconds);   // 앞 층 사진 통계는 판정(Judge) 때 이미 넘겼다
             PatrolInspection.ResetErrorLog();
             IsCleared = false;
             ResetAllObjects();
@@ -232,11 +274,13 @@ namespace NightPatrol.Run
             SafeEvent.Raise(FloorStarted, CurrentFloor, this);
             if (tasks == null) tasks = UnityEngine.Object.FindAnyObjectByType<FloorTasks>();
             if (tasks != null) tasks.Generate(CurrentFloor, Attempt);
+            Photos.SetRequired(PhotoSubjects.Active().Count);   // 이상현상이 다 켜진 뒤 (촬영 장수·일지용)
         }
 
         private void Clear()
         {
             Schedule.Reset();
+            Photos.Begin(PlaySeconds);
             IsCleared = true;
             Debug.Log($"[Run] {CurrentFloor}층 도착 — 클리어", this);
             SafeEvent.Raise(Cleared, this);

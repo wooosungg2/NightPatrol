@@ -47,6 +47,33 @@ namespace NightPatrol.Debugging
             return text.ToString();
         }
 
+        /// <summary>
+        /// F1 "사진": 이번 층 찍은 것/찍어야 할 것, 장수, 아직 안 찍은 이상현상, 찍을 곳을 몰라 판정에서 뺀 이상현상
+        /// (개발용 — 플레이어에게는 안 보임)
+        /// </summary>
+        public static string PhotoText(PatrolRun run)
+        {
+            if (run == null) return "PatrolRun 없음";
+            var photos = run.Photos;
+            var unknown = new System.Collections.Generic.List<NightPatrol.Anomalies.Anomaly>();
+            var subjects = NightPatrol.Photo.PhotoSubjects.Active(unknown);
+            var notYet = new StringBuilder();
+            int captured = 0;
+            foreach (var subject in subjects)
+            {
+                if (photos.IsCaptured(subject.Source)) captured++;
+                else notYet.Append(notYet.Length > 0 ? ", " : "").Append(subject.Name);
+            }
+            var text = new StringBuilder($"찍음 {captured}/{subjects.Count} · 장수 {photos.Shots} (일반 {photos.EmptyShots}, 다시 {photos.RepeatShots})");
+            if (notYet.Length > 0) text.Append("\n안 찍음: ").Append(notYet);
+            if (unknown.Count > 0)
+            {
+                text.Append('\n').Append(DevInfo.Paint("찍을 곳 모름 (판정에서 뺌): ", DevInfo.BadColor));
+                for (int i = 0; i < unknown.Count; i++) text.Append(i > 0 ? ", " : "").Append(unknown[i].name);
+            }
+            return text.ToString();
+        }
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         // F7 시험 전화: 손에 드는 전화가 받기·자막·끊기까지 되는지 (통화 표 없이)
         private static readonly PhoneCall TestCall = new PhoneCall
@@ -78,6 +105,7 @@ namespace NightPatrol.Debugging
         {
             if (showHelp) DevInfo.Register(this, "개발자 키", () => HelpText(run != null), 200);
             if (run != null) DevInfo.Register(this, "예약", () => ScheduleText(run != null ? run.Schedule : null), 210);
+            if (run != null) DevInfo.Register(this, "사진", () => PhotoText(run), 215);
         }
 
         private void OnDisable() => DevInfo.Unregister(this);

@@ -1367,6 +1367,7 @@ GameObject:
   - component: {fileID: 748472758127996045}
   - component: {fileID: 2030619317700011511}
   - component: {fileID: 5989702605482249954}
+  - component: {fileID: 4576079106204144315}
   m_Layer: 6
   m_Name: Apps
   m_TagString: Untagged
@@ -1428,6 +1429,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 183abf0bd738bc04d92a1c0e066929ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: NightPatrol::NightPatrol.Phone.BrowserApp
+  icon: {fileID: 0}
+--- !u!114 &4576079106204144315
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5150852765128670805}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 69c22c8a538849d5abff5a815f92f980, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NightPatrol::NightPatrol.Phone.CameraApp
   icon: {fileID: 0}
 --- !u!1 &5613635196623789360
 GameObject:
@@ -2166,6 +2180,11 @@ MonoBehaviour:
     pitchJitter: 0
     playOn: 0
   - name: "\uC7A1\uC74C"
+    clips: []
+    volume: 1
+    pitchJitter: 0
+    playOn: 0
+  - name: "\uC154\uD130"
     clips: []
     volume: 1
     pitchJitter: 0
