@@ -1,101 +1,90 @@
+
 using UnityEngine;
-using NightPatrol.Patrol;
+using NightPatrol.Lighting;
 
 namespace NightPatrol.Anomalies
 {
     public class LightColorAnomaly : Anomaly
     {
-        [Header("색상을 변경할 조명")]
-        [SerializeField] private Light targetLight;
+        [Header("조명 구간 ID")]
+        [SerializeField]
+        private string zoneId = "Corridor.Lights.00";
 
-        [Header("점검 판정 대상")]
-        [SerializeField] private PatrolLamp target;
+        [Header("변경할 조명 번호 (0부터 시작)")]
+        [SerializeField]
+        private int lightIndex = 0;
 
         [Header("이상현상 설정")]
-        [SerializeField] private Color anomalyColor = Color.red;
+        [SerializeField]
+        private Color anomalyColor = Color.red;
 
-        private Color originalColor;
-        private bool originalEnabled;
+        private LightZone zone;
 
-        // 점검 시스템에 이상현상을 등록했는지 확인
-        private bool anomalyRegistered;
-
-        private void Awake()
-        {
-            if (targetLight != null)
-            {
-                originalColor = targetLight.color;
-                originalEnabled = targetLight.enabled;
-            }
-        }
+        // ========================================
+        // 이상현상 활성화
+        // ========================================
 
         public override void Activate()
         {
-            if (IsActive || targetLight == null || target == null)
+            if (IsActive)
                 return;
 
-            // 기존 조명 상태 저장
-            originalColor = targetLight.color;
-            originalEnabled = targetLight.enabled;
+            zone = LightZone.FindById(zoneId);
 
-            // 빨간 조명 이상현상 발생
-            targetLight.color = anomalyColor;
-            targetLight.enabled = true;
+            if (zone == null)
+            {
+                Debug.LogWarning(
+                    $"[LightColorAnomaly] LightZone not found: {zoneId}",
+                    this
+                );
+                return;
+            }
+
+            // 지정한 조명의 색상 변경
+            zone.SetSingleLightAnomalyColor(
+                lightIndex,
+                anomalyColor
+            );
 
             IsActive = true;
 
-            // 점검 판정 시스템에 이상현상 등록
-            target.AddAnomaly();
-            anomalyRegistered = true;
+            // 점검 판정 등록
+            RegisterAnomaly();
         }
+
+        // ========================================
+        // 이상현상 비활성화
+        // ========================================
 
         public override void Deactivate()
         {
-            if (!IsActive && !anomalyRegistered)
-                return;
-
-            RestoreLight();
-            UnregisterAnomaly();
-        }
-
-        public override void ResetAfterFloorReset()
-        {
-            // PatrolRun이 카운터를 먼저 초기화한다는 전제
-            RestoreLight();
-
-            // 카운터는 이미 초기화되었으므로 RemoveAnomaly 호출하지 않음
-            anomalyRegistered = false;
-        }
-
-        private void RestoreLight()
-        {
-            if (targetLight != null)
+            if (IsActive && zone != null)
             {
-                targetLight.color = originalColor;
-                targetLight.enabled = originalEnabled;
+                zone.ClearSingleLightAnomalyColor();
             }
 
             IsActive = false;
+            zone = null;
+
+            UnregisterAnomaly();
         }
 
-        private void UnregisterAnomaly()
+        // ========================================
+        // 층 초기화
+        // ========================================
+
+        public override void ResetAfterFloorReset()
         {
-            if (!anomalyRegistered)
-                return;
+            // LightZone은 FloorReset에서 초기화됨
+            IsActive = false;
+            zone = null;
 
-            if (target != null)
-                target.RemoveAnomaly();
-
-            anomalyRegistered = false;
+            ForgetRegistrationAfterFloorReset();
         }
 
         private void OnDisable()
         {
-            if (IsActive || anomalyRegistered)
-            {
-                RestoreLight();
-                UnregisterAnomaly();
-            }
+            Deactivate();
         }
     }
 }
