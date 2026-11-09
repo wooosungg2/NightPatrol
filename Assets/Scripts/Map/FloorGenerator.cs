@@ -153,6 +153,9 @@ namespace NightPatrol
 		[Header("복도 디테일: 천장 조명·걸레받이·표찰·소화기·유도등 (사진 기준)")]
 		public FloorDetailSettings details = new FloorDetailSettings();
 
+		[Header("복도 포스터 · 게시물 (Assets/Textures/Posters)")]
+		public PosterSettings posters = new PosterSettings();
+
 		[ContextMenu("Reset Fire Equipment")]
 		void ResetFire()
 		{
@@ -510,8 +513,9 @@ namespace NightPatrol
 				DoorStyle st = ResolveDoorStyle(slot);
 				foreach (var kv in styleAt)
 					if (Mathf.Abs(kv.Key - (a + b) * 0.5f) < 0.5f) { st = kv.Value; break; }
-				DoorBuilder.Build(ds, b - a, dh, t, st, doorSettings, slot.label,
+				var builtDoor = DoorBuilder.Build(ds, b - a, dh, t, st, doorSettings, slot.label,
 					stair && doorSettings != null && doorSettings.stairDoorsInward ? true : (bool?)null);
+				if (classroom && details != null && details.enabled) PosterBuilder.OnDoor(builtDoor, st, slot.label, posters);
 				// 복도 벽선(앞벽에서 setback + recess만큼 복도 쪽)의 문 구멍
 				float zl = -(slot.setback + slot.recess);
 				openings.Add(new[] { pos + rot * new Vector3(a, 0f, zl), pos + rot * new Vector3(b, 0f, zl) });
@@ -528,9 +532,13 @@ namespace NightPatrol
 						foreach (var o in doors) if (o != doors[i] && px + 0.15f > o.x && px - 0.15f < o.y) clash = true;
 						if (clash) px = a - 0.3f;
 						FloorDetailBuilder.Nameplate(root, slot.label, px, zl, st == DoorStyle.WoodSingle, details);
+						PosterBuilder.BesideDoor(root, slot.label, i, a, b, zl, doors, hw, t, px, posters);
 					}
 					if (stair && i == 0 && stairGen && ss.bulletinBoard)       // 문 오른쪽(+X) 게시판
+					{
 						FloorDetailBuilder.BulletinBoard(root, Mathf.Min(b + 0.25f + 0.6f, hw - 0.65f), zl, 1.2f);
+						PosterBuilder.FillBulletinBoard(root, posters);
+					}
 					if (stair && details.exitSigns && i == 0)
 						FloorDetailBuilder.ExitSign(root, new Vector3((a + b) * 0.5f, Mathf.Min(dh + 0.2f, ceilingHeight - 0.12f), zl - 0.01f),
 							Quaternion.Euler(0f, 180f, 0f));
