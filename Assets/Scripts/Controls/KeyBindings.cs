@@ -8,7 +8,7 @@ namespace NightPatrol.Controls
     /// <summary>
     /// 키 설정: 바꾼 키를 PlayerPrefs에 저장·불러오기, 키 하나 다시 지정, 기본값으로, 키 이름.
     /// 게임 코드는 Input Actions 에셋의 액션을 그대로 쓰므로(복제하지 않음) 바꾼 키가 바로 먹힌다.
-    /// 다시 지정할 수 있는 키: 키보드 키와 마우스 오른쪽·가운데·옆 버튼. ESC(메뉴·취소)와 개발자 키(F1~F5, PgUp/PgDn)는 받지 않는다
+    /// 다시 지정할 수 있는 키: 키보드 키와 마우스 오른쪽·가운데·옆 버튼. ESC(메뉴·취소)와 개발자 키(F1~F7, PgUp/PgDn)는 받지 않는다
     /// </summary>
     public static class KeyBindings
     {
@@ -20,7 +20,7 @@ namespace NightPatrol.Controls
         private static readonly string[] Reserved =
         {
             "<Keyboard>/escape", "<Keyboard>/anyKey",
-            "<Keyboard>/f1", "<Keyboard>/f2", "<Keyboard>/f3", "<Keyboard>/f4", "<Keyboard>/f5",
+            "<Keyboard>/f1", "<Keyboard>/f2", "<Keyboard>/f3", "<Keyboard>/f4", "<Keyboard>/f5", "<Keyboard>/f6", "<Keyboard>/f7",
             "<Keyboard>/pageUp", "<Keyboard>/pageDown",
             "<Keyboard>/upArrow", "<Keyboard>/downArrow", "<Keyboard>/leftArrow", "<Keyboard>/rightArrow",
         };
@@ -89,7 +89,31 @@ namespace NightPatrol.Controls
                 try { asset.LoadBindingOverridesFromJson(json); }
                 catch (Exception e) { Debug.LogWarning($"[Keys] 저장된 키 설정을 읽지 못해 기본값을 씁니다: {e.Message}"); }
             }
+            DropReservedOverrides(asset);
             SafeEvent.Raise(Changed, null);
+        }
+
+        // 받지 않는 키(Reserved)가 늘면 예전에 그 키로 저장한 설정이 개발자 키·메뉴 키와 같이 눌린다 → 그 덮어쓰기만 지워 기본 키로
+        private static void DropReservedOverrides(InputActionAsset asset)
+        {
+            foreach (var action in asset)
+            {
+                var bindings = action.bindings;
+                for (int i = 0; i < bindings.Count; i++)
+                {
+                    string overridePath = bindings[i].overridePath;
+                    if (string.IsNullOrEmpty(overridePath) || !IsReserved(overridePath)) continue;
+                    action.RemoveBindingOverride(i);
+                    Debug.LogWarning($"[Keys] 개발자 키라 기본값으로: {action.name} {KeyName(overridePath)}");
+                }
+            }
+        }
+
+        private static bool IsReserved(string path)
+        {
+            foreach (var reserved in Reserved)
+                if (string.Equals(reserved, path, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
         }
 
         public static void Save(InputActionAsset asset, string prefsKey = PrefsKey)

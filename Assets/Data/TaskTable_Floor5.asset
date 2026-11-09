@@ -81,4 +81,4 @@ MonoBehaviour:
     name: "\uB3D9\uCABD \uB0A8\uC790 \uD654\uC7A5\uC2E4"
   - area: BalconyW
     name: "\uC11C\uCABD \uBC1C\uCF54\uB2C8"
-  roomFloor: 5
+  roomFloor: 0

@@ -86,6 +86,20 @@ namespace NightPatrol.Tests
             Assert.AreEqual("<Keyboard>/j", journal.bindings[Index(journal)].effectivePath);
         }
 
+        // 03_09 (00_17e): 개발자 키가 늘면(F6) 예전에 그 키로 저장한 설정이 개발자 키와 같이 눌린다 → 불러올 때 그 줄만 기본 키로
+        [Test]
+        public void Load_DropsSavedOverridesOnReservedKeys()
+        {
+            journal.ApplyBindingOverride(Index(journal), "<Keyboard>/f6");
+            interact.ApplyBindingOverride(Index(interact), "<Keyboard>/g");
+            KeyBindings.Save(asset, TestPrefsKey);
+
+            UnityEngine.TestTools.LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(@"\[Keys\] 개발자 키라 기본값으로: Journal F6"));
+            KeyBindings.Load(asset, TestPrefsKey);
+            Assert.AreEqual("<Keyboard>/tab", journal.bindings[Index(journal)].effectivePath);
+            Assert.AreEqual("<Keyboard>/g", interact.bindings[Index(interact)].effectivePath, "다른 줄의 설정은 그대로");
+        }
+
         [Test]
         public void Load_ClearsOverridesThatWereNotSaved()
         {

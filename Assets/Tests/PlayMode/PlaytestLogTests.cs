@@ -80,10 +80,10 @@ namespace NightPatrol.Tests
 
             CollectionAssert.AreEqual(new[]
             {
-                "1,5,통과,0.0,0,0,전등 끄기",
-                "1,4,실패,0.0,0,0,전등 끄기",
-                "2,5,통과,0.0,0,0,전등 끄기",
-                "2,1,클리어,0.0,,,",
+                "1,5,통과,0.0,0,0,전등 끄기,,,,,,,",
+                "1,4,실패,0.0,0,0,전등 끄기,,,,,,,",
+                "2,5,통과,0.0,0,0,전등 끄기,,,,,,,",
+                "2,1,클리어,0.0,,,,,,,,,,",
             }, log.Rows);
         }
 
@@ -98,8 +98,8 @@ namespace NightPatrol.Tests
 
             CollectionAssert.AreEqual(new[]
             {
-                "1,5,F4 재시작,0.0,0,0,전등 끄기",
-                "1,5,통과,0.0,0,0,전등 끄기",
+                "1,5,F4 재시작,0.0,0,0,전등 끄기,,,,,,,",
+                "1,5,통과,0.0,0,0,전등 끄기,,,,,,,",
             }, log.Rows);
         }
 
@@ -111,7 +111,16 @@ namespace NightPatrol.Tests
             journal.SetRaised(false);
             journal.SetRaised(true);
             run.Descend(true);
-            Assert.AreEqual("1,5,통과,0.0,0,2,전등 끄기", log.Rows[0]);
+            Assert.AreEqual("1,5,통과,0.0,0,2,전등 끄기,,,,,,,", log.Rows[0]);
+        }
+
+        // 06_04: 엘리베이터 판정을 거친 층은 카메라 칸이 채워진다 (찍은 장수·대상 없는 사진·다시 찍은 사진·찍힌·요구·첫 촬영·실패 이유)
+        [Test]
+        public void JudgedFloor_WritesTheCameraCells()
+        {
+            run.RestartFloor();   // 5층: 전등 끄기 (A.Lamp.01이 켜짐)
+            run.TryDescend();     // 판정: 미처리 1건 → 실패
+            Assert.AreEqual("1,5,실패,0.0,0,0,전등 끄기,0,0,0,0,0,,미처리 1건", log.Rows[0]);
         }
 
         [Test]
@@ -119,7 +128,7 @@ namespace NightPatrol.Tests
         {
             run.RestartFloor();
             log.enabled = false;
-            CollectionAssert.AreEqual(new[] { "1,5,중단,0.0,0,0,전등 끄기" }, log.Rows);
+            CollectionAssert.AreEqual(new[] { "1,5,중단,0.0,0,0,전등 끄기,,,,,,," }, log.Rows);
         }
 
         [Test]
