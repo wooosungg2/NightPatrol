@@ -25,6 +25,15 @@ namespace NightPatrol
 		const string MatDir = "Assets/Materials/Generated";
 		static readonly Dictionary<string, Material> cache = new Dictionary<string, Material>();
 
+		/// <summary>호수·이름으로 정해지는 난수 (다시 생성해도 같은 모양)</summary>
+		static System.Random Rng(string key)
+		{
+			int h = 17;
+			foreach (char c in key) h = h * 31 + c;
+			return new System.Random(h);
+		}
+		static float Range(System.Random r, float a, float b) => a + (float)r.NextDouble() * (b - a);
+
 		static bool In(string[] list, string label)
 		{
 			if (list == null) return false;
@@ -58,7 +67,7 @@ namespace NightPatrol
 		}
 
 		/// <summary>앞면이 -Z(복도 쪽)를 보는 얇은 종이. 충돌 없음</summary>
-		public static GameObject Sheet(Transform parent, string name, Vector3 localPos, float w, float h)
+		public static GameObject Sheet(Transform parent, string name, Vector3 localPos, float w, float h, float roll = 0f)
 		{
 			var mat = Mat(name);
 			if (mat == null) return null;
@@ -68,7 +77,7 @@ namespace NightPatrol
 			Object.DestroyImmediate(go.GetComponent<Collider>());
 			go.transform.SetParent(parent, false);
 			go.transform.localPosition = localPos;
-			go.transform.localRotation = Quaternion.identity;
+			go.transform.localRotation = Quaternion.Euler(0f, 0f, roll);
 			go.transform.localScale = new Vector3(w, h, 1f);
 			var r = go.GetComponent<Renderer>();
 			r.sharedMaterial = mat;
@@ -93,6 +102,7 @@ namespace NightPatrol
 			if (door == null || ps == null || !ps.enabled || door.leaves == null || door.leaves.Length == 0) return;
 			if (style != DoorStyle.SteelDouble && style != DoorStyle.SteelSingle) return;   // 나무문(교수님 방)·유리문은 없음
 
+			var rng = Rng(label + door.transform.parent.name);
 			int right = door.leaves.Length - 1;   // 양문이면 오른쪽 문짝, 외문이면 그 문짝
 			if (LeafPanel(door.leaves[right], out float cx, out float lw, out float lt))
 			{
@@ -100,23 +110,26 @@ namespace NightPatrol
 				float z = -lt * 0.5f - 0.002f;
 				bool banner = In(ps.eventBannerRooms, label) && door.leaves.Length == 2;
 				if (banner)
-					Sheet(h, "Poster_EventBanner", new Vector3(cx, 1.05f, z), Mathf.Min(0.42f, lw - 0.2f), 1.6f);
+					Sheet(h, "Poster_EventBanner", new Vector3(cx + Range(rng, -0.04f, 0.04f), 1.05f, z), Mathf.Min(0.42f, lw - 0.2f), 1.6f, Range(rng, -0.6f, 0.6f));
 				else if (ps.safetySheets)
 				{
 					bool dots = In(ps.dotChartRooms, label);
-					float sx = dots ? cx - Mathf.Sign(cx) * 0.06f : cx;
-					Sheet(h, "Poster_SafetySheet", new Vector3(sx, 1.5f, z), 0.21f, 0.297f);
-					if (dots) Sheet(h, "Poster_DotChart", new Vector3(sx + Mathf.Sign(cx) * 0.2f, 1.5f, z), 0.15f, 0.212f);
+					float sx = (dots ? cx - Mathf.Sign(cx) * 0.06f : cx) + Range(rng, -0.05f, 0.05f);
+					float sy = Range(rng, 1.42f, 1.58f);
+					Sheet(h, "Poster_SafetySheet", new Vector3(sx, sy, z), 0.21f, 0.297f, Range(rng, -2f, 2f));
+					if (dots) Sheet(h, "Poster_DotChart", new Vector3(sx + Mathf.Sign(cx) * 0.2f, sy + Range(rng, -0.06f, 0.03f), z), 0.15f, 0.212f, Range(rng, -3f, 3f));
 				}
 			}
 			if (door.leaves.Length == 2 && LeafPanel(door.leaves[0], out float cx0, out float lw0, out float lt0))
 			{
 				var h0 = door.leaves[0];
 				float z0 = -lt0 * 0.5f - 0.002f;
-				if (In(ps.lightsOffRooms, label)) Sheet(h0, "Poster_LightsOff", new Vector3(cx0, 1.45f, z0), 0.42f, 0.6f);
-				else if (In(ps.openLabRooms, label)) Sheet(h0, "Poster_OpenLab", new Vector3(cx0, 1.45f, z0), 0.42f, 0.6f);
+				float sc = Range(rng, 0.9f, 1.05f);
+				var p0 = new Vector3(cx0 + Range(rng, -0.05f, 0.05f), Range(rng, 1.38f, 1.55f), z0);
+				if (In(ps.lightsOffRooms, label)) Sheet(h0, "Poster_LightsOff", p0, 0.42f * sc, 0.6f * sc, Range(rng, -1.5f, 1.5f));
+				else if (In(ps.openLabRooms, label)) Sheet(h0, "Poster_OpenLab", p0, 0.42f * sc, 0.6f * sc, Range(rng, -1.5f, 1.5f));
 				else if (ps.safetySheets && In(ps.eventBannerRooms, label))
-					Sheet(h0, "Poster_SafetySheet", new Vector3(cx0, 1.5f, z0), 0.21f, 0.297f);
+					Sheet(h0, "Poster_SafetySheet", new Vector3(p0.x, Range(rng, 1.42f, 1.58f), z0), 0.21f, 0.297f, Range(rng, -2f, 2f));
 			}
 		}
 
@@ -143,18 +156,20 @@ namespace NightPatrol
 
 			int seed = 0;
 			foreach (char c in label) seed = seed * 31 + c;
+			var rng = Rng("wall" + label);
 			float used0 = 0f, used1 = 0f;   // 이미 쓴 자리
 
 			// 연구실 소개 포스터 (A1): 문 왼쪽, 안 되면 오른쪽
 			if (In(ps.labPosterRooms, label))
 			{
-				const float w = 0.6f, h = 0.85f;
-				float x = a - 0.15f - w * 0.5f;
+				float sc = Range(rng, 0.85f, 1.05f);
+				float w = 0.6f * sc, h = 0.85f * sc;
+				float x = a - Range(rng, 0.12f, 0.3f) - w * 0.5f;
 				if (!Free(x - w * 0.5f, x + w * 0.5f)) x = b + 0.15f + w * 0.5f;
 				if (!Free(x - w * 0.5f, x + w * 0.5f) && plateX > b) x = plateX + 0.17f + 0.1f + w * 0.5f;
 				if (Free(x - w * 0.5f, x + w * 0.5f))
 				{
-					Sheet(g, (seed & 1) == 0 ? "Poster_Lab_1" : "Poster_Lab_2", new Vector3(x, 1.5f, -0.004f), w, h);
+					Sheet(g, (seed & 1) == 0 ? "Poster_Lab_1" : "Poster_Lab_2", new Vector3(x, Range(rng, 1.42f, 1.62f), -0.004f), w, h, Range(rng, -1.2f, 1.2f));
 					used0 = x - w * 0.5f; used1 = x + w * 0.5f;
 				}
 			}
@@ -206,31 +221,72 @@ namespace NightPatrol
 				if (span > 2.4f)
 				{
 					float mid = (bestA + bestB) * 0.5f;
-					Sheet(g, "Poster_AI_Small", new Vector3(mid - 0.95f, 1.55f, -0.004f), 0.42f, 0.6f);
-					Sheet(g, "Poster_AI_Dark", new Vector3(mid - 0.2f, 1.6f, -0.004f), 0.52f, 0.76f);
-					Sheet(g, "Poster_AI_Diagram", new Vector3(mid + 0.7f, 1.62f, -0.004f), 0.6f, 0.78f);
+					Sheet(g, "Poster_AI_Small", new Vector3(mid - 1.0f + Range(rng, -0.05f, 0.05f), Range(rng, 1.5f, 1.62f), -0.004f), 0.42f, 0.6f, Range(rng, -1.5f, 1.5f));
+					Sheet(g, "Poster_AI_Dark", new Vector3(mid - 0.22f, Range(rng, 1.55f, 1.68f), -0.004f), 0.52f, 0.76f, Range(rng, -1f, 1f));
+					Sheet(g, "Poster_AI_Diagram", new Vector3(mid + 0.72f + Range(rng, -0.05f, 0.05f), Range(rng, 1.58f, 1.7f), -0.004f), 0.6f, 0.78f, Range(rng, -1f, 1f));
 				}
 			}
 			if (g.childCount == 0) Object.DestroyImmediate(g.gameObject);
 		}
 
-		/// <summary>계단실 게시판(FloorDetailBuilder.BulletinBoard)의 색 상자를 포스터 그림으로</summary>
+		/// <summary>
+		/// 계단실 게시판(FloorDetailBuilder.BulletinBoard)의 색 상자를 지우고 포스터를 붙임:
+		/// 크기 제각각(A3·A4·작은 공지), 조금씩 겹치고 비뚤게. 호수로 정한 난수라 다시 생성해도 같은 모양
+		/// </summary>
 		public static void FillBulletinBoard(Transform room, PosterSettings ps)
 		{
 			if (ps == null || !ps.enabled || !ps.bulletinBoardPosters || room == null) return;
 			var board = room.Find("BulletinBoard");
 			if (board == null) return;
-			string[] names = { "Poster_Board_1", "Poster_Board_2", "Poster_Board_3", "Poster_Board_4", "Poster_OpenLab" };
-			int k = 0;
-			foreach (Transform c in board)
+			var inner = board.Find("Board");
+			if (inner == null) return;
+			if (Mat("Poster_Board_1") == null) return;   // 텍스처가 없으면 원래 색 상자 그대로
+
+			for (int i = board.childCount - 1; i >= 0; i--)
+				if (board.GetChild(i).name == "Poster") Object.DestroyImmediate(board.GetChild(i).gameObject);
+
+			float bw = inner.localScale.x, bh = inner.localScale.y;
+			float cx = inner.localPosition.x, cy = inner.localPosition.y, z0 = inner.localPosition.z - 0.002f;
+			var rng = Rng(room.name);
+			// (이름, 폭, 세로/가로 비율) — 큰 것부터 붙이고 작은 공지를 위에 겹침
+			var items = new List<(string n, float w, float r)>
 			{
-				if (c.name != "Poster") continue;
-				var mat = Mat(names[k % names.Length]);
+				("Poster_Board_1", Range(rng, 0.30f, 0.34f), 1.414f),
+				("Poster_Board_2", Range(rng, 0.26f, 0.30f), 1.414f),
+				("Poster_Board_3", Range(rng, 0.22f, 0.26f), 1.414f),
+				("Poster_Board_4", Range(rng, 0.24f, 0.28f), 1.414f),
+				("Poster_Notice_1", Range(rng, 0.15f, 0.18f), 1.414f),
+				("Poster_Notice_2", Range(rng, 0.14f, 0.17f), 1.414f),
+			};
+			// 섞기
+			for (int i = items.Count - 1; i > 0; i--) { int j = rng.Next(i + 1); (items[i], items[j]) = (items[j], items[i]); }
+			items.Sort((p, q) => q.w.CompareTo(p.w));
+
+			var placed = new List<Rect>();
+			int k = 0;
+			foreach (var it in items)
+			{
+				float w = it.w, h = it.w * it.r;
+				if (h > bh - 0.04f) { h = bh - 0.04f; w = h / it.r; }
+				Rect best = default; float bestOverlap = float.MaxValue;
+				for (int tries = 0; tries < 24; tries++)
+				{
+					float x = Range(rng, cx - bw * 0.5f + w * 0.5f + 0.02f, cx + bw * 0.5f - w * 0.5f - 0.02f);
+					float y = Range(rng, cy - bh * 0.5f + h * 0.5f + 0.02f, cy + bh * 0.5f - h * 0.5f - 0.02f);
+					var rc = new Rect(x - w * 0.5f, y - h * 0.5f, w, h);
+					float ov = 0f;
+					foreach (var p in placed)
+					{
+						float ox = Mathf.Max(0f, Mathf.Min(rc.xMax, p.xMax) - Mathf.Max(rc.xMin, p.xMin));
+						float oy = Mathf.Max(0f, Mathf.Min(rc.yMax, p.yMax) - Mathf.Max(rc.yMin, p.yMin));
+						ov += ox * oy;
+					}
+					if (ov < bestOverlap) { bestOverlap = ov; best = rc; }
+					if (ov <= 0.0001f) break;
+				}
+				placed.Add(best);
+				Sheet(board, it.n, new Vector3(best.center.x, best.center.y, z0 - 0.0015f * k), best.width, best.height, Range(rng, -3.5f, 3.5f));
 				k++;
-				if (mat == null) continue;
-				var s = c.localScale;
-				c.localScale = new Vector3(s.x, s.x * 1.414f, s.z);   // A판 비율
-				c.GetComponent<Renderer>().sharedMaterial = mat;
 			}
 		}
 	}
