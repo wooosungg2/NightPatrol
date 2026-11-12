@@ -135,6 +135,16 @@ namespace NightPatrol.Tests
             Assert.IsFalse(PhoneHolder.AcceptsInput(false, true, false, true), "메뉴를 이번 프레임에 닫음");
         }
 
+        // 06_04b: 커서가 풀린 동안의 클릭은 커서를 다시 잡는 데만 쓴다 — 지난 프레임에도 지금도 잡혀 있을 때만 휴대폰이 받음
+        [Test]
+        public void AcceptsPointer_OnlyWhenTheCursorWasAndIsLocked()
+        {
+            Assert.IsTrue(PhoneHolder.AcceptsPointer(true, true));
+            Assert.IsFalse(PhoneHolder.AcceptsPointer(false, true), "이번 프레임에 다시 잡음 (그 클릭)");
+            Assert.IsFalse(PhoneHolder.AcceptsPointer(true, false), "풀림");
+            Assert.IsFalse(PhoneHolder.AcceptsPointer(false, false));
+        }
+
         [Test]
         public void SubtitleFormat_AndStateNames()
         {

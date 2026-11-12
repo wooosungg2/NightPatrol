@@ -266,6 +266,66 @@ namespace NightPatrol.Tests
             Assert.IsFalse(screen.transform.Find("PhoneModel/Face/Display/Home/Icons/전화/Badge").gameObject.activeSelf);
         }
 
+        // 06_04b 마우스: 좌클릭 = 홈에서 고른 앱 열기(다른 앱 안에서는 넘김), 우클릭 = 앱이면 뒤로·홈이면 넣기. 넣은 동안은 받지 않음
+        [UnityTest]
+        public IEnumerator Mouse_LeftOpens_RightGoesBackThenStows()
+        {
+            yield return MakePhone(false);
+            Assert.IsFalse(phone.HandlePointerInput(true, false), "넣은 동안은 안 받음");
+            phone.TakeOut();
+            Assert.IsTrue(phone.HandlePointerInput(true, false));
+            Assert.IsNull(screen.OpenApp, "꺼낸 프레임의 클릭은 꺼낸 누름과 같이 온 것");
+            yield return null;
+            Assert.IsTrue(phone.HandlePointerInput(true, false));
+            Assert.AreEqual("전화", screen.OpenApp.Title, "고른 앱(전화)이 열림");
+            Assert.IsFalse(phone.HandlePointerInput(true, false), "카메라가 아닌 앱 안의 좌클릭은 넘김 (E로)");
+            Assert.IsTrue(phone.HandlePointerInput(false, true));
+            Assert.IsNull(screen.OpenApp, "우클릭: 홈으로");
+            Assert.AreEqual(PhoneState.Held, phone.State);
+            Assert.IsTrue(phone.HandlePointerInput(false, true));
+            Assert.AreEqual(PhoneState.Stowed, phone.State, "홈에서 우클릭: 넣기");
+        }
+
+        [UnityTest]
+        public IEnumerator Mouse_IgnoredWhileTheMenuIsOpen()
+        {
+            yield return MakePhone(false);
+            phone.TakeOut();
+            yield return null;
+            Object.FindAnyObjectByType<JournalHolder>().SetMenuOpen(true);
+            Assert.IsFalse(phone.HandlePointerInput(true, true));
+            Assert.IsNull(screen.OpenApp);
+            Assert.AreEqual(PhoneState.Held, phone.State);
+        }
+
+        // 06_04b: 손에 든 채 울리면 좌클릭으로 받기(E·Q와 같음). 통화 중 우클릭은 끊기, 울릴 때 우클릭은 넣기(주머니에서 계속 울림).
+        // 통화 화면 단추 글도 마우스로
+        [UnityTest]
+        public IEnumerator Mouse_LeftAnswersARingingPhoneInHand_RightHangsUpOrStows()
+        {
+            yield return MakePhone(false);
+            phone.TakeOut();
+            yield return null;
+            Assert.IsTrue(phone.Ring(new PhoneCall { id = "C01", lines = new[] { new PhoneLine { text = "첫 줄", seconds = 5f } } }));
+            yield return null;
+            Assert.AreEqual("좌클릭 받기", Text("Call/Button/Text").text);
+            Assert.IsTrue(phone.HandlePointerInput(true, false));
+            Assert.AreEqual(PhoneState.Talking, phone.State, "좌클릭: 받기");
+            yield return null;
+            Assert.AreEqual("우클릭 끊기", Text("Call/Button/Text").text);
+            Assert.IsTrue(phone.HandlePointerInput(false, true));
+            Assert.AreEqual(PhoneState.Stowed, phone.State, "통화 중 우클릭: 끊고 넣기");
+
+            phone.TakeOut();
+            yield return null;
+            Assert.IsTrue(phone.Ring(new PhoneCall { id = "C02" }));
+            Assert.IsTrue(phone.HandlePointerInput(false, true));
+            Assert.AreEqual(PhoneState.Ringing, phone.State, "울릴 때 우클릭: 넣기만 (계속 울림)");
+            Assert.IsFalse(phone.IsInHand);
+            Assert.IsFalse(phone.HandlePointerInput(true, false), "주머니에서 울리면 좌클릭은 안 받음 (Q로 꺼내며 받기)");
+            Assert.AreEqual(PhoneState.Ringing, phone.State);
+        }
+
         [UnityTest]
         public IEnumerator Ringing_ShowsTheCallScreenOverAnOpenApp()
         {

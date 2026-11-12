@@ -80,6 +80,7 @@ namespace NightPatrol.Phone
         private float progress;              // 자세 (0 = 넣음, 1 = 듦)
         private bool inHand;                 // 손에 들고 있는지 (울릴 때는 손일 수도 주머니일 수도)
         private bool menuWasOpen;            // 지난 프레임에 메뉴가 열려 있었는지
+        private bool cursorWasLocked;        // 지난 프레임에 커서가 잡혀 있었는지 (커서를 다시 잡는 클릭은 휴대폰에 안 넘김)
         private int takenOutFrame = -1;      // 꺼낸 프레임 (그 프레임의 E는 꺼낸 누름과 같이 온 것)
         private float nextWheelTime;         // 이 시각(실제 시간) 전의 휠은 무시 (wheelRepeatSeconds)
         private float ringElapsed;
@@ -161,6 +162,7 @@ namespace NightPatrol.Phone
             bool menuOpen = journal != null && journal.IsMenuOpen;
             if (AcceptsInput(IsBlocked, Time.timeScale > 0f, menuOpen, menuWasOpen)) HandleInput();
             menuWasOpen = menuOpen;
+            cursorWasLocked = Cursor.lockState == CursorLockMode.Locked;
             Advance(Time.deltaTime);
             TickNotice(Time.deltaTime);
             // 메뉴가 클립보드를 들어 올리는 동안은 넣은 자세로만 보인다 (상태는 그대로). 일시정지 중에도 움직이게 실제 시간으로
@@ -175,20 +177,36 @@ namespace NightPatrol.Phone
         internal static bool AcceptsInput(bool blocked, bool timeRunning, bool menuOpen, bool menuWasOpen) =>
             !blocked && timeRunning && !menuOpen && !menuWasOpen;
 
+        /// <summary>
+        /// 이번 프레임 마우스 클릭을 휴대폰이 받을지: 지난 프레임에도 지금도 커서가 잡혀 있을 때만.
+        /// 커서가 풀린 동안의 클릭은 커서를 다시 잡는 데만 쓰인다 (PlayerLook) — 카메라가 열려 있어도 한 장을 쓰지 않게 (Update 순서와 상관없이)
+        /// </summary>
+        internal static bool AcceptsPointer(bool cursorWasLocked, bool cursorLocked) => cursorWasLocked && cursorLocked;
+
         private void HandleInput()
         {
             var mouse = Mouse.current;
-            if (HandlePointerInput(mouse != null && mouse.leftButton.wasPressedThisFrame,
+            if (AcceptsPointer(cursorWasLocked, Cursor.lockState == CursorLockMode.Locked) &&
+                HandlePointerInput(mouse != null && mouse.leftButton.wasPressedThisFrame,
                                    mouse != null && mouse.rightButton.wasPressedThisFrame)) return;
             Route(Pressed(phoneInput, Key.Q), Pressed(interactInput, Key.E),
                 mouse != null ? mouse.scroll.ReadValue().y : 0f, Time.unscaledTime);
         }
 
-        /// <summary>좌클릭은 홈에서 앱 열기 또는 카메라 촬영, 우클릭은 앱 뒤로/폰 넣기. 폰을 넣은 동안은 무시.</summary>
+        /// <summary>
+        /// 마우스: 좌클릭은 홈에서 앱 열기, 카메라에서 찍기, 손에 든 채 울리면 받기(E·Q와 같음).
+        /// 우클릭은 앱이면 뒤로, 홈이면 넣기, 통화 중이면 끊기, 울리는 중이면 넣기(주머니에서 계속 울림).
+        /// 폰을 넣은 동안·메뉴가 열린 동안은 무시 (false — 키 입력으로 넘어감). 커서가 풀린 동안의 클릭은 부르기 전에 거른다
+        /// </summary>
         public bool HandlePointerInput(bool leftPressed, bool rightPressed)
         {
             if (!inHand || !AcceptsInput(IsBlocked, Time.timeScale > 0f,
                     journal != null && journal.IsMenuOpen, menuWasOpen)) return false;
+            if (leftPressed && State == PhoneState.Ringing)
+            {
+                if (takenOutFrame != Time.frameCount) Answer();
+                return true;
+            }
             if (rightPressed)
             {
                 if (State == PhoneState.Held && screen != null && screen.Back()) return true;

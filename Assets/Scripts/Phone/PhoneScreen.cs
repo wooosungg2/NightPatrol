@@ -466,9 +466,6 @@ namespace NightPatrol.Phone
             if (hint != null) hint.text = "휠 고르기 · 좌클릭 열기 · 우클릭 넣기";
         }
 
-        private string PhoneKey => phone != null ? phone.PhoneKey : "Q";
-        private string InteractKey => phone != null ? phone.InteractKey : "E";
-
         private void ShowClock()
         {
             if (clock == null) return;
@@ -541,7 +538,7 @@ namespace NightPatrol.Phone
             callStatus.text = CallStatus(state, playback);
             bool ringing = state == PhoneState.Ringing;
             callButton.color = ringing ? CallGreen : CallRed;
-            callAction.text = ringing ? $"{PhoneKey} 받기" : $"{PhoneKey} 끊기";
+            callAction.text = ringing ? "좌클릭 받기" : "우클릭 끊기";   // 화면이 보이면 손에 든 것 — 마우스로 (Q·E도 됨)
         }
 
         /// <summary>통화 화면 상태 글: "전화 옴" / "연결 중…" / "통화 중 0:12"</summary>

@@ -149,6 +149,22 @@ namespace NightPatrol.Tests
             Assert.IsTrue(run.Photos.IsCaptured(ghost));
         }
 
+        // 06_04b 마우스: 카메라 안에서 좌클릭 = 찍기, 우클릭 = 홈으로
+        [UnityTest]
+        public IEnumerator Mouse_LeftTakesAPicture_RightGoesHome()
+        {
+            yield return MakePhone();
+            var phone = app.GetComponentInParent<PhoneHolder>();
+            phone.TakeOut();
+            yield return null;
+            screen.Open(app);
+            SetField(app, "retakeSeconds", 0f);
+            Assert.IsTrue(phone.HandlePointerInput(true, false));
+            Assert.AreEqual(1, run.Photos.Shots, "좌클릭: 찍기");
+            Assert.IsTrue(phone.HandlePointerInput(false, true));
+            Assert.IsNull(screen.OpenApp, "우클릭: 홈으로");
+        }
+
         [UnityTest]
         public IEnumerator ShotLimit_StopsTheShutter()
         {
