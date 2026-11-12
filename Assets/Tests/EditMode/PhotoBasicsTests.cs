@@ -176,12 +176,12 @@ namespace NightPatrol.Tests
         }
 
         [Test]
-        public void CameraApp_IsFirstInTheDock()
+        public void CameraApp_IsInTheDock_AfterTheCallApp()
         {
             var app = New("Camera").AddComponent<CameraApp>();
             var call = New("Call").AddComponent<CallApp>();
             Assert.IsTrue(app.InDock);
-            Assert.Less(app.Order, call.Order, "꺼낼 때 골라져 있도록 전화보다 앞");
+            Assert.Greater(app.Order, call.Order, "꺼낼 때는 전화가 골라져 있고 카메라는 그 뒤 칸");
         }
     }
 }

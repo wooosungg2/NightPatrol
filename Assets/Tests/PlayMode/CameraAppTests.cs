@@ -13,7 +13,7 @@ using UnityEngine.TestTools;
 
 namespace NightPatrol.Tests
 {
-    // 06_04 카메라 앱: 독 첫 칸(꺼내면 골라져 있음), 찍으면 이번 층 기록에 남고 화면에는 결과가 안 보임,
+    // 06_04 카메라 앱: 독 셋째 칸(전화·메시지 다음), 찍으면 이번 층 기록에 남고 화면에는 결과가 안 보임,
     // 장수 제한, 다시 찍기 대기, 층이 바뀌면 사진첩·장수 처음부터, 휠로 사진첩. 키 입력 대신 앱·화면 함수를 부른다
     public class CameraAppTests
     {
@@ -101,11 +101,11 @@ namespace NightPatrol.Tests
         }
 
         [UnityTest]
-        public IEnumerator Camera_IsFirstInTheDock_AndPickedWhenTakenOut()
+        public IEnumerator Camera_IsThirdInTheDock_AndThePhoneAppIsPickedWhenTakenOut()
         {
             yield return MakePhone();
-            CollectionAssert.AreEqual(new[] { "카메라", "전화", "메시지", "인터넷" }, Titles(screen.Apps));
-            Assert.AreEqual("카메라", screen.Selected.Title);
+            CollectionAssert.AreEqual(new[] { "전화", "메시지", "카메라", "인터넷" }, Titles(screen.Apps));
+            Assert.AreEqual("전화", screen.Selected.Title);
         }
 
         [UnityTest]
