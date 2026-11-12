@@ -147,21 +147,62 @@ namespace NightPatrol.Tests
             Assert.AreEqual(1, run.Photos.RequiredAtStart);
         }
 
-        // F1 "사진": 찍을 곳을 몰라 판정에서 뺀 이상현상이 항상 보인다 (경고는 콘솔에 한 번뿐이라)
+        // F1 "사진": 찍을 곳을 못 찾아 판정에서 뺀 이상현상이 항상 보인다 (경고는 콘솔에 한 번뿐이라)
         [Test]
         public void PhotoText_ShowsAnomaliesWithNothingToPhotograph()
         {
             run.RestartFloor();
             anomaly.Activate();
-            var bare = New("LightColorAnomaly_01").AddComponent<FakeAnomaly>();   // 렌더러도 알려 준 물체도 없음
+            var bare = New("SoundAnomaly_01").AddComponent<FakeAnomaly>();   // 렌더러도 바꾼 물체도 없음
             bare.Activate();
 
             string text = NightPatrol.Debugging.DevMenu.PhotoText(run);
 
             StringAssert.Contains("찍음 0/1", text);
-            StringAssert.Contains("안 찍음: FixedImageAnomaly_01", text);
-            StringAssert.Contains("찍을 곳 모름", text);
-            StringAssert.Contains("LightColorAnomaly_01", text);
+            StringAssert.Contains("안 찍음: FixedImageAnomaly_01(자기 아래)", text);
+            StringAssert.Contains("찍을 곳 못 찾음", text);
+            StringAssert.Contains("SoundAnomaly_01", text);
+        }
+
+        // 맵의 물체를 바꾸는 이상현상 (빨간 모니터처럼): 바꾼 물체를 되돌리려고 칸에 들고 있을 뿐, 따로 알려 주지 않는다
+        private class RepaintAnomaly : Anomaly
+        {
+            public Renderer screen;
+            public Material paint;
+            private Material before;
+
+            public override void Activate()
+            {
+                before = screen.sharedMaterial;
+                screen.sharedMaterial = paint;
+                IsActive = true;
+            }
+
+            public override void Deactivate()
+            {
+                if (IsActive) screen.sharedMaterial = before;
+                IsActive = false;
+            }
+        }
+
+        // 층이 시작될 때 켜진 이상현상이 바깥 물체를 바꾸면, 시스템이 그 물체를 찾아 찍어야 할 것에 넣는다
+        [Test]
+        public void FloorStart_FindsTheOutsideObjectAnAnomalyChanged()
+        {
+            var monitor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            created.Add(monitor);
+            monitor.name = "Monitor";
+            var red = New("RedMonitorAnomaly_01").AddComponent<RepaintAnomaly>();
+            red.screen = monitor.GetComponent<Renderer>();
+            red.paint = new Material(red.screen.sharedMaterial);
+            run.FloorStarted += _ => red.Activate();
+
+            run.RestartFloor();
+
+            Assert.AreEqual(1, run.Photos.RequiredAtStart);
+            CollectionAssert.AreEqual(new[] { "RedMonitorAnomaly_01" }, run.Judge().Unphotographed);
+            StringAssert.Contains("RedMonitorAnomaly_01(Monitor)", NightPatrol.Debugging.DevMenu.PhotoText(run));
+            Object.DestroyImmediate(red.paint);
         }
 
         [Test]
