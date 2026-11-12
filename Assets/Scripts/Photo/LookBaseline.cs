@@ -6,7 +6,7 @@ namespace NightPatrol.Photo
     /// <summary>
     /// 화면에 보이는 것들(렌더러·빛)의 모습을 한순간 적어 둔 것. 나중에 어떤 물체가 "그때와 달라졌는지" 본다.
     /// 이상현상이 무엇을 바꿨는지 시스템이 스스로 찾는 데 쓴다 (PhotoSubjects) — 이상현상 쪽에서 따로 알려 줄 필요가 없게.
-    /// 모습 = 켜짐 + 재질(색·그림) + 프로퍼티 블록 색. 자리(위치·방향·크기)는 따로 본다. 빛은 켜짐·색·밝기
+    /// 모습 = 켜짐 + 레이어(카메라로만 보이게 바꾼 것) + 재질(색·그림) + 프로퍼티 블록 색. 자리(위치·방향·크기)는 따로 본다. 빛은 켜짐·색·밝기
     /// </summary>
     public sealed class LookBaseline
     {
@@ -54,6 +54,7 @@ namespace NightPatrol.Photo
         private static int Look(Renderer renderer, Dictionary<Material, int> materialLooks)
         {
             int look = renderer.enabled && renderer.gameObject.activeInHierarchy ? 1 : 0;
+            look = Mix(look, renderer.gameObject.layer);
             renderer.GetSharedMaterials(materials);
             foreach (var material in materials)
             {

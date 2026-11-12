@@ -6,6 +6,7 @@ using NightPatrol.Anomalies;
 using NightPatrol.Interaction;
 using NightPatrol.Journal;
 using NightPatrol.Phone;
+using NightPatrol.Photo;
 using NightPatrol.Run;
 using NUnit.Framework;
 using UnityEngine;
@@ -124,6 +125,28 @@ namespace NightPatrol.Tests
             Assert.IsTrue(run.Photos.IsCaptured(anomaly));
             Assert.AreEqual(1, app.Pictures.Count);
             Assert.IsFalse(app.HasLens, "앱을 안 열고 찍었으면 잠깐 만든 카메라는 지움");
+        }
+
+        // 카메라로만 보이는 이상현상(CameraOnly 레이어): 눈은 안 그리고 뷰파인더는 그린다. 찍힘 판정은 다른 이상현상과 같다
+        [UnityTest]
+        public IEnumerator CameraOnlyAnomaly_ShowsInTheViewfinderOnly_AndCanBePhotographed()
+        {
+            yield return MakePhone();
+            int layer = CameraOnlyLayer.Index;
+            Assert.GreaterOrEqual(layer, 0, "CameraOnly 레이어 없음 (Project Settings → Tags and Layers)");
+            var eye = app.GetComponentInParent<Camera>();
+            eye.cullingMask = ~(1 << layer) & ~(1 << LayerMask.NameToLayer("FirstPerson"));   // Player 프리팹 PlayerCamera처럼
+            var ghost = AnomalyInFront();
+            foreach (var part in ghost.GetComponentsInChildren<Transform>(true)) part.gameObject.layer = layer;
+
+            screen.Open(app);   // 앱을 열면 뷰파인더 카메라를 만든다
+            Assert.IsTrue(app.HasLens);
+            Assert.IsTrue(CameraOnlyLayer.In(app.Lens.cullingMask), "뷰파인더는 CameraOnly를 그림");
+            Assert.IsFalse(CameraOnlyLayer.In(eye.cullingMask), "눈은 그대로 안 그림");
+            Assert.AreEqual(eye.cullingMask | (1 << layer), app.Lens.cullingMask, "그 밖에는 눈과 같은 것을 그림");
+
+            Assert.IsNotNull(app.Take());
+            Assert.IsTrue(run.Photos.IsCaptured(ghost));
         }
 
         [UnityTest]

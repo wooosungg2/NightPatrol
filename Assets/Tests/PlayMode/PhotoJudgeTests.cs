@@ -277,6 +277,18 @@ namespace NightPatrol.Tests
             CollectionAssert.AreEqual(new Anomaly[] { anomaly }, Capture());
         }
 
+        // 맵 물체를 카메라로만 보이게(CameraOnly 레이어로) 바꾼 이상현상: 레이어가 바뀐 것도 달라진 것으로 찾는다
+        [Test]
+        public void ObjectMadeCameraOnly_IsFound()
+        {
+            Assert.GreaterOrEqual(CameraOnlyLayer.Index, 0, "CameraOnly 레이어 없음");
+            var statue = MapCube("Statue", Front);
+            var anomaly = Changing("Ghost statue", statue);
+            anomaly.change = _ => statue.layer = CameraOnlyLayer.Index;
+            StartFloor(anomaly);
+            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, Capture());
+        }
+
         // 조명 구역처럼 여러 부분으로 된 물체를 들고 있어도, 달라진 부분(등 하나)만 찍을 곳이 된다
         [Test]
         public void OnlyTheChangedPart_OfAnObjectWithManyParts()

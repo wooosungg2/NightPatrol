@@ -5,6 +5,7 @@ using NightPatrol.Interaction;
 using NightPatrol.Journal;
 using NightPatrol.Menu;
 using NightPatrol.Phone;
+using NightPatrol.Photo;
 using NightPatrol.Player;
 using NightPatrol.Run;
 using NUnit.Framework;
@@ -160,6 +161,19 @@ namespace NightPatrol.Tests
             var phone = prefab.GetComponentInChildren<PhoneHolder>(true);
             Assert.IsNotNull(phone, "PhoneHolder 없음");
             PhoneHomeTests.AssertOnScreen((Vector3)PhoneHomeTests.Field(phone, "heldPosition"), (Vector3)PhoneHomeTests.Field(phone, "heldEuler"));
+        }
+
+        // 카메라로만 보이는 것(CameraOnly 레이어)은 눈(PlayerCamera)과 손에 든 것 카메라(ViewModelCamera)가 안 그린다 — 휴대폰 뷰파인더만
+        [Test]
+        public void CameraOnlyLayer_Exists_AndThePlayerCamerasDoNotDrawIt()
+        {
+            Assert.GreaterOrEqual(CameraOnlyLayer.Index, 0, "Project Settings → Tags and Layers에 CameraOnly 레이어가 없음");
+            var cameras = prefab.GetComponentsInChildren<Camera>(true);
+            Assert.IsNotEmpty(cameras);
+            var problems = new List<string>();
+            foreach (var camera in cameras)
+                if (CameraOnlyLayer.In(camera.cullingMask)) problems.Add(camera.name + "이 CameraOnly를 그림 (Culling Mask에서 빼야 함)");
+            Assert.IsEmpty(problems, string.Join(" / ", problems));
         }
     }
 }

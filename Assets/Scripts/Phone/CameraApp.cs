@@ -304,6 +304,7 @@ namespace NightPatrol.Phone
             go.transform.SetParent(eye.transform, false);
             lens = go.AddComponent<Camera>();
             lens.CopyFrom(eye);
+            lens.cullingMask = CameraOnlyLayer.With(eye.cullingMask);   // 카메라로만 보이는 것(CameraOnly 레이어)은 뷰파인더에만
             lens.targetTexture = preview;
             lens.aspect = (float)Width / Height;   // 판정도 이 카메라로 하므로 뷰파인더와 조준 박스가 같은 자리
             lens.enabled = false;   // 보일 때만 손으로 그린다
