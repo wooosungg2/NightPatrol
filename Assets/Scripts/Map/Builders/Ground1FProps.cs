@@ -310,6 +310,7 @@ namespace NightPatrol
 			for (int row = 0; row < 2; row++)
 				for (int i = 0; i < 5; i++)
 				{
+					if (i != 1 && i != 3) continue;   // 2열·4열만 (4개)
 					float x = -16f + i * 8f + (row == 1 ? 4f : 0f) + (float)(rng.NextDouble() - 0.5) * 0.8f;
 					float z = z0 + 9f + row * 9f;
 					var p = Group(g, "Planter");
@@ -364,15 +365,7 @@ namespace NightPatrol
 				l.type = LightType.Point; l.range = 9f; l.intensity = 1.6f; l.color = lamp; l.shadows = LightShadows.None;
 			}
 			// 맞은편 벽돌 공학관 (사진: 같은 벽돌·유리탑, 1층 파란 현수막)
-			BrickBuilding(g, new Vector3(4f, 0f, z0 + D - 12f), 46f, 17f, 14f, rng);
-			// 왼쪽 밝은 건물
-			var white = Group(g, "LightBuilding");
-			white.localPosition = new Vector3(-36f, 0f, z0 + D - 18f);
-			white.localRotation = Quaternion.Euler(0f, 60f, 0f);
-			NoCol(Box(white, "Mass", new Vector3(0f, 9f, 0f), new Vector3(22f, 18f, 12f), new Color(0.80f, 0.80f, 0.78f)));
-			for (int f = 0; f < 5; f++)
-				for (float x = -9.5f; x <= 9.6f; x += 2.4f)
-					NoCol(Box(white, "Window", new Vector3(x, f * 3.5f + 2f, -6.03f), new Vector3(1.7f, 1.3f, 0.04f), rng.NextDouble() < 0.06 ? lamp : new Color(0.08f, 0.10f, 0.13f)));
+			BrickBuilding(g, new Vector3(4f, 0f, z0 + D - 29f), 46f, 18f, 14f, rng);   // 앞면만 보이므로 앞면 판만
 		}
 
 		// 벽돌 공학관 앞면 (기둥 칸·창·유리탑·받침). pos = 앞면 가운데 바닥, 앞면이 frame 쪽(-Z)을 봄
@@ -381,33 +374,22 @@ namespace NightPatrol
 			var b = Group(parent, "BrickBuilding");
 			b.localPosition = pos;
 			Color brick = new Color(0.66f, 0.38f, 0.27f), pier = new Color(0.60f, 0.34f, 0.24f), frameC = new Color(0.62f, 0.64f, 0.64f), glass = new Color(0.10f, 0.16f, 0.15f), lit = new Color(0.95f, 0.86f, 0.62f);
-			NoCol(Box(b, "Mass", new Vector3(0f, h * 0.5f, d * 0.5f), new Vector3(w, h, d), brick));
+			NoCol(Box(b, "Mass", new Vector3(0f, h * 0.5f, 0.15f), new Vector3(w, h, 0.3f), brick));   // 앞면 판 (뒷면·옆면은 안 보여서 없음)
 			NoCol(Box(b, "Base", new Vector3(0f, 0.5f, -0.04f), new Vector3(w, 1f, 0.08f), new Color(0.62f, 0.62f, 0.60f)));
 			NoCol(Box(b, "Cap", new Vector3(0f, h - 0.15f, -0.06f), new Vector3(w + 0.1f, 0.3f, 0.12f), new Color(0.80f, 0.79f, 0.76f)));
 			float tw = 4f;
 			NoCol(Box(b, "GlassTower", new Vector3(0f, h * 0.5f, -0.1f), new Vector3(tw, h, 0.1f), new Color(0.12f, 0.18f, 0.20f)));
-			int bays = Mathf.RoundToInt(w / 3f);
-			float bay = w / bays;
+			// 창: 3m 칸 그림 판 (생성기가 M_Gen_Facade를 입힘). 앞면 왼쪽 끝을 3m 배수에 맞춤은 생략 (멀어서 어긋남이 안 보임)
+			int bays = Mathf.FloorToInt(w / 3f);
+			float bay = 3f, xs = -bays * bay * 0.5f;
+			NoCol(Box(b, "WindowBand", new Vector3(-tw * 0.25f - (w * 0.25f), (1f + h) * 0.5f, -0.03f), new Vector3(w * 0.5f - tw * 0.5f, h - 1f, 0.02f), glass));
+			NoCol(Box(b, "WindowBand", new Vector3(tw * 0.25f + (w * 0.25f), (1f + h) * 0.5f, -0.03f), new Vector3(w * 0.5f - tw * 0.5f, h - 1f, 0.02f), glass));
 			for (int i = 0; i <= bays; i++)
 			{
-				float x = -w * 0.5f + i * bay;
+				float x = xs + i * bay;
 				if (Mathf.Abs(x) < tw * 0.5f) continue;
 				NoCol(Box(b, "Pier", new Vector3(x, h * 0.5f, -0.06f), new Vector3(0.38f, h - 1f, 0.12f), pier));
 			}
-			for (int i = 0; i < bays; i++)
-			{
-				float x = -w * 0.5f + (i + 0.5f) * bay;
-				if (Mathf.Abs(x) < tw * 0.5f + 0.5f) continue;
-				for (int f = 0; f < 5; f++)
-				{
-					float y = f * 3.4f + 1.9f;
-					NoCol(Box(b, "WinFrame", new Vector3(x, y, -0.02f), new Vector3(2.3f, 1.7f, 0.04f), frameC));
-					NoCol(Box(b, "WinGlass", new Vector3(x, y, -0.045f), new Vector3(2.15f, 1.55f, 0.02f), rng.NextDouble() < 0.06 ? lit : glass));
-				}
-			}
-			// 1층 파란 현수막 몇 장
-			for (int i = 0; i < 4; i++)
-				NoCol(Box(b, "Banner", new Vector3(-12f + i * 7f, 1.6f, -0.3f), new Vector3(2.2f, 1.4f, 0.03f), new Color(0.20f, 0.45f, 0.75f)));
 		}
 
 		public static Color BinColor => BinBlue;

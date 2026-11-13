@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace NightPatrol
@@ -117,16 +117,9 @@ namespace NightPatrol
 				float y = 0.05f + i * (h - 0.1f) / 5f;
 				NoCol(Box(s, "Shelf", new Vector3(0f, y, 0f), new Vector3(w - 0.04f, 0.02f, d), WoodDark, false));
 				if (i == 5) break;
-				// 책: 칸마다 70~95% 채움, 높이·두께 제각각, 가끔 눕힌 책
-				float x = -w * 0.5f + 0.03f, end = w * 0.5f - 0.03f - (float)rng.NextDouble() * 0.2f;
-				while (x < end)
-				{
-					float bw = 0.025f + (float)rng.NextDouble() * 0.035f, bh = 0.2f + (float)rng.NextDouble() * 0.12f;
-					if (x + bw > end) break;
-					var b = Box(s, "Book", new Vector3(x + bw * 0.5f, y + 0.01f + bh * 0.5f, 0.02f), new Vector3(bw, bh, d - 0.08f), BookCols[rng.Next(BookCols.Length)], false);
-					NoCol(b);
-					x += bw + 0.002f;
-				}
+				// 책: 칸마다 책등 그림이 그려진 판 1장 (책 한 권씩 만들면 씬이 너무 커짐). 재질은 생성기가 M_Gen_Books0~2로 입힘
+				NoCol(Box(s, $"BookRow_{rng.Next(3)}", new Vector3(0f, y + 0.01f + 0.15f, 0.02f), new Vector3(0.84f, 0.30f, d - 0.08f), new Color(0.35f, 0.25f, 0.2f), false));
+				float end = w * 0.5f - 0.05f;
 				if (rng.NextDouble() < 0.35)
 					NoCol(Box(s, "LyingBooks", new Vector3(end - 0.08f, y + 0.05f, 0.02f), new Vector3(0.22f, 0.08f, d - 0.1f), BookCols[rng.Next(BookCols.Length)], false));
 			}

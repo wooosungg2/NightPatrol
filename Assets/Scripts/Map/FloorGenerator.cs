@@ -691,38 +691,39 @@ namespace NightPatrol
 		static readonly Color BaseConcrete = new Color(0.62f, 0.62f, 0.60f);
 		static readonly Color CapBand = new Color(0.80f, 0.79f, 0.76f);
 
-		// 외벽 한 면: zFace = 벽면, outward = 바깥 방향(+1 북쪽 / -1 남쪽). 3m 칸마다 벽돌 기둥, 층(3.6m)마다 창 하나
+		// 외벽 한 면: zFace = 벽면, outward = 바깥 방향(+1 북쪽 / -1 남쪽).
+		// 창은 칸(3m)마다 5층 높이 그림 판 1장 (M_Gen_Facade: 3m × 3.6m에 창 하나) — 창마다 조각을 만들면 씬이 너무 커짐.
+		// 칸은 월드 X 3m 배수에 맞춰야 그림 창과 벽돌 기둥이 어긋나지 않음 (TextureTiler가 월드 좌표로 그림을 맞춤)
 		void Facade(Transform parent, float x0, float x1, float zFace, float outward, float top, System.Random rng)
 		{
-			if (x1 - x0 < 1f) return;
+			if (x1 - x0 < 3.2f) return;
 			var g = new GameObject("Facade").transform;
 			g.SetParent(parent, false);
 			g.gameObject.isStatic = true;
 			float o = outward;
-			void Part(string n, float cx, float cy, float w, float h, float protrude, Color c)
+			GameObject Part(string n, float cx, float cy, float w, float h, float protrude, Color c)
 			{
 				var go = GroundExitBuilder.Box(g, n, new Vector3(cx, cy, zFace + o * protrude * 0.5f), new Vector3(w, h, protrude), null, c);
 				GroundExitBuilder.NoCol(go);
+				return go;
 			}
-			// 아래 콘크리트 받침 + 위 띠
+			const float bay = 3f;
+			float xs = Mathf.Ceil(x0 / bay) * bay;
+			int bays = Mathf.FloorToInt((x1 - xs) / bay);
+			if (bays < 1) return;
 			Part("Base", (x0 + x1) * 0.5f, 0.5f, x1 - x0, 1.0f, 0.08f, BaseConcrete);
 			Part("Cap", (x0 + x1) * 0.5f, top - 0.15f, x1 - x0 + 0.1f, 0.3f, 0.12f, CapBand);
-			int bays = Mathf.Max(1, Mathf.RoundToInt((x1 - x0) / 3.0f));
-			float bay = (x1 - x0) / bays;
-			for (int i = 0; i <= bays; i++)
-				Part("Pier", x0 + i * bay, (top - 0.3f) * 0.5f + 0.5f, 0.38f, top - 1.3f, 0.12f, BrickPier);
+			// 창 그림 판 (받침 위 ~ 띠 아래), 벽면에서 2cm
 			int floors = Mathf.Max(1, Mathf.RoundToInt(top / 3.6f));
+			float bandTop = Mathf.Min(top - 0.3f, floors * 3.6f);
+			Part("WindowBand", xs + bays * bay * 0.5f, (1.0f + bandTop) * 0.5f, bays * bay, bandTop - 1.0f, 0.02f, WindowGlass);
+			for (int i = 0; i <= bays; i++)
+				Part("Pier", xs + i * bay, (top - 0.3f) * 0.5f + 0.5f, 0.38f, top - 1.3f, 0.12f, BrickPier);
+			// 불 켜진 창 몇 칸만 따로 (그림 창 위에 겹침)
 			for (int i = 0; i < bays; i++)
-			{
-				float cx = x0 + (i + 0.5f) * bay, ww = Mathf.Min(2.3f, bay - 0.6f);
 				for (int f = 0; f < floors; f++)
-				{
-					float cy = f * 3.6f + 1.95f;
-					Part("WinFrame", cx, cy, ww, 1.7f, 0.04f, WindowFrame);
-					Part("WinGlass", cx - ww * 0.25f + 0.0f, cy, ww * 0.5f - 0.08f, 1.55f, 0.06f, rng.NextDouble() < 0.05 ? WindowLit : WindowGlass);
-					Part("WinGlass", cx + ww * 0.25f, cy, ww * 0.5f - 0.08f, 1.55f, 0.06f, rng.NextDouble() < 0.05 ? WindowLit : WindowGlass);
-				}
-			}
+					if (rng.NextDouble() < 0.04)
+						Part("WinLit", xs + (i + 0.5f) * bay, f * 3.6f + 1.8f, 2.1f, 1.5f, 0.035f, WindowLit);
 		}
 
 		// 입구 위 세로 유리벽 (외관 사진): 홀 북쪽 면, 회색 격자 + 짙은 유리
@@ -826,7 +827,8 @@ namespace NightPatrol
 		void ApplyGeneratedMaterials()
 		{
 #if UNITY_EDITOR
-			Material M(string name, string file, float meters, Color tint, float smooth)
+			Material M(string name, string file, float meters, Color tint, float smooth) => M2(name, file, new Vector2(meters, meters), tint, smooth);
+			Material M2(string name, string file, Vector2 meters, Color tint, float smooth)
 			{
 				string path = $"Assets/Materials/Generated/M_Gen_{name}.mat";
 				var m = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -846,7 +848,7 @@ namespace NightPatrol
 				}
 				m.SetTexture("_BaseMap", tex);
 				m.SetColor("_BaseColor", tint);
-				m.SetTextureScale("_BaseMap", Vector2.one / Mathf.Max(0.05f, meters));
+				m.SetTextureScale("_BaseMap", new Vector2(1f / Mathf.Max(0.05f, meters.x), 1f / Mathf.Max(0.05f, meters.y)));
 				m.SetFloat("_Smoothness", smooth);
 				EditorUtility.SetDirty(m);
 				return m;
@@ -860,6 +862,13 @@ namespace NightPatrol
 			var tactile = M("Tactile", "tactile.png", 0.3f, Color.white, 0.2f);
 			var woodL = M("WoodLight", "wood_light.png", 1f, Color.white, 0.3f);
 			var woodD = M("WoodDark", "wood_dark.png", 1f, Color.white, 0.25f);
+			var facade = M2("Facade", "facade_bay.png", new Vector2(3f, 3.6f), Color.white, 0.2f);
+			var books = new[]
+			{
+				M2("Books0", "books_0.png", new Vector2(0.84f, 0.30f), Color.white, 0.15f),
+				M2("Books1", "books_1.png", new Vector2(0.84f, 0.30f), Color.white, 0.15f),
+				M2("Books2", "books_2.png", new Vector2(0.84f, 0.30f), Color.white, 0.15f),
+			};
 			if (brick == null) { Debug.LogWarning("[FloorGenerator] Assets/Textures/Generated 텍스처가 없어 재질을 넣지 않음", this); return; }
 
 			int n = 0;
@@ -867,7 +876,9 @@ namespace NightPatrol
 			{
 				string nm = r.gameObject.name, pn = r.transform.parent != null ? r.transform.parent.name : "";
 				Material m = null;
-				if (nm == "Mass" && (pn == "Building_Mass" || pn == "BrickBuilding")) m = brick;
+				if (nm == "WindowBand") m = facade;
+				else if (nm.StartsWith("BookRow_") && nm.Length > 8 && int.TryParse(nm.Substring(8), out int bi) && bi >= 0 && bi < books.Length) m = books[bi];
+				else if (nm == "Mass" && (pn == "Building_Mass" || pn == "BrickBuilding")) m = brick;
 				else if (nm == "Mass" && pn == "LightBuilding") m = concrete;
 				else if (nm == "Pier") m = brickDark;
 				else if (pn == "Facade" && nm == "Base") m = granite;

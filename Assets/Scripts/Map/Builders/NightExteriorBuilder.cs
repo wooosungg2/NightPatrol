@@ -114,28 +114,6 @@ namespace NightPatrol
 				}
 			}
 
-			// 건물 둘레 나무 + 남쪽 산 (외관 항공 사진: 건물 뒤로 숲 언덕). 위층 창밖에 내려다보임
-			{
-				var trees = Group(ground, "Campus_Trees");
-				float x0 = building.min.x - 6f, x1 = building.max.x + 6f, zs = building.min.z - 7f, ze = building.max.z + 7f;
-				for (float x = x0; x <= x1; x += R(5f, 8f))
-				{
-					GroundExitBuilder.Tree(trees, new Vector3(x, baseY, zs - R(0f, 4f)), R(0.9f, 1.4f), rng);
-				}
-				for (float z = zs; z <= ze; z += R(5f, 8f))
-				{
-					GroundExitBuilder.Tree(trees, new Vector3(x0 - R(0f, 4f), baseY, z), R(0.9f, 1.4f), rng);
-					GroundExitBuilder.Tree(trees, new Vector3(x1 + R(0f, 4f), baseY, z), R(0.9f, 1.4f), rng);
-				}
-				var hill = Group(ground, "Hill_South");
-				for (int i = 0; i < 9; i++)
-				{
-					float hx = building.center.x + (i - 4) * building.size.x * 0.3f + R(-6f, 6f);
-					var h = Sphere(hill, "Hill", new Vector3(hx, baseY - 8f, building.min.z - 45f - R(0f, 20f)), R(18f, 30f), new Color(0.05f, 0.08f, 0.05f), 0f);
-					NoCol(h);
-				}
-			}
-
 			// 복도 반사 프로브
 			if (s.reflectionProbes && corridors != null)
 			{
