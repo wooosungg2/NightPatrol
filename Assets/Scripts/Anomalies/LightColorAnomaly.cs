@@ -1,11 +1,15 @@
-
+﻿
 using UnityEngine;
 using NightPatrol.Lighting;
+using NightPatrol.Photo;
 
 namespace NightPatrol.Anomalies
 {
-    public class LightColorAnomaly : Anomaly
+    public class LightColorAnomaly : Anomaly, IPhotoVisual
     {
+        /// <summary>색이 바뀐 등 하나 (촬영용). 꺼져 있으면 null</summary>
+        public GameObject PhotoVisual => IsActive && zone != null ? zone.GetFixture(lightIndex) : null;
+
         [Header("조명 구간 ID")]
         [SerializeField]
         private string zoneId = "Corridor.Lights.00";

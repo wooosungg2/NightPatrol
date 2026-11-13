@@ -211,6 +211,7 @@ namespace NightPatrol
 			public List<WindowWall> windowWalls = new List<WindowWall>(); // 창문이 있는 바깥벽
 			public List<Solid> solids = new List<Solid>();                // 그 밖의 상자 (발코니 난간벽·바닥 등)
 			public List<Rect> skylights = new List<Rect>();               // 천장이 뚫리고 유리 지붕이 있는 곳 (x, z, 폭, 깊이)
+			public Vector2 elevBoardWall;                                // 엘리베이터 서쪽 옆 블록 벽 (x 시작, x 끝, z = 0, 복도는 +Z). 게시판 자리
 			public Rect hallNorth, hallSouth;                             // 동쪽 홀 (자판기 쪽 / 학습공간 쪽). 크기 0이면 없음
 			public List<Furniture> furniture = new List<Furniture>();     // 사물함·벤치 등 (사진 기준 위치)
 		}
@@ -432,6 +433,7 @@ namespace NightPatrol
 			float menL = elevStart + ELEV;             // 남자화장실 앞 공간 서쪽 끝
 			float wcBack = ELEV;                       // 화장실 앞벽 = 엘리베이터 뒷면 선
 			south.Add("ELEV", RoomType.Elevator, elevStart, ELEV, false, 0f, ELEV);
+			f.elevBoardWall = new Vector2(blockL, elevStart);
 			// 여자: 통로 끝 화장실 앞벽에 나무문(통로 가운데). 남자: 엘리베이터 벽에서 10cm 띄운 나무문
 			south.Add("WC-F-E", RoomType.Bathroom, passL, coreW * 0.5f - F_WALL_E, true, wcBack, E_WC_DEPTH,
 				doorAt: passL + PASS_L * 0.5f, doorWidth: WC_DOOR).Fixtures(2, 2) // 실측: 세면대 2, 변기 2

@@ -1,10 +1,14 @@
-
+ï»¿
 using UnityEngine;
+using NightPatrol.Photo;
 
 namespace NightPatrol.Anomalies
 {
-    public class BellColorAnomaly : Anomaly
+    public class BellColorAnomaly : Anomaly, IPhotoVisual
     {
+        /// <summary>ìƒ‰ì´ ë°”ë€ ë²¨ (ì´¬ì˜ìš©). êº¼ì ¸ ìˆìœ¼ë©´ null</summary>
+        public GameObject PhotoVisual => IsActive && bellRenderer != null ? bellRenderer.gameObject : null;
+
         [Header("Bell Renderer")]
         [SerializeField]
         private Renderer bellRenderer;
@@ -20,7 +24,7 @@ namespace NightPatrol.Anomalies
             if (bellRenderer == null)
             {
                 Debug.LogError(
-                    "[BellColorAnomaly] Bell Renderer°¡ ¾ø½À´Ï´Ù.",
+                    "[BellColorAnomaly] Bell Rendererê°€ ì—†ìŠµë‹ˆë‹¤.",
                     this
                 );
                 return;
@@ -30,7 +34,7 @@ namespace NightPatrol.Anomalies
         }
 
         // ========================================
-        // ÀÌ»óÇö»ó È°¼ºÈ­
+        // ì´ìƒí˜„ìƒ í™œì„±í™”
         // ========================================
 
         public override void Activate()
@@ -43,23 +47,23 @@ namespace NightPatrol.Anomalies
                 originalMaterial == null)
             {
                 Debug.LogWarning(
-                    "[BellColorAnomaly] Renderer ¶Ç´Â MaterialÀ» È®ÀÎÇÏ¼¼¿ä.",
+                    "[BellColorAnomaly] Renderer ë˜ëŠ” Materialì„ í™•ì¸í•˜ì„¸ìš”.",
                     this
                 );
                 return;
             }
 
-            // º§À» ÆÄ¶õ»öÀ¸·Î º¯°æ
+            // ë²¨ì„ íŒŒë€ìƒ‰ìœ¼ë¡œ ë³€ê²½
             bellRenderer.sharedMaterial = blueMaterial;
 
             IsActive = true;
 
-            // Á¡°Ë ´ë»ó¿¡ ÀÌ»óÇö»ó µî·Ï
+            // ì ê²€ ëŒ€ìƒì— ì´ìƒí˜„ìƒ ë“±ë¡
             RegisterAnomaly();
         }
 
         // ========================================
-        // ÀÌ»óÇö»ó ºñÈ°¼ºÈ­
+        // ì´ìƒí˜„ìƒ ë¹„í™œì„±í™”
         // ========================================
 
         public override void Deactivate()
@@ -73,12 +77,12 @@ namespace NightPatrol.Anomalies
 
             IsActive = false;
 
-            // Á¡°Ë ´ë»ó¿¡¼­ ÀÌ»óÇö»ó ÇØÁ¦
+            // ì ê²€ ëŒ€ìƒì—ì„œ ì´ìƒí˜„ìƒ í•´ì œ
             UnregisterAnomaly();
         }
 
         // ========================================
-        // Ãş ÃÊ±âÈ­
+        // ì¸µ ì´ˆê¸°í™”
         // ========================================
 
         public override void ResetAfterFloorReset()

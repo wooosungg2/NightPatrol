@@ -32,6 +32,12 @@ namespace NightPatrol
 	{
 		public bool enabled = true;
 
+		[Header("게시판 포스터")]
+		[Tooltip("포스터 그림 (비워두면 색 판). 게시판마다 몇 장씩 섞어 붙임 — 재질은 Materials/Generated/Poster_이름에 저장")]
+		public Texture2D[] posterTextures;
+		[Tooltip("게시판 포스터 크기 배율 (1 = A4·B5 실제 크기). 칸보다 커지면 칸에 맞춰 줄어듦")] [Range(0.6f, 2f)]
+		public float posterScale = 1.5f;
+
 		[Header("복도 천장 조명 (매입 2등 형광등)")]
 		public bool ceilingLights = true;
 		[Tooltip("등 간격(m), 복도 길이 방향")] public float lightSpacing = 3.0f;
@@ -643,20 +649,176 @@ namespace NightPatrol
 		}
 
 		// ── 게시판 (짙은 테두리 + 코르크 + 게시물). room 로컬, 복도 쪽 면 z = zFace, 가운데 x ──
-		public static void BulletinBoard(Transform room, float x, float zFace, float width)
+		/// <summary>생성기가 매 생성 시작에 채움 (FloorDetailSettings.posterTextures)</summary>
+		public static Texture2D[] PosterTextures;
+		/// <summary>생성기가 매 생성 시작에 채움 (FloorDetailSettings.posterScale)</summary>
+		public static float PosterScale = 1.5f;
+
+		/// <summary>
+		/// 게시판. 포스터는 사람이 붙인 것처럼: 크기(A4·A3·B5)·위치 제각각, 살짝 기울고, 겹치고, 압정·테이프로 고정.
+		/// 배치는 위치로 정한 시드라 다시 생성해도 같음. dense = 엘리베이터 앞처럼 빽빽한 게시판
+		/// </summary>
+		public static void BulletinBoard(Transform room, float x, float zFace, float width, bool dense = false)
 		{
 			var g = Group(room, "BulletinBoard");
 			g.localPosition = new Vector3(x, 0f, zFace);
+			const float y0 = 1.09f, y1 = 1.95f;                       // 판 아래·위 (판 가운데 1.52, 높이 0.86)
 			NoCol(Box(g, "Frame", new Vector3(0f, 1.55f, -0.02f), new Vector3(width, 1.0f, 0.04f), null, new Color(0.25f, 0.26f, 0.28f)));
 			NoCol(Box(g, "Board", new Vector3(0f, 1.52f, -0.041f), new Vector3(width - 0.08f, 0.86f, 0.002f), null, new Color(0.35f, 0.36f, 0.38f)));
 			NoCol(Box(g, "Header", new Vector3(0f, 2.0f, -0.042f), new Vector3(width - 0.08f, 0.08f, 0.002f), null, new Color(0.55f, 0.56f, 0.58f)));
-			Color[] cols = { new Color(0.15f, 0.22f, 0.45f), new Color(0.85f, 0.85f, 0.88f), new Color(0.25f, 0.45f, 0.75f), new Color(0.92f, 0.92f, 0.90f), new Color(0.20f, 0.20f, 0.30f) };
-			for (int k = 0; k < cols.Length; k++)
+
+			Vector3 wp = g.position;
+			var rng = new System.Random(Mathf.RoundToInt(wp.x * 97f) ^ Mathf.RoundToInt(wp.z * 131f) ^ (dense ? 7 : 0));
+			// 칸을 나눠 한 칸에 한 장씩 (사람이 붙인 것처럼 칸 안에서 조금씩 어긋나고 살짝 기욺). 빈 칸도 조금
+			float bw = width - 0.08f;
+			int cols = Mathf.Max(1, Mathf.FloorToInt(bw / (0.27f * Mathf.Max(1f, PosterScale))));
+			float cw = bw / cols, rh = (y1 - y0) / 2f;
+			int k = 0;
+			for (int row = 0; row < 2; row++)
+				for (int c = 0; c < cols; c++)
+				{
+					if (rng.NextDouble() < (dense ? 0.08 : 0.25)) continue;
+					float cx = -bw * 0.5f + (c + 0.5f) * cw, cy = y0 + (row + 0.5f) * rh;
+					PosterInCell(g, rng, cx, cy, cw - 0.04f, rh - 0.04f, -0.046f - (k % 3) * 0.0012f, k);
+					k++;
+				}
+		}
+
+		/// <summary>칸(가운데 cx·cy, 크기 maxW·maxH) 안에 한 장. 조금 어긋나고 살짝 기욺</summary>
+		public static void PosterInCell(Transform parent, System.Random rng, float cx, float cy, float maxW, float maxH, float z, int index)
+		{
+			float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+			Vector2[] sizes = { new Vector2(0.21f, 0.297f), new Vector2(0.182f, 0.257f), new Vector2(0.148f, 0.21f) };
+			Vector2 sz = sizes[rng.Next(sizes.Length)] * PosterScale;
+			if (rng.NextDouble() < 0.12) sz = new Vector2(sz.y, sz.x);
+			float k = Mathf.Min(1f, maxW / sz.x, maxH / sz.y);
+			sz *= k;
+			float jx = Mathf.Max(0f, (maxW - sz.x) * 0.5f), jy = Mathf.Max(0f, (maxH - sz.y) * 0.5f);
+			float tilt = rng.NextDouble() < 0.85 ? R(-1.2f, 1.2f) : R(-3f, 3f);
+			MakePoster(parent, rng, new Vector3(cx + R(-jx, jx), cy + R(-jy, jy), z), sz, tilt, index);
+		}
+
+		/// <summary>
+		/// 벽이나 판에 붙인 종이 한 장. 범위(x0~x1, y0~y1) 안에서 크기·위치·기울기를 고르고 압정 또는 테이프를 붙인다.
+		/// z = 붙는 면 (로컬 -Z가 복도 쪽). 겹칠 때 앞장이 앞으로 오게 부르는 쪽에서 z를 조금씩 당김
+		/// </summary>
+		public static void PinnedPoster(Transform parent, System.Random rng, float x0, float x1, float y0, float y1, float z, int index)
+		{
+			float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+			Vector2 sz = (rng.NextDouble() < 0.5 ? new Vector2(0.21f, 0.297f) : new Vector2(0.182f, 0.257f)) * PosterScale;
+			float cx = R(x0 + sz.x * 0.5f, Mathf.Max(x0 + sz.x * 0.5f, x1 - sz.x * 0.5f));
+			float cy = R(y0 + sz.y * 0.5f, Mathf.Max(y0 + sz.y * 0.5f, y1 - sz.y * 0.5f));
+			MakePoster(parent, rng, new Vector3(cx, cy, z), sz, R(-1.5f, 1.5f), index);
+		}
+
+		static void MakePoster(Transform parent, System.Random rng, Vector3 pos, Vector2 sz, float tilt, int index)
+		{
+			var p = Group(parent, $"Poster_{index:00}");
+			p.localPosition = pos;
+			p.localRotation = Quaternion.Euler(0f, 0f, tilt);   // 젖히면 반쪽이 판 뒤로 들어가서 기울기만
+			p.gameObject.isStatic = true;
+			var tex = PosterTextures != null && PosterTextures.Length > 0 && rng.NextDouble() < 0.9 ? PosterTextures[rng.Next(PosterTextures.Length)] : null;
+			// 한 장씩 Inspector에서 그림·크기를 바꿀 수 있게 (PosterSheet)
+			p.gameObject.AddComponent<PosterSheet>().Init(tex, sz, rng.Next());
+		}
+
+		/// <summary>
+		/// 포스터 한 장의 내용 (종이·인쇄 모양 또는 그림 + 압정·테이프). PosterSheet가 부름 — 그림·크기를 바꾸면 이걸로 다시 만듦.
+		/// 돌려주는 값 = 실제 크기 (그림 비율 맞춤 후)
+		/// </summary>
+		public static Vector2 BuildPosterContents(Transform p, Texture2D tex, Vector2 sz, bool fitImage, int seed)
+		{
+			var rng = new System.Random(seed);
+			float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+			if (tex != null)
 			{
-				float px = -width * 0.5f + 0.15f + (k % 3) * (width - 0.3f) / 2f;
-				float py = k < 3 ? 1.7f : 1.3f;
-				NoCol(Box(g, "Poster", new Vector3(px, py, -0.044f), new Vector3(0.24f, 0.34f, 0.002f), null, cols[k]));
+				// 그림 비율에 맞춰 세로 길이만 조정
+				float aspect = tex.height > 0 ? (float)tex.width / tex.height : 0.7f;
+				// 그림 비율을 지키면서 주어진 크기 안에 들어가게 (칸 밖·판 밖으로 넘치지 않게)
+				if (fitImage) sz = sz.x / Mathf.Max(0.05f, sz.y) > aspect ? new Vector2(sz.y * aspect, sz.y) : new Vector2(sz.x, sz.x / Mathf.Max(0.05f, aspect));
+				var sheet = Box(p, "Sheet", Vector3.zero, new Vector3(sz.x, sz.y, 0.001f), null, Color.white);
+				sheet.transform.localRotation = Quaternion.Euler(0f, 0f, 180f);   // 정육면체 앞(-Z)면은 그림이 거꾸로 붙어서 돌려 놓음
+				var r = sheet.GetComponent<Renderer>();
+				var m = PosterMaterial(tex);
+				if (m != null) r.sharedMaterial = m;
+				NoCol(sheet);
 			}
+			else
+			{
+				Color[] paper = { new Color(0.94f, 0.94f, 0.92f), new Color(0.98f, 0.95f, 0.80f), new Color(0.85f, 0.90f, 0.97f), new Color(0.97f, 0.88f, 0.88f), new Color(0.18f, 0.24f, 0.45f) };
+				Color[] ink = { new Color(0.15f, 0.25f, 0.55f), new Color(0.75f, 0.20f, 0.20f), new Color(0.15f, 0.45f, 0.30f), new Color(0.90f, 0.55f, 0.10f), new Color(0.25f, 0.25f, 0.28f) };
+				int pi = rng.Next(paper.Length);
+				bool dark = pi == paper.Length - 1;
+				NoCol(Box(p, "Sheet", Vector3.zero, new Vector3(sz.x, sz.y, 0.001f), null, paper[pi]));
+				// 인쇄된 것처럼: 위 제목 띠 + 그림 칸 + 글줄 몇 개
+				Color c = ink[rng.Next(ink.Length)];
+				NoCol(Box(p, "Title", new Vector3(0f, sz.y * 0.36f, -0.0006f), new Vector3(sz.x * 0.8f, sz.y * 0.09f, 0.0004f), null, dark ? new Color(0.95f, 0.95f, 0.95f) : c));
+				if (rng.NextDouble() < 0.6)
+					NoCol(Box(p, "Picture", new Vector3(0f, sz.y * 0.08f, -0.0006f), new Vector3(sz.x * 0.75f, sz.y * 0.32f, 0.0004f), null, c * 0.8f + Color.white * 0.2f));
+				int lines = 2 + rng.Next(3);
+				for (int l = 0; l < lines; l++)
+					NoCol(Box(p, "Text", new Vector3(R(-0.02f, 0.02f), -sz.y * 0.15f - l * sz.y * 0.07f, -0.0006f), new Vector3(sz.x * R(0.45f, 0.75f), sz.y * 0.022f, 0.0004f), null, dark ? new Color(0.8f, 0.8f, 0.85f) : new Color(0.45f, 0.45f, 0.48f)));
+			}
+
+			// 고정: 압정 4개 / 압정 2개 (위) / 테이프 (위 가운데) / 테이프 두 귀퉁이
+			int fix = rng.Next(4);
+			Color[] pinCol = { new Color(0.85f, 0.15f, 0.15f), new Color(0.15f, 0.35f, 0.85f), new Color(0.95f, 0.80f, 0.10f), new Color(0.15f, 0.65f, 0.30f), new Color(0.9f, 0.9f, 0.9f) };
+			Color pc = pinCol[rng.Next(pinCol.Length)];
+			float hx = sz.x * 0.5f - 0.015f, hy = sz.y * 0.5f - 0.015f;
+			void Pin(float px, float py) => NoCol(Box(p, "Pin", new Vector3(px, py, -0.004f), new Vector3(0.011f, 0.011f, 0.008f), null, pc));
+			void Tape(float px, float py, float ang)
+			{
+				var t = Box(p, "Tape", new Vector3(px, py, -0.0012f), new Vector3(0.07f, 0.022f, 0.0005f), null, new Color(0.90f, 0.88f, 0.80f));
+				t.transform.localRotation = Quaternion.Euler(0f, 0f, ang);
+				NoCol(t);
+			}
+			switch (fix)
+			{
+				case 0: Pin(-hx, hy); Pin(hx, hy); Pin(-hx, -hy); Pin(hx, -hy); break;
+				case 1: Pin(-hx, hy); Pin(hx, hy); break;
+				case 2: Tape(0f, sz.y * 0.5f, R(-6f, 6f)); break;
+				default: Tape(-hx, sz.y * 0.5f - 0.005f, 40f); Tape(hx, sz.y * 0.5f - 0.005f, -40f); break;
+			}
+			// 붙은 종이 그림자 (오른쪽 아래로 살짝, 종이 뒤)
+			NoCol(Box(p, "Shadow", new Vector3(0.004f, -0.006f, 0.0007f), new Vector3(sz.x + 0.006f, sz.y + 0.006f, 0.0003f), null, new Color(0.16f, 0.16f, 0.18f)));
+			return sz;
+		}
+
+		static readonly Dictionary<Texture2D, Material> posterMats = new Dictionary<Texture2D, Material>();
+
+		// 포스터 그림 재질 (에디터에서는 Materials/Generated/Poster_이름.mat으로 저장 — 씬을 다시 열어도 유지)
+		public static Material PosterMaterial(Texture2D tex)
+		{
+			if (tex == null) return null;
+			if (posterMats.TryGetValue(tex, out var m) && m != null) return m;
+#if UNITY_EDITOR
+			string path = $"Assets/Materials/Generated/Poster_{tex.name}.mat";
+			if (!Application.isPlaying)
+			{
+				m = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(path);
+				if (m != null) { posterMats[tex] = m; return m; }
+			}
+#endif
+			var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+			if (shader == null) return null;
+			m = new Material(shader) { name = $"Poster_{tex.name}" };
+			if (m.HasProperty("_BaseMap")) m.SetTexture("_BaseMap", tex);
+			if (m.HasProperty("_MainTex")) m.SetTexture("_MainTex", tex);
+			if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", Color.white);
+			if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.25f);
+#if UNITY_EDITOR
+			if (!Application.isPlaying)
+			{
+				if (!UnityEditor.AssetDatabase.IsValidFolder("Assets/Materials/Generated"))
+				{
+					if (!UnityEditor.AssetDatabase.IsValidFolder("Assets/Materials")) UnityEditor.AssetDatabase.CreateFolder("Assets", "Materials");
+					UnityEditor.AssetDatabase.CreateFolder("Assets/Materials", "Generated");
+				}
+				UnityEditor.AssetDatabase.CreateAsset(m, path);
+			}
+#endif
+			posterMats[tex] = m;
+			return m;
 		}
 
 		static GameObject Triangle(Transform parent, string name, Vector3 a, Vector3 b, Vector3 c, Material mat)

@@ -17,6 +17,7 @@ namespace NightPatrol
 		[Tooltip("양문 오른쪽 문짝에 세로 행사 배너")] public string[] eventBannerRooms = { "528" };
 		[Tooltip("복도 쪽 벽 빈 곳에 AI 포스터 3장")] public string[] aiPosterRooms = { "523" };
 		[Tooltip("계단실 게시판 포스터를 그림으로")] public bool bulletinBoardPosters = true;
+		[Tooltip("엘리베이터 옆 벽에 게시판 (사진 기준)")] public bool elevatorBoard = true;
 	}
 
 	public static class PosterBuilder
@@ -142,11 +143,13 @@ namespace NightPatrol
 		{
 			if (ps == null || !ps.enabled || doorIndex != 0) return;   // 방마다 첫 문 옆에만
 			float lo = -hw + t + 0.05f, hi = hw - t - 0.05f;
+			var blocked = BlockedOnFrontWall(room, zFace);   // 표찰·소화기·소화전·게시판 자리
+			if (!float.IsNaN(plateX)) blocked.Add(new Vector2(plateX - 0.17f, plateX + 0.17f));
 			bool Free(float x0, float x1)
 			{
 				if (x0 < lo || x1 > hi) return false;
 				foreach (var d in doors) if (x1 > d.x - 0.05f && x0 < d.y + 0.05f) return false;
-				if (x1 > plateX - 0.17f && x0 < plateX + 0.17f) return false;
+				foreach (var k in blocked) if (x1 > k.x - 0.08f && x0 < k.y + 0.08f) return false;
 				return true;
 			}
 			var g = new GameObject($"Posters_{label}").transform;
@@ -210,6 +213,7 @@ namespace NightPatrol
 			{
 				float bestA = 0f, bestB = 0f, cur = lo;
 				var sorted = new List<Vector2>(doors);
+				foreach (var k in blocked) sorted.Add(new Vector2(k.x - 0.08f, k.y + 0.08f));
 				sorted.Sort((p, q) => p.x.CompareTo(q.x));
 				foreach (var d in sorted)
 				{
@@ -227,6 +231,46 @@ namespace NightPatrol
 				}
 			}
 			if (g.childCount == 0) Object.DestroyImmediate(g.gameObject);
+		}
+
+		/// <summary>방 앞벽(복도 쪽)에 이미 붙어 있는 것들의 x 구간 (방 로컬): 표찰·소화기·소화전·방수함·게시판</summary>
+		static List<Vector2> BlockedOnFrontWall(Transform room, float zFace)
+		{
+			var list = new List<Vector2>();
+			foreach (Transform c in room)
+			{
+				string n = c.name;
+				if (!(n.StartsWith("Nameplate") || n == "Extinguisher" || n == "Hydrant" || n == "HoseBox" || n == "BulletinBoard")) continue;
+				bool any = false; float x0 = 0f, x1 = 0f, zc = 0f;
+				foreach (var r in c.GetComponentsInChildren<Renderer>())
+				{
+					var b = r.bounds;
+					for (int i = 0; i < 8; i++)
+					{
+						var corner = new Vector3((i & 1) == 0 ? b.min.x : b.max.x, (i & 2) == 0 ? b.min.y : b.max.y, (i & 4) == 0 ? b.min.z : b.max.z);
+						var lp = room.InverseTransformPoint(corner);
+						if (!any) { x0 = x1 = lp.x; zc = lp.z; any = true; }
+						else { x0 = Mathf.Min(x0, lp.x); x1 = Mathf.Max(x1, lp.x); zc = Mathf.Min(zc, lp.z); }
+					}
+				}
+				if (any && zc < zFace + 0.3f) list.Add(new Vector2(x0, x1));   // 복도 쪽(앞벽 바깥)에 있는 것만
+			}
+			return list;
+		}
+
+		/// <summary>엘리베이터 옆 블록 벽에 게시판 (사진: 엘리베이터 바로 옆). wall = (x 시작, x 끝), 벽면 z = 0, 복도는 +Z</summary>
+		public static void ElevatorBoard(Transform parent, Vector2 wall, PosterSettings ps)
+		{
+			if (ps == null || !ps.enabled || !ps.elevatorBoard) return;
+			float len = wall.y - wall.x;
+			if (len < 0.9f) return;
+			var holder = new GameObject("ElevatorBoard").transform;
+			holder.SetParent(parent, false);
+			holder.gameObject.isStatic = true;
+			holder.localPosition = new Vector3((wall.x + wall.y) * 0.5f + 0.05f, 0f, 0f);
+			holder.localRotation = Quaternion.Euler(0f, 180f, 0f);   // 게시판 앞(-Z)이 복도(+Z)를 보게
+			FloorDetailBuilder.BulletinBoard(holder, 0f, 0f, Mathf.Min(1.2f, len - 0.3f));
+			FillBulletinBoard(holder, ps);
 		}
 
 		/// <summary>

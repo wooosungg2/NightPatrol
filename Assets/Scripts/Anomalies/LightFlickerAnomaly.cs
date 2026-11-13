@@ -1,11 +1,15 @@
-
+﻿
 using UnityEngine;
 using NightPatrol.Lighting;
+using NightPatrol.Photo;
 
 namespace NightPatrol.Anomalies
 {
-    public class LightFlickerAnomaly : Anomaly
+    public class LightFlickerAnomaly : Anomaly, IPhotoVisual
     {
+        /// <summary>깜빡이는 등 하나 (촬영용). 꺼져 있으면 null</summary>
+        public GameObject PhotoVisual => IsActive && zone != null ? zone.GetFixture(lightIndex) : null;
+
         [Header("깜빡일 조명 구간 ID")]
         [SerializeField]
         private string zoneId = "Corridor.Lights.00";

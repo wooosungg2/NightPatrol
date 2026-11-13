@@ -1,12 +1,16 @@
-
+ï»¿
 using UnityEngine;
 using NightPatrol.Patrol;
+using NightPatrol.Photo;
 
 namespace NightPatrol.Anomalies
 {
-    public class MonitorGlitchAnomaly : Anomaly
+    public class MonitorGlitchAnomaly : Anomaly, IPhotoVisual
     {
-        [Header("¸ğ´ÏÅÍ ID")]
+        /// <summary>ê¸€ë¦¬ì¹˜ê°€ ê±¸ë¦° ëª¨ë‹ˆí„° (ì´¬ì˜ìš©). êº¼ì ¸ ìˆìœ¼ë©´ null</summary>
+        public GameObject PhotoVisual => IsActive && monitor != null ? monitor.gameObject : null;
+
+        [Header("ëª¨ë‹ˆí„° ID")]
         [SerializeField]
         private string monitorId;
 
@@ -17,7 +21,7 @@ namespace NightPatrol.Anomalies
         private MonitorDevice monitor;
 
         // ========================================
-        // ÀÌ»óÇö»ó È°¼ºÈ­
+        // ì´ìƒí˜„ìƒ í™œì„±í™”
         // ========================================
 
         public override void Activate()
@@ -38,17 +42,17 @@ namespace NightPatrol.Anomalies
                 return;
             }
 
-            // Glitch È­¸é Àû¿ë
+            // Glitch í™”ë©´ ì ìš©
             monitor.OverrideScreen(glitchMaterial);
 
             IsActive = true;
 
-            // Á¡°Ë ÆÇÁ¤ µî·Ï
+            // ì ê²€ íŒì • ë“±ë¡
             RegisterAnomaly(monitor);
         }
 
         // ========================================
-        // ÀÌ»óÇö»ó ºñÈ°¼ºÈ­
+        // ì´ìƒí˜„ìƒ ë¹„í™œì„±í™”
         // ========================================
 
         public override void Deactivate()
@@ -65,7 +69,7 @@ namespace NightPatrol.Anomalies
         }
 
         // ========================================
-        // Ãş ÃÊ±âÈ­
+        // ì¸µ ì´ˆê¸°í™”
         // ========================================
 
         public override void ResetAfterFloorReset()
