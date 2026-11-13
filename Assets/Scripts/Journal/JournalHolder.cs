@@ -24,13 +24,18 @@ namespace NightPatrol.Journal
         [SerializeField] private Vector3 raisedPosition = new Vector3(0f, -0.06f, 0.28f);
         [Tooltip("들었을 때 각도 (부모 기준 로컬 회전, 도)")]
         [SerializeField] private Vector3 raisedEuler = new Vector3(8f, 0f, 0f);
+        [Tooltip("치웠을 때 위치 (화면 밖 아래, 같은 왼손에 휴대폰을 든 동안). 부모 기준 로컬 좌표, m")]
+        [SerializeField] private Vector3 hiddenPosition = new Vector3(-0.16f, -0.62f, 0.20f);
+        [Tooltip("치웠을 때 각도 (부모 기준 로컬 회전, 도)")]
+        [SerializeField] private Vector3 hiddenEuler = new Vector3(80f, 12f, 0f);
         [Tooltip("들고 내리는 데 걸리는 시간 (초). 일시정지 중에도 진행")]
         [SerializeField] private float transitionSeconds = 0.25f;
         [Tooltip("실패하면 깨어나기 연출이 끝나고 일지 잠금이 풀린 뒤 일지를 자동으로 든다 (지난 순찰 기록을 바로 보게). 기본 꺼짐")]
         [SerializeField] private bool raiseAfterFailure = false;
         private readonly HashSet<object> blockers = new HashSet<object>();
+        private readonly HashSet<object> hiders = new HashSet<object>();
         private InputAction toggleAction;
-        private float progress;
+        private float progress, hideProgress;
         private PatrolRun run;
         private PatrolRun subscribedRun;
         private bool raisePending;
@@ -42,6 +47,10 @@ namespace NightPatrol.Journal
         public bool IsBlocked => blockers.Count > 0;
         /// <summary>현재 잠근 주체들 (진단용)</summary>
         public IReadOnlyCollection<object> Blockers => blockers;
+        /// <summary>누군가 일지를 화면 밖으로 치워 두라고 했으면 true (같은 왼손에 휴대폰을 든 동안). 들거나 메뉴가 열리면 다시 올라온다</summary>
+        public bool IsHidden => hiders.Count > 0;
+        /// <summary>치운 정도 (0 = 내린 자세, 1 = 화면 밖)</summary>
+        public float HiddenAmount => hideProgress;
         /// <summary>일시정지 메뉴가 클립보드를 쓰는 중인지 (이 동안 클립보드는 들려 있고 Tab은 무시)</summary>
         public bool IsMenuOpen { get; private set; }
         /// <summary>들거나 내릴 때 (true = 듦)</summary>
@@ -89,6 +98,7 @@ namespace NightPatrol.Journal
             }
             // 일시정지(시간 0) 중에도 메뉴를 들어 올려야 하므로 실제 시간으로 움직인다
             progress = Step(progress, IsRaised || IsMenuOpen, Time.unscaledDeltaTime, transitionSeconds);
+            hideProgress = Step(hideProgress, IsHidden && !IsRaised && !IsMenuOpen, Time.unscaledDeltaTime, transitionSeconds);
             ApplyPose();
         }
         private void HandleInput()
@@ -129,6 +139,16 @@ namespace NightPatrol.Journal
             SetRaised(false);
         }
         /// <summary>
+        /// 주체(owner)별로 일지를 화면 밖 아래로 치우거나 되돌린다 (휴대폰을 든 동안 — 둘 다 왼손).
+        /// 일지를 들거나 메뉴가 열리면 치운 것과 상관없이 올라온다. 치운 쪽은 꺼질 때(OnDisable) 꼭 false로 풀 것
+        /// </summary>
+        public void SetHidden(object owner, bool hidden)
+        {
+            if (owner == null) return;
+            if (hidden) hiders.Add(owner);
+            else hiders.Remove(owner);
+        }
+        /// <summary>
         /// 일시정지 메뉴용: 일지 상태(IsRaised)와 상관없이 클립보드를 들어 올리거나 원래대로 둔다.
         /// 막혀 있어도 들리고, RaisedChanged는 내지 않는다 (일지를 본 것이 아님)
         /// </summary>
@@ -140,9 +160,11 @@ namespace NightPatrol.Journal
         private void ApplyPose()
         {
             float eased = Mathf.SmoothStep(0f, 1f, progress);
-            transform.localPosition = Vector3.Lerp(loweredPosition, raisedPosition, eased);
-            transform.localRotation = Quaternion.Slerp(
-                Quaternion.Euler(loweredEuler), Quaternion.Euler(raisedEuler), eased);
+            float hide = Mathf.SmoothStep(0f, 1f, hideProgress);
+            var position = Vector3.Lerp(loweredPosition, raisedPosition, eased);
+            var rotation = Quaternion.Slerp(Quaternion.Euler(loweredEuler), Quaternion.Euler(raisedEuler), eased);
+            transform.localPosition = Vector3.Lerp(position, hiddenPosition, hide);
+            transform.localRotation = Quaternion.Slerp(rotation, Quaternion.Euler(hiddenEuler), hide);
         }
         /// <summary>자세 진행도(0 = 내림, 1 = 듦)를 목표 쪽으로 한 프레임만큼 옮김</summary>
         public static float Step(float t, bool raised, float deltaTime, float seconds)

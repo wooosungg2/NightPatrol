@@ -492,7 +492,9 @@ namespace NightPatrol.Tests
             Assert.AreEqual("전화", screen.Selected.Title, "고른 앱은 그대로");
             yield return null;
             Assert.IsNotNull(screen.transform.Find("PhoneModel/Face/Display/Home/Icons/보고"), "아이콘");
-            Assert.IsFalse(Text("Home/BigClock").gameObject.activeSelf, "격자에 앱이 있으면 큰 시계는 숨김");
+            var bigClock = Text("Home/BigClock");
+            Assert.IsTrue(bigClock.gameObject.activeSelf, "격자가 한 줄이면 큰 시계는 그 아래에");
+            Assert.AreEqual(-PhoneScreen.ClockTop(1), bigClock.rectTransform.anchoredPosition.y, 0.01f);
 
             phone.TakeOut();
             screen.Move(-1);

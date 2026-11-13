@@ -134,7 +134,7 @@ namespace NightPatrol.Tests
             Assert.IsEmpty(problems, "전화 배치: " + string.Join(" / ", problems));
         }
 
-        // 06_03: 홈 화면(PhoneScreen)이 전화 옆에, 독 앱(06_04 카메라·전화·메시지·인터넷)은 Apps 아래 — 인스펙터에서 앱을 더하고 뺄 수 있게
+        // 06_03: 홈 화면(PhoneScreen)이 전화 옆에, 독 앱(06_04 카메라·갤러리·전화·메시지·인터넷)은 Apps 아래 — 인스펙터에서 앱을 더하고 뺄 수 있게
         [Test]
         public void Phone_HasItsHomeScreen_AndTheDockApps()
         {
@@ -150,6 +150,7 @@ namespace NightPatrol.Tests
                 if (apps.GetComponent<MessagesApp>() == null) problems.Add("MessagesApp 없음");
                 if (apps.GetComponent<BrowserApp>() == null) problems.Add("BrowserApp 없음");
                 if (apps.GetComponent<CameraApp>() == null) problems.Add("CameraApp 없음 (06_04)");
+                if (apps.GetComponent<GalleryApp>() == null) problems.Add("GalleryApp 없음 (06_04f)");
             }
             Assert.IsEmpty(problems, "전화 화면: " + string.Join(" / ", problems));
         }

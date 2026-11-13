@@ -15,7 +15,7 @@ using UnityEngine.TestTools;
 namespace NightPatrol.Tests
 {
     // 06_04 카메라 앱: 독 셋째 칸(전화·메시지 다음), 찍으면 이번 층 기록에 남고 화면에는 결과가 안 보임,
-    // 장수 제한, 다시 찍기 대기, 층이 바뀌면 사진첩·장수 처음부터, 휠로 사진첩. 키 입력 대신 앱·화면 함수를 부른다
+    // 장수 제한, 다시 찍기 대기, 층이 바뀌면 사진·장수 처음부터, 찍은 뒤 1.5초 사진 보여 주기, 갤러리(독 넷째 칸). 키 입력 대신 앱·화면 함수를 부른다
     public class CameraAppTests
     {
         private class FakeAnomaly : Anomaly
@@ -28,6 +28,7 @@ namespace NightPatrol.Tests
         private PatrolRun run;
         private PhoneScreen screen;
         private CameraApp app;
+        private GalleryApp gallery;
 
         [TearDown]
         public void TearDown()
@@ -54,7 +55,7 @@ namespace NightPatrol.Tests
         private static void SetField(object target, string name, object value) =>
             target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).SetValue(target, value);
 
-        // Player 프리팹처럼: PlayerCamera 아래 전화, 그 아래 Apps(카메라·전화·메시지·인터넷). 층 진행이 5층 1회차로 시작
+        // Player 프리팹처럼: PlayerCamera 아래 전화, 그 아래 Apps(카메라·전화·메시지·인터넷·갤러리). 층 진행이 5층 1회차로 시작
         private IEnumerator MakePhone()
         {
             run = New("PatrolRun").AddComponent<PatrolRun>();
@@ -78,6 +79,7 @@ namespace NightPatrol.Tests
             apps.AddComponent<MessagesApp>();
             apps.AddComponent<BrowserApp>();
             app = apps.AddComponent<CameraApp>();
+            gallery = apps.AddComponent<GalleryApp>();
             phoneObject.SetActive(true);
             yield return null;   // Start (5층 1회차)
         }
@@ -102,10 +104,11 @@ namespace NightPatrol.Tests
         }
 
         [UnityTest]
-        public IEnumerator Camera_IsThirdInTheDock_AndThePhoneAppIsPickedWhenTakenOut()
+        public IEnumerator CameraAndGallery_AreInTheDock_AndThePhoneAppIsPickedWhenTakenOut()
         {
             yield return MakePhone();
-            CollectionAssert.AreEqual(new[] { "전화", "메시지", "카메라", "인터넷" }, Titles(screen.Apps));
+            // 독 4칸이 차서 인터넷은 위 격자로 (Apps 순서 = 격자 → 독)
+            CollectionAssert.AreEqual(new[] { "인터넷", "전화", "메시지", "카메라", "갤러리" }, Titles(screen.Apps));
             Assert.AreEqual("전화", screen.Selected.Title);
         }
 
@@ -149,7 +152,7 @@ namespace NightPatrol.Tests
             Assert.IsTrue(run.Photos.IsCaptured(ghost));
         }
 
-        // 06_04b 마우스: 카메라 안에서 좌클릭 = 찍기, 우클릭 = 홈으로
+        // 06_04b 마우스: 카메라 안에서 좌클릭 = 찍기, 우클릭 = (찍은 사진을 보는 중이면 뷰파인더로, 아니면) 홈으로
         [UnityTest]
         public IEnumerator Mouse_LeftTakesAPicture_RightGoesHome()
         {
@@ -161,6 +164,10 @@ namespace NightPatrol.Tests
             SetField(app, "retakeSeconds", 0f);
             Assert.IsTrue(phone.HandlePointerInput(true, false));
             Assert.AreEqual(1, run.Photos.Shots, "좌클릭: 찍기");
+            Assert.IsTrue(app.IsReviewing);
+            Assert.IsTrue(phone.HandlePointerInput(false, true));
+            Assert.AreSame(app, screen.OpenApp, "우클릭: 찍은 사진 → 뷰파인더");
+            Assert.IsFalse(app.IsReviewing);
             Assert.IsTrue(phone.HandlePointerInput(false, true));
             Assert.IsNull(screen.OpenApp, "우클릭: 홈으로");
         }
@@ -203,24 +210,113 @@ namespace NightPatrol.Tests
             Assert.AreEqual(allowed, app.ShotsLeft);
         }
 
+        // 찍으면 그 사진을 잠깐 보여 주고 뷰파인더로. 우클릭이면 바로, 좌클릭은 찍지 않고 뷰파인더로. 휠은 아무것도 안 함
         [UnityTest]
-        public IEnumerator Wheel_BrowsesTheAlbum_ThenBackToTheViewfinder()
+        public IEnumerator Take_ShowsThePicture_ThenBackToTheViewfinder()
+        {
+            yield return MakePhone();
+            SetField(app, "retakeSeconds", 0f);
+            screen.Open(app);
+            screen.Move(1);
+            Assert.AreSame(app, screen.OpenApp, "휠은 카메라에서 아무것도 안 함");
+
+            screen.Confirm();
+            Assert.IsTrue(app.IsReviewing, "찍은 사진을 보여 줌");
+            Assert.AreSame(app.Pictures[0], app.Reviewed);
+            screen.Move(1);
+            Assert.AreSame(app, screen.OpenApp);
+            Assert.IsTrue(screen.Back());
+            Assert.AreSame(app, screen.OpenApp, "뒤로 = 바로 뷰파인더");
+            Assert.IsFalse(app.IsReviewing);
+
+            screen.Confirm();
+            Assert.IsTrue(app.IsReviewing);
+            screen.Confirm();
+            Assert.IsFalse(app.IsReviewing, "보는 중 좌클릭 = 뷰파인더로");
+            Assert.AreEqual(2, run.Photos.Shots, "그 클릭으로는 안 찍힘");
+
+            SetField(app, "reviewSeconds", 0.1f);
+            screen.Confirm();
+            Assert.IsTrue(app.IsReviewing);
+            yield return new WaitForSeconds(0.25f);
+            Assert.IsFalse(app.IsReviewing, "시간이 지나면 뷰파인더로");
+            Assert.AreSame(app, screen.OpenApp);
+        }
+
+        // 앱을 안 열고 찍거나(코드) 0초로 두면 보여 주지 않는다. 앱을 닫으면 끝남
+        [UnityTest]
+        public IEnumerator Review_OnlyWhileOpen()
         {
             yield return MakePhone();
             SetField(app, "retakeSeconds", 0f);
             app.Take();
+            Assert.IsFalse(app.IsReviewing, "닫힌 채 찍으면 안 보여 줌");
+            screen.Open(app);
             app.Take();
+            Assert.IsTrue(app.IsReviewing);
+            screen.GoHome();
+            Assert.IsFalse(app.IsReviewing, "닫으면 끝남");
+            SetField(app, "reviewSeconds", 0f);
+            screen.Open(app);
+            app.Take();
+            Assert.IsFalse(app.IsReviewing, "0초면 안 보여 줌");
+        }
 
-            app.Moved(1);
-            Assert.IsTrue(app.IsBrowsing, "휠 → 사진첩 (마지막 사진부터)");
-            app.Moved(1);
-            Assert.IsTrue(app.IsBrowsing, "더 오래된 사진");
-            app.Moved(1);
-            Assert.IsFalse(app.IsBrowsing, "끝에서 한 번 더 → 뷰파인더");
+        // 갤러리는 홈에서 연다: 마지막 사진부터, 휠 아래 = 더 오래된 것, 끝에서 멈춤, 뒤로 = 홈. 사진이 없으면 "사진 없음"
+        [UnityTest]
+        public IEnumerator Gallery_OpenedFromHome_FlipsAndBackGoesHome()
+        {
+            yield return MakePhone();
+            screen.Open(gallery);
+            Assert.AreEqual(0, gallery.Count);
+            Assert.AreEqual(-1, gallery.Index);
+            Assert.IsNull(gallery.Current);
+            screen.Move(1);
+            Assert.IsTrue(screen.Back());
+            Assert.IsNull(screen.OpenApp, "뒤로 = 홈");
 
-            app.Moved(1);
-            app.Moved(-1);
-            Assert.IsFalse(app.IsBrowsing, "마지막 사진에서 위로 → 뷰파인더");
+            SetField(app, "retakeSeconds", 0f);
+            app.Take();
+            app.Take();
+            screen.Open(gallery);
+            Assert.AreEqual(2, gallery.Count);
+            Assert.AreEqual(1, gallery.Index, "마지막 사진부터");
+            Assert.AreSame(app.Pictures[1], gallery.Current);
+            screen.Move(1);
+            Assert.AreEqual(0, gallery.Index, "휠 아래 = 더 오래된 사진");
+            screen.Move(1);
+            Assert.AreEqual(0, gallery.Index, "끝에서 멈춤");
+            screen.Move(-1);
+            Assert.AreEqual(1, gallery.Index, "휠 위 = 최근 쪽");
+            Assert.IsTrue(screen.Back());
+            Assert.IsNull(screen.OpenApp, "뒤로 = 홈");
+        }
+
+        // 보는 중에 층이 바뀌면 사진이 비고 갤러리도 "사진 없음"
+        [UnityTest]
+        public IEnumerator Gallery_EmptiesWhenTheFloorChanges()
+        {
+            yield return MakePhone();
+            app.Take();
+            screen.Open(gallery);
+            Assert.AreEqual(0, gallery.Index);
+
+            run.Descend(true);
+            yield return null;
+
+            Assert.AreEqual(0, gallery.Count);
+            Assert.IsNull(gallery.Current);
+        }
+
+        // 카메라·갤러리는 가로 화면 (휴대폰이 가운데로 와서 돈다), 다른 앱은 세로
+        [UnityTest]
+        public IEnumerator CameraAndGallery_AreLandscape()
+        {
+            yield return MakePhone();
+            Assert.IsTrue(app.Landscape);
+            Assert.IsTrue(gallery.Landscape);
+            foreach (var each in screen.Apps)
+                if (!(each is CameraApp) && !(each is GalleryApp)) Assert.IsFalse(each.Landscape, each.Title);
         }
     }
 }

@@ -146,6 +146,7 @@ namespace NightPatrol.Phone
             State = PhoneState.Stowed;
             if (interactor != null) interactor.SetBlocked(this, false);
             if (journal != null) journal.SetBlocked(this, false);
+            if (journal != null) journal.SetHidden(this, false);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             DevInfo.Unregister(this);
 #endif
@@ -168,6 +169,7 @@ namespace NightPatrol.Phone
             // 메뉴가 클립보드를 들어 올리는 동안은 넣은 자세로만 보인다 (상태는 그대로). 일시정지 중에도 움직이게 실제 시간으로
             progress = JournalHolder.Step(progress, inHand && !menuOpen, Time.unscaledDeltaTime, transitionSeconds);
             ApplyPose();
+            if (journal != null) journal.SetHidden(this, inHand);   // 같은 왼손 — 휴대폰을 든 동안 일지는 화면 밖 아래로
         }
 
         /// <summary>
@@ -553,7 +555,7 @@ namespace NightPatrol.Phone
         private void ApplyPose()
         {
             bool aiming = inHand && State == PhoneState.Held && screen != null &&
-                          screen.OpenApp is CameraApp && !screen.IsCallShown &&
+                          screen.OpenApp != null && screen.OpenApp.Landscape && !screen.IsCallShown &&
                           (journal == null || !journal.IsMenuOpen);
             cameraProgress = JournalHolder.Step(cameraProgress, aiming, Time.unscaledDeltaTime, cameraTransitionSeconds);
             float cameraEase = Mathf.SmoothStep(0f, 1f, cameraProgress);

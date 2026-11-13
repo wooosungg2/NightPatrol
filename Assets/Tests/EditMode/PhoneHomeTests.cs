@@ -79,6 +79,18 @@ namespace NightPatrol.Tests
             CollectionAssert.AreEqual(new[] { "독0", "독1", "독2", "독3" }, Titles(order.GetRange(9, 4)));
         }
 
+        // 11/13: 독이 차서 인터넷이 격자 한 줄에 가도 큰 시계는 그 아래에 남는다. 두 줄부터는 자리가 없어 숨김
+        [Test]
+        public void ClockTop_StaysUnderOneGridRow_HiddenFromTwoRows()
+        {
+            float empty = PhoneScreen.ClockTop(0), oneRow = PhoneScreen.ClockTop(1);
+            Assert.Greater(empty, 0f);
+            Assert.Greater(oneRow, empty, "한 줄이면 아래로");
+            Assert.Less(oneRow + 66f + 22f, 262f, "층 표시까지 홈 안내 줄 위에");
+            Assert.Less(PhoneScreen.ClockTop(2), 0f);
+            Assert.Less(PhoneScreen.ClockTop(3), 0f);
+        }
+
         [Test]
         public void Wrap_GoesAroundBothWays()
         {

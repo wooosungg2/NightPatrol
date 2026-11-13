@@ -111,6 +111,19 @@ namespace NightPatrol.Tests
             Assert.AreEqual(PhoneState.Held, phone.State);
         }
 
+        // 같은 왼손: 휴대폰을 든 동안 일지는 화면 밖으로 치우고, 넣으면 되돌린다
+        [UnityTest]
+        public IEnumerator HoldingThePhone_PutsTheJournalAway()
+        {
+            yield return null;
+            phone.TakeOut();
+            yield return null;
+            Assert.IsTrue(journal.IsHidden);
+            phone.Stow();
+            yield return null;
+            Assert.IsFalse(journal.IsHidden);
+        }
+
         [Test]
         public void RaisingTheJournal_StowsThePhone()
         {
