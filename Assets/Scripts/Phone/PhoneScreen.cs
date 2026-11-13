@@ -153,7 +153,7 @@ namespace NightPatrol.Phone
             ShowClock();
             ShowBadges();
             ShowCall();
-            if (statusBar != null) statusBar.gameObject.SetActive(!(OpenApp is CameraApp) || IsCallShown);
+            if (statusBar != null) statusBar.gameObject.SetActive(OpenApp == null || !OpenApp.Landscape || IsCallShown);
         }
 
         // ── 앱 설치 ──
@@ -343,7 +343,7 @@ namespace NightPatrol.Phone
             PhoneUI.Image(dock, art.Gradient(new Color(0.74f, 0.77f, 0.82f, 0.5f), new Color(0.3f, 0.32f, 0.36f, 0.6f)), Color.white);
             PhoneUI.Image(PhoneUI.Box(dock, "Shine", 0f, 0f, Width, 1f), null, new Color(1f, 1f, 1f, 0.55f));
             hint = PhoneUI.Label(home, "Hint", 0f, HintTop, Width, 18f, "", 12f, new Color(0.62f, 0.66f, 0.72f), TextAlignmentOptions.Center);
-            // 위 격자에 앱이 없으면 그 자리에 큰 시계와 층
+            // 위 격자가 비면 그 자리에, 한 줄이면 그 아래에 큰 시계와 층 (두 줄부터는 숨김 — RebuildIcons)
             bigClock = PhoneUI.Label(home, "BigClock", 0f, 62f, Width, 64f, "", 46f, Color.white, TextAlignmentOptions.Center);
             floorLabel = PhoneUI.Label(home, "Floor", 0f, 128f, Width, 22f, "", 15f, new Color(0.7f, 0.74f, 0.8f), TextAlignmentOptions.Center);
             iconLayer = PhoneUI.Fill(home, "Icons");
@@ -389,6 +389,9 @@ namespace NightPatrol.Phone
             ShowClock();
         }
 
+        /// <summary>큰 시계 윗변 (격자 줄 수에 따라). 격자가 비면 가운데쯤, 한 줄이면 그 줄 아래, 두 줄부터는 자리가 없어 -1</summary>
+        internal static float ClockTop(int gridRows) => gridRows <= 0 ? 62f : gridRows == 1 ? GridTop + CellHeight + 30f : -1f;
+
         private void RebuildIcons()
         {
             iconsDirty = false;
@@ -403,8 +406,15 @@ namespace NightPatrol.Phone
             float dockLeft = (Width - dockCount * dockCell) / 2f;
             for (int i = 0; i < dockCount; i++)
                 icons.Add(CreateIcon(order[gridCount + i], dockLeft + i * dockCell, DockTop + 2f, dockCell));
-            bigClock.gameObject.SetActive(gridCount == 0);
-            floorLabel.gameObject.SetActive(gridCount == 0);
+            int rows = (gridCount + GridColumns - 1) / GridColumns;
+            float clockTop = ClockTop(rows);
+            bigClock.gameObject.SetActive(clockTop >= 0f);
+            floorLabel.gameObject.SetActive(clockTop >= 0f);
+            if (clockTop >= 0f)
+            {
+                bigClock.rectTransform.anchoredPosition = new Vector2(0f, -clockTop);
+                floorLabel.rectTransform.anchoredPosition = new Vector2(0f, -(clockTop + 66f));
+            }
             ShowSelection();
         }
 
@@ -465,9 +475,6 @@ namespace NightPatrol.Phone
             }
             if (hint != null) hint.text = "휠 고르기 · 좌클릭 열기 · 우클릭 넣기";
         }
-
-        private string PhoneKey => phone != null ? phone.PhoneKey : "Q";
-        private string InteractKey => phone != null ? phone.InteractKey : "E";
 
         private void ShowClock()
         {
@@ -541,7 +548,7 @@ namespace NightPatrol.Phone
             callStatus.text = CallStatus(state, playback);
             bool ringing = state == PhoneState.Ringing;
             callButton.color = ringing ? CallGreen : CallRed;
-            callAction.text = ringing ? $"{PhoneKey} 받기" : $"{PhoneKey} 끊기";
+            callAction.text = ringing ? "좌클릭 받기" : "우클릭 끊기";   // 화면이 보이면 손에 든 것 — 마우스로 (Q·E도 됨)
         }
 
         /// <summary>통화 화면 상태 글: "전화 옴" / "연결 중…" / "통화 중 0:12"</summary>

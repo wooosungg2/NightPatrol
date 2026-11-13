@@ -54,6 +54,30 @@ namespace NightPatrol.Tests
             Assert.That(Vector3.Distance(holder.transform.localPosition, new Vector3(0f, -0.06f, 0.28f)), Is.LessThan(0.001f));
         }
 
+        // 휴대폰을 든 동안(같은 왼손): 일지는 화면 밖 아래로. 들면 다시 올라오고, 풀면 내린 자세로
+        [UnityTest]
+        public IEnumerator Hidden_GoesBelowTheLoweredPose_RaiseStillWorks()
+        {
+            yield return null;
+            var lowered = new Vector3(-0.16f, -0.30f, 0.30f);
+            var owner = new object();
+            holder.SetHidden(owner, true);
+            Assert.IsTrue(holder.IsHidden);
+            yield return new WaitForSeconds(0.4f);
+            Assert.AreEqual(1f, holder.HiddenAmount, 0.001f);
+            Assert.Less(holder.transform.localPosition.y, lowered.y - 0.2f, "화면 밖 아래");
+
+            holder.SetRaised(true);
+            yield return new WaitForSeconds(0.4f);
+            Assert.That(Vector3.Distance(holder.transform.localPosition, new Vector3(0f, -0.06f, 0.28f)), Is.LessThan(0.001f), "들면 치운 것과 상관없이 눈앞");
+
+            holder.SetRaised(false);
+            holder.SetHidden(owner, false);
+            Assert.IsFalse(holder.IsHidden);
+            yield return new WaitForSeconds(0.4f);
+            Assert.That(Vector3.Distance(holder.transform.localPosition, lowered), Is.LessThan(0.001f));
+        }
+
         [Test]
         public void Disable_WhileRaised_Unblocks()
         {

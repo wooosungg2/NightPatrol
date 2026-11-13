@@ -20,6 +20,9 @@ namespace NightPatrol.Phone
         public virtual bool InDock => false;
         /// <summary>홈 화면 순서 (작을수록 앞, 같으면 이름순)</summary>
         public virtual int Order => 100;
+        /// <summary>가로 화면 앱인지 (카메라·갤러리): 열면 휴대폰이 화면 가운데로 와서 가로로 돌고 상태 표시줄이 숨는다.
+        /// Build의 root는 그대로 세로 240×342 — 내용은 CameraApp.LandscapeRoot 안에 그린다</summary>
+        public virtual bool Landscape => false;
         /// <summary>코드 아이콘 바탕 위쪽 색</summary>
         public virtual Color IconTop => new Color(0.62f, 0.66f, 0.74f);
         /// <summary>코드 아이콘 바탕 아래쪽 색</summary>

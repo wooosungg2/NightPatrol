@@ -7,7 +7,7 @@ using UnityEngine;
 namespace NightPatrol.Tests
 {
     // 06_04 촬영 판정: 조준 박스·크기에 비례한 거리·5점 가림·면 대상(벽 뒤 막기)·켜진 이상현상만·
-    // 찍을 곳(PhotoTarget → IPhotoVisual이 알려 준 바깥 물체 → 자기 아래 렌더러)
+    // 찍을 곳(PhotoTarget → 자기 아래 렌더러 → 이상현상이 바꾼 바깥 물체를 시스템이 찾음)
     // 눈은 (0, 1.6, 0)에서 +Z를 본다 (세로 시야 60°, 4:3 — 카메라 앱 뷰파인더와 같은 비율)
     public class PhotoJudgeTests
     {
@@ -17,17 +17,34 @@ namespace NightPatrol.Tests
             public override void Deactivate() => IsActive = false;
         }
 
-        // 맵의 물체를 바꾸는 이상현상 (모니터·등·벨처럼): 보이는 물체가 자기 아래에 없어서 알려 준다
-        private class OutsideAnomaly : Anomaly, IPhotoVisual
+        // 맵의 물체를 바꾸는 이상현상 (모니터·벨·의자·등·얼룩처럼): 바꾼 물체를 되돌리려고 칸에 들고 있다.
+        // 따로 알려 주지 않아도 시스템이 그 칸의 물체 중 켜지기 전과 달라진 것을 찍을 곳으로 삼는다
+        private class ChangingAnomaly : Anomaly
         {
-            public GameObject visual;
-            public override void Activate() => IsActive = true;
+            public GameObject[] holds = new GameObject[0];   // 들고 있는 물체 (바꾸는 것 + 가리키기만 하는 것)
+            public System.Action<ChangingAnomaly> change;    // 켤 때 하는 일
+            private GameObject made;                          // 켤 때 새로 만든 물체 (private 칸도 읽는다)
+            public GameObject Made => made;
+
+            public override void Activate()
+            {
+                IsActive = true;
+                change?.Invoke(this);
+            }
+
             public override void Deactivate() => IsActive = false;
-            public GameObject PhotoVisual => IsActive ? visual : null;
+
+            public void Make(Vector3 position)
+            {
+                made = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                made.name = "Stain";
+                made.transform.position = position;
+            }
         }
 
         private static readonly Vector3 EyePosition = new Vector3(0f, 1.6f, 0f);
         private readonly List<GameObject> created = new List<GameObject>();
+        private readonly List<Material> paints = new List<Material>();
         private Camera eye;
         private PhotoRules rules;
 
@@ -48,6 +65,10 @@ namespace NightPatrol.Tests
             foreach (var go in created)
                 if (go != null) Object.DestroyImmediate(go);
             created.Clear();
+            foreach (var paint in paints)
+                if (paint != null) Object.DestroyImmediate(paint);
+            paints.Clear();
+            PhotoSubjects.Forget();   // 적어 둔 모습이 다음 테스트로 넘어가지 않게
         }
 
         private GameObject New(string name)
@@ -154,67 +175,251 @@ namespace NightPatrol.Tests
             CollectionAssert.AreEqual(new Anomaly[] { bare }, missing);
         }
 
-        // 맵의 모니터처럼 이상현상 오브젝트 밖에 있는 물체: 이상현상이 IPhotoVisual로 알려 주면 그걸 찍는다
-        private OutsideAnomaly AnomalyShowing(GameObject visual)
-        {
-            var anomaly = New("Red monitor").AddComponent<OutsideAnomaly>();
-            anomaly.transform.position = new Vector3(30f, 0f, 30f);   // 이상현상 오브젝트 자체는 멀리 (렌더러 없음)
-            anomaly.visual = visual;
-            anomaly.Activate();
-            return anomaly;
-        }
+        // ── 이상현상이 바꾼 바깥 물체를 시스템이 찾는다 ──
 
-        private GameObject MapCube(Vector3 position)
+        private static readonly Vector3 Front = new Vector3(0f, 1.6f, 4f), Back = new Vector3(0f, 1.6f, -4f);
+
+        private GameObject MapCube(string name, Vector3 position, Transform parent = null)
         {
             var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            created.Add(cube);
-            cube.name = "Map monitor";
+            if (parent == null) created.Add(cube);
+            else cube.transform.SetParent(parent, false);
+            cube.name = name;
             cube.transform.position = position;
             return cube;
         }
 
-        [Test]
-        public void OutsideVisual_IsWhatGetsPhotographed()
+        private ChangingAnomaly Changing(string name, params GameObject[] holds)
         {
-            var anomaly = AnomalyShowing(MapCube(new Vector3(0f, 1.6f, 4f)));
+            var anomaly = New(name).AddComponent<ChangingAnomaly>();
+            anomaly.transform.position = new Vector3(30f, 0f, 30f);   // 이상현상 오브젝트 자체는 멀리 (렌더러 없음)
+            anomaly.holds = holds;
+            return anomaly;
+        }
+
+        // 재질을 바꿔 끼운다 (빨간 화면·파란 벨)
+        private void Repaint(GameObject target)
+        {
+            var renderer = target.GetComponent<Renderer>();
+            var paint = new Material(renderer.sharedMaterial);
+            paints.Add(paint);
+            renderer.sharedMaterial = paint;
+        }
+
+        // 프로퍼티 블록으로 색만 바꾼다 (조명 구역이 등 하나의 색을 바꾸는 방식)
+        private static void Tint(GameObject target)
+        {
+            var block = new MaterialPropertyBlock();
+            block.SetColor("_BaseColor", Color.red);
+            target.GetComponent<Renderer>().SetPropertyBlock(block);
+        }
+
+        // 층 시작 흉내: 켜지기 전 모습을 적고 → 이상현상을 켜고 → 달라진 물체를 찾는다 (PatrolRun이 하는 순서)
+        private void StartFloor(params Anomaly[] anomalies)
+        {
+            PhotoSubjects.BeginFloor();
+            foreach (var anomaly in anomalies) anomaly.Activate();
+            PhotoSubjects.FindChanged();
+        }
+
+        private void LookBack() => eye.transform.rotation = Quaternion.LookRotation(Vector3.back);
+
+        [Test]
+        public void ChangedOutsideObject_IsWhatGetsPhotographed_NotTheOnesItOnlyHolds()
+        {
+            var door = MapCube("Door", Front);          // 가리키기만 하는 물체 (점검 대상 문 같은)
+            var monitor = MapCube("Monitor", Back);     // 바꾸는 물체
+            var anomaly = Changing("Red monitor", door, monitor);
+            anomaly.change = _ => Repaint(monitor);
+            StartFloor(anomaly);
+
+            Assert.IsEmpty(Capture(), "들고만 있는 문은 찍어도 안 됨");
+            LookBack();
+            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, Capture(), "바뀐 모니터를 찍어야 함");
+            Assert.AreEqual("Monitor", PhotoSubjects.Active()[0].Where);
+        }
+
+        [Test]
+        public void ObjectMadeWhenTurnedOn_IsFound()
+        {
+            var anomaly = Changing("Wall stain");
+            anomaly.change = a => a.Make(new Vector3(0f, 1.6f, 3f));
+            StartFloor(anomaly);
+            created.Add(anomaly.Made);
             CollectionAssert.AreEqual(new Anomaly[] { anomaly }, Capture());
         }
 
         [Test]
-        public void OutsideVisual_ComesBeforeOwnRenderers()
+        public void MovedObject_IsFoundWhereItIsNow()
         {
-            var anomaly = AnomalyShowing(MapCube(new Vector3(0f, 1.6f, 4f)));
-            var own = GameObject.CreatePrimitive(PrimitiveType.Cube);   // 자기 아래 렌더러는 카메라 뒤
-            own.transform.SetParent(anomaly.transform, false);
-            own.transform.position = new Vector3(0f, 1.6f, -4f);
-            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, Capture(), "알려 준 바깥 물체를 씀");
+            var chair = MapCube("Chair", Back);
+            var anomaly = Changing("Ceiling chair", chair);
+            anomaly.change = _ => chair.transform.position = Front;
+            StartFloor(anomaly);
+            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, Capture());
+        }
+
+        // 여러 부분으로 된 물체가 통째로 달라졌으면(옮긴 의자) 부분마다가 아니라 한 덩어리로 찍을 곳이 된다
+        [Test]
+        public void WholeObjectChanged_IsOneShape()
+        {
+            var chair = New("Chair");
+            chair.transform.position = Back;
+            MapCube("Seat", Back, chair.transform);
+            MapCube("Back", Back + Vector3.up * 0.6f, chair.transform);
+            var anomaly = Changing("Ceiling chair", chair);
+            anomaly.change = _ => chair.transform.position = Front;
+            StartFloor(anomaly);
+
+            var subject = PhotoSubjects.Active()[0];
+            Assert.AreEqual(1, subject.Shapes.Count);
+            Assert.AreEqual("Chair", subject.Where);
+            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, Capture());
+        }
+
+        // 맵 물체를 카메라로만 보이게(CameraOnly 레이어로) 바꾼 이상현상: 레이어가 바뀐 것도 달라진 것으로 찾는다
+        [Test]
+        public void ObjectMadeCameraOnly_IsFound()
+        {
+            Assert.GreaterOrEqual(CameraOnlyLayer.Index, 0, "CameraOnly 레이어 없음");
+            var statue = MapCube("Statue", Front);
+            var anomaly = Changing("Ghost statue", statue);
+            anomaly.change = _ => statue.layer = CameraOnlyLayer.Index;
+            StartFloor(anomaly);
+            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, Capture());
+        }
+
+        // 조명 구역처럼 여러 부분으로 된 물체를 들고 있어도, 달라진 부분(등 하나)만 찍을 곳이 된다
+        [Test]
+        public void OnlyTheChangedPart_OfAnObjectWithManyParts()
+        {
+            var zone = New("Zone");
+            MapCube("Light_00", Front, zone.transform);
+            var odd = MapCube("Light_01", Back, zone.transform);
+            var anomaly = Changing("Light color", zone);
+            anomaly.change = _ => Tint(odd);
+            StartFloor(anomaly);
+
+            Assert.IsEmpty(Capture(), "안 바뀐 등은 찍어도 안 됨");
+            LookBack();
+            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, Capture());
+            Assert.AreEqual("Light_01", PhotoSubjects.Active()[0].Where);
         }
 
         [Test]
-        public void OutsideVisual_NullOrDestroyed_IsLeftOut()
+        public void LightOnlyChange_IsFoundAtTheLight()
         {
-            var cube = MapCube(new Vector3(0f, 1.6f, 4f));
-            var anomaly = AnomalyShowing(cube);
-            Object.DestroyImmediate(cube);
-            var missing = new List<Anomaly>();
-            Assert.IsEmpty(PhotoSubjects.Active(missing), "파괴된 물체");
-            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, missing);
-
-            anomaly.visual = null;
-            missing.Clear();
-            Assert.IsEmpty(PhotoSubjects.Active(missing), "모름(null)");
-            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, missing);
+            var lamp = New("Lamp");   // 빛만 있고 렌더러가 없는 물체
+            lamp.transform.position = new Vector3(0f, 1.6f, 1.5f);
+            var light = lamp.AddComponent<Light>();
+            var anomaly = Changing("Lamp color", lamp);
+            anomaly.change = _ => light.color = Color.red;
+            StartFloor(anomaly);
+            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, Capture());
         }
 
+        // 깜빡이는 등처럼 켜질 때는 그대로였다가 조금 뒤에 달라지는 것: 층 준비 뒤 잠깐 지켜보는 동안 찾는다
         [Test]
-        public void OutsideVisual_WithoutRenderers_IsLeftOut()
+        public void ChangeThatComesLater_IsFoundWhileWatching()
         {
-            var lightOnly = New("Light only");   // 빛만 있고 렌더러가 없는 물체 — 기구(케이스·형광등)를 알려 줘야 함
-            lightOnly.AddComponent<Light>();
-            var anomaly = AnomalyShowing(lightOnly);
+            var lamp = MapCube("Lamp", Front);
+            var anomaly = Changing("Flicker", lamp);
+            StartFloor(anomaly);
+            PhotoSubjects.Settle(1f);
             var missing = new List<Anomaly>();
             Assert.IsEmpty(PhotoSubjects.Active(missing));
             CollectionAssert.AreEqual(new Anomaly[] { anomaly }, missing);
+            Assert.IsFalse(PhotoSubjects.Watch(), "아직 안 달라짐");
+
+            lamp.GetComponent<Renderer>().enabled = false;   // 꺼진 순간
+            Assert.IsTrue(PhotoSubjects.Watch());
+            lamp.GetComponent<Renderer>().enabled = true;    // 다시 켜져도 찾아 둔 곳은 그대로
+            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, Capture());
+        }
+
+        // 지켜보는 동안에도 자리만 바뀐 것(저절로 열리는 문)은 치지 않고,
+        // 지켜보는 시간이 지난 뒤 달라진 것(플레이어가 바꾼 것)은 찾지 않는다
+        [Test]
+        public void WhileWatching_MovesDoNotCount_AndAfterwardsNothingIsSearched()
+        {
+            var door = MapCube("Door", Front);
+            var anomaly = Changing("Sound only", door);
+            StartFloor(anomaly);
+            PhotoSubjects.Settle(1f);
+            door.transform.position += Vector3.right * 0.5f;
+            Assert.IsFalse(PhotoSubjects.Watch(), "자리만 바뀐 것");
+
+            PhotoSubjects.Settle(0f);
+            Repaint(door);
+            Assert.IsFalse(PhotoSubjects.Watch());
+            Assert.IsEmpty(PhotoSubjects.Active(), "나중에 달라진 것은 이상현상 탓이 아님");
+        }
+
+        // 같은 물체(조명 구역)를 두 이상현상이 들고 있으면, 먼저 찾은 쪽이 가져간 부분은 다른 쪽 것이 되지 않는다
+        [Test]
+        public void TwoAnomalies_HoldingTheSameObject_EachGetsItsOwnPart()
+        {
+            var zone = New("Zone");
+            var first = MapCube("Light_00", Front, zone.transform);
+            var second = MapCube("Light_01", Back, zone.transform);
+            var color = Changing("A color", zone);
+            color.change = _ => Tint(first);
+            var flicker = Changing("B flicker", zone);   // 켤 때는 그대로
+            StartFloor(color, flicker);
+            PhotoSubjects.Settle(1f);
+            second.GetComponent<Renderer>().enabled = false;
+            Assert.IsTrue(PhotoSubjects.Watch());
+
+            CollectionAssert.AreEqual(new Anomaly[] { color }, Capture());
+            LookBack();
+            CollectionAssert.AreEqual(new Anomaly[] { flicker }, Capture());
+        }
+
+        // 둘 다 켜지는 순간에 바꿨어도(깜빡이는 등이 마침 꺼진 채로 시작) 한쪽이 다 가져가지 않고 하나씩 나눠 가진다
+        [Test]
+        public void TwoAnomalies_BothChangedAtOnce_TakeOnePartEach()
+        {
+            var zone = New("Zone");
+            var first = MapCube("Light_00", Front, zone.transform);
+            var second = MapCube("Light_01", Back, zone.transform);
+            var color = Changing("A color", zone);
+            color.change = _ => Tint(first);
+            var flicker = Changing("B flicker", zone);
+            flicker.change = _ => second.GetComponent<Renderer>().enabled = false;
+            StartFloor(color, flicker);
+
+            Assert.AreEqual(2, PhotoSubjects.Active().Count);
+            CollectionAssert.AreEqual(new Anomaly[] { color }, Capture());
+            LookBack();
+            CollectionAssert.AreEqual(new Anomaly[] { flicker }, Capture());
+        }
+
+        // 층 시작을 거치지 않으면(적어 둔 모습이 없으면) 바깥 물체는 찾지 않는다 — 자기 아래 렌더러·PhotoTarget만
+        [Test]
+        public void WithoutABaseline_OutsideObjectsAreNotSearched()
+        {
+            var monitor = MapCube("Monitor", Front);
+            var anomaly = Changing("Red monitor", monitor);
+            anomaly.change = _ => Repaint(monitor);
+            anomaly.Activate();
+            var missing = new List<Anomaly>();
+            Assert.IsEmpty(PhotoSubjects.Active(missing));
+            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, missing);
+        }
+
+        [Test]
+        public void TurnedOff_IsDropped_AndSearchedAgainWhenTurnedOn()
+        {
+            var monitor = MapCube("Monitor", Front);
+            var anomaly = Changing("Red monitor", monitor);
+            anomaly.change = _ => Repaint(monitor);
+            StartFloor(anomaly);
+            Assert.AreEqual(1, PhotoSubjects.Active().Count);
+
+            anomaly.Deactivate();
+            Assert.IsEmpty(PhotoSubjects.Active());
+            anomaly.Activate();
+            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, Capture());
         }
 
         [Test]

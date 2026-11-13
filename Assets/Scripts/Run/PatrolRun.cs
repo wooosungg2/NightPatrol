@@ -117,7 +117,11 @@ namespace NightPatrol.Run
 
         private void OnDisable()
         {
-            if (Current == this) Current = null;
+            if (Current == this)
+            {
+                Current = null;
+                PhotoSubjects.Forget();   // 씬을 떠날 때 적어 둔 모습을 붙잡고 있지 않게
+            }
             Schedule.Reset();
         }
 
@@ -126,6 +130,8 @@ namespace NightPatrol.Run
         {
             if (!IsCleared) PlaySeconds += Time.deltaTime;
             Schedule.Tick(Time.deltaTime, CanAct);
+            // 층 시작 뒤 몇 초: 늦게 달라지는 이상현상을 찾았으면 찍어야 할 수를 다시 센다
+            if (PhotoSubjects.Watch()) Photos.SetRequired(PhotoSubjects.Active().Count);
         }
 
         /// <summary>근무 시간(초)과 회차로 시각(분): 흐른 분 + 실패한 회차마다 30분</summary>
@@ -271,15 +277,20 @@ namespace NightPatrol.Run
             WarnAbnormalAfterReset();
 #endif
             Debug.Log($"[Run] {CurrentFloor}층 시작 ({Attempt}회차)", this);
+            // 이상현상이 무엇을 바꿨는지는 시스템이 찾는다: 켜지기 전 모습을 적어 두고 → 켜진 직후 달라진 물체를 찾는다
+            PhotoSubjects.BeginFloor();
             SafeEvent.Raise(FloorStarted, CurrentFloor, this);
+            PhotoSubjects.FindChanged();   // 점검 항목이 사물을 바꾸기 전에
             if (tasks == null) tasks = UnityEngine.Object.FindAnyObjectByType<FloorTasks>();
             if (tasks != null) tasks.Generate(CurrentFloor, Attempt);
+            PhotoSubjects.Settle();   // 깜빡임처럼 조금 뒤에 달라지는 것은 잠깐 더 지켜본다 (Update)
             Photos.SetRequired(PhotoSubjects.Active().Count);   // 이상현상이 다 켜진 뒤 (촬영 장수·일지용)
         }
 
         private void Clear()
         {
             Schedule.Reset();
+            PhotoSubjects.Forget();
             Photos.Begin(PlaySeconds);
             IsCleared = true;
             Debug.Log($"[Run] {CurrentFloor}층 도착 — 클리어", this);

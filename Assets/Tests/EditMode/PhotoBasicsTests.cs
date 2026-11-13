@@ -176,12 +176,25 @@ namespace NightPatrol.Tests
         }
 
         [Test]
-        public void CameraApp_IsFirstInTheDock()
+        public void CameraApp_IsInTheDock_AfterTheCallApp()
         {
             var app = New("Camera").AddComponent<CameraApp>();
             var call = New("Call").AddComponent<CallApp>();
             Assert.IsTrue(app.InDock);
-            Assert.Less(app.Order, call.Order, "꺼낼 때 골라져 있도록 전화보다 앞");
+            Assert.Greater(app.Order, call.Order, "꺼낼 때는 전화가 골라져 있고 카메라는 그 뒤 칸");
+        }
+
+        [Test]
+        public void GalleryApp_IsInTheDock_RightAfterTheCamera_BeforeTheBrowser()
+        {
+            var camera = New("Camera").AddComponent<CameraApp>();
+            var gallery = New("Gallery").AddComponent<GalleryApp>();
+            var browser = New("Browser").AddComponent<BrowserApp>();
+            Assert.IsTrue(gallery.InDock);
+            Assert.AreEqual(camera.Order + 1, gallery.Order);
+            Assert.Greater(browser.Order, gallery.Order, "독 4칸이 차면 인터넷이 격자로");
+            Assert.IsTrue(GalleryApp.IconShape(new Vector2(0.3f, 0.2f)), "해");
+            Assert.IsFalse(GalleryApp.IconShape(new Vector2(-0.4f, 0.4f)), "하늘은 비움");
         }
     }
 }

@@ -48,8 +48,8 @@ namespace NightPatrol.Debugging
         }
 
         /// <summary>
-        /// F1 "사진": 이번 층 찍은 것/찍어야 할 것, 장수, 아직 안 찍은 이상현상, 찍을 곳을 몰라 판정에서 뺀 이상현상
-        /// (개발용 — 플레이어에게는 안 보임)
+        /// F1 "사진": 이번 층 찍은 것/찍어야 할 것, 장수, 아직 안 찍은 이상현상(괄호 안 = 시스템이 찾은 찍을 곳),
+        /// 찍을 곳을 못 찾아 판정에서 뺀 이상현상 (개발용 — 플레이어에게는 안 보임)
         /// </summary>
         public static string PhotoText(PatrolRun run)
         {
@@ -62,13 +62,13 @@ namespace NightPatrol.Debugging
             foreach (var subject in subjects)
             {
                 if (photos.IsCaptured(subject.Source)) captured++;
-                else notYet.Append(notYet.Length > 0 ? ", " : "").Append(subject.Name);
+                else notYet.Append(notYet.Length > 0 ? ", " : "").Append(subject.Name).Append('(').Append(subject.Where).Append(')');
             }
             var text = new StringBuilder($"찍음 {captured}/{subjects.Count} · 장수 {photos.Shots} (일반 {photos.EmptyShots}, 다시 {photos.RepeatShots})");
             if (notYet.Length > 0) text.Append("\n안 찍음: ").Append(notYet);
             if (unknown.Count > 0)
             {
-                text.Append('\n').Append(DevInfo.Paint("찍을 곳 모름 (판정에서 뺌): ", DevInfo.BadColor));
+                text.Append('\n').Append(DevInfo.Paint("찍을 곳 못 찾음 (판정에서 뺌): ", DevInfo.BadColor));
                 for (int i = 0; i < unknown.Count; i++) text.Append(i > 0 ? ", " : "").Append(unknown[i].name);
             }
             return text.ToString();

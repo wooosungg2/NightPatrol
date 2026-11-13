@@ -12,7 +12,8 @@ namespace NightPatrol.Phone
     /// 카메라 앱: 이상현상은 고치지 않고 찍는다. 가운데 조준 박스에 대상을 넣고 좌클릭 또는 E로 찍는다.
     /// 무엇이 찍혔는지는 보여 주지 않는다 — 엘리베이터 판정 때만 안다 (찍는 순간 알려 주면 탐지기가 된다).
     /// 한 층에 찍을 수 있는 장수가 정해져 있고, 이상현상이 아닌 것을 찍어도 장수만 준다.
-    /// 전화·메시지 다음 독 세 번째 칸. 휠로 이번 층 사진첩(넘겨 보기만, 지우기 없음).
+    /// 전화·메시지 다음 독 세 번째 칸. 찍으면 그 사진을 잠깐(1.5초) 보여 주고 뷰파인더로 돌아온다 (우클릭이면 바로).
+    /// 지난 사진은 갤러리 앱에서 본다 (홈에서 연다).
     /// </summary>
     public sealed class CameraApp : PhoneApp
     {
@@ -26,7 +27,7 @@ namespace NightPatrol.Phone
             [Min(0)] public int shots;
         }
 
-        /// <summary>사진첩의 사진 한 장 (찍힌 대상은 판정용이라 여기 없음 — PatrolRun.Photos)</summary>
+        /// <summary>갤러리의 사진 한 장 (찍힌 대상은 판정용이라 여기 없음 — PatrolRun.Photos)</summary>
         public sealed class Picture
         {
             public Texture2D Image;
@@ -51,6 +52,8 @@ namespace NightPatrol.Phone
         [SerializeField, Min(0f)] private float flashSeconds = 0.15f;
         [Tooltip("다음 셔터를 받기까지(초). 번쩍임과 별개")]
         [SerializeField, Min(0f)] private float retakeSeconds = 0.3f;
+        [Tooltip("찍은 뒤 그 사진을 보여 주는 시간(초). 지나거나 우클릭하면 뷰파인더로. 0이면 안 보여 줌")]
+        [SerializeField, Min(0f)] private float reviewSeconds = 1.5f;
         [Tooltip("눈(찍는 위치·방향). 비어 있으면 휴대폰이 달린 카메라(PlayerCamera)")]
         [SerializeField] private Camera eye;
 
@@ -58,27 +61,29 @@ namespace NightPatrol.Phone
         private PatrolRun run;
         private Camera lens;
         private RenderTexture preview;
-        private RectTransform viewfinder, album;
-        private RawImage live, shown;
+        private RectTransform viewfinder;
+        private RawImage live, review;
         private Image flash;
-        private TextMeshProUGUI count, caption, footer, title;
-        private bool browsing;
-        private int index;
-        private float flashLeft, retakeLeft, emptyBlink;
+        private TextMeshProUGUI count, footer, title;
+        private float flashLeft, retakeLeft, emptyBlink, reviewLeft;
+        private Picture reviewed;
 
         public override string Title => "카메라";
         public override bool InDock => true;
         public override int Order => 2;
+        public override bool Landscape => true;
         public override Color IconTop => new Color(0.7f, 0.72f, 0.76f);
         public override Color IconBottom => new Color(0.24f, 0.25f, 0.29f);
         public override bool HasSymbol => true;
         public override bool SymbolAt(Vector2 p) => IconShape(p);
 
         public PhotoRules Rules => rules;
-        /// <summary>이번 층 사진첩 (오래된 것이 앞)</summary>
+        /// <summary>이번 층에 찍은 사진 (오래된 것이 앞, 갤러리가 보여 준다)</summary>
         public IReadOnlyList<Picture> Pictures => pictures;
-        /// <summary>사진첩을 보는 중인지 (아니면 뷰파인더)</summary>
-        public bool IsBrowsing => browsing;
+        /// <summary>방금 찍은 사진을 보여 주는 중인지 (아니면 뷰파인더)</summary>
+        public bool IsReviewing => reviewed != null;
+        /// <summary>보여 주는 사진 (뷰파인더면 null)</summary>
+        public Picture Reviewed => reviewed;
         /// <summary>뷰파인더 카메라가 있는지 (앱을 닫으면 지움)</summary>
         public bool HasLens => lens != null;
         /// <summary>뷰파인더·판정에 쓰는 카메라 (없으면 null)</summary>
@@ -152,34 +157,28 @@ namespace NightPatrol.Phone
             base.OnDestroy();
         }
 
-        // 사진은 그 층의 증거 — 층이 바뀌면 사진첩도 비운다 (장수·찍힌 기록은 PatrolRun.Photos가 비움)
+        // 사진은 그 층의 증거 — 층이 바뀌면 사진도 비운다 (장수·찍힌 기록은 PatrolRun.Photos가 비움)
         private void OnFloorChanged(int floor) => ResetFloor();
         private void OnCleared() => ResetFloor();
 
         private void ResetFloor()
         {
+            reviewed = null;
             ClearPictures();
-            browsing = false;
             Redraw();
         }
 
         protected override void Build(RectTransform root)
         {
-            var content = PhoneUI.Rect(root, "LandscapeCamera");
-            content.anchorMin = content.anchorMax = new Vector2(0.5f, 0.5f);
-            content.pivot = new Vector2(0.5f, 0.5f);
-            content.sizeDelta = new Vector2(Width, Height);
-            content.anchoredPosition = new Vector2(0f, PhoneScreen.StatusHeight / 2f);
-            content.localRotation = Quaternion.Euler(0f, 0f, -90f);
+            var content = LandscapeRoot(root, "LandscapeCamera");
             PhoneUI.Image(content, null, new Color(0.08f, 0.08f, 0.09f));
             title = PhoneUI.Label(content, "Title", 8f, 2f, 120f, 22f, Title, 13f, Color.white, TextAlignmentOptions.Left);
             viewfinder = PhoneUI.Box(content, "Viewfinder", 0f, 0f, Width, Height);
             live = PictureBox(viewfinder, "Live");
             AimBox(viewfinder);
+            review = PictureBox(content, "Review");
+            review.gameObject.SetActive(false);
             count = PhoneUI.Label(content, "Count", 198f, 2f, 154f, 22f, "", 13f, Color.white, TextAlignmentOptions.Right);
-            album = PhoneUI.Box(content, "Album", 0f, 0f, Width, Height);
-            shown = PictureBox(album, "Photo");
-            caption = PhoneUI.Label(album, "Caption", 8f, 184f, 344f, 24f, "", 12f, Color.white, TextAlignmentOptions.BottomRight);
             PhoneUI.Image(PhoneUI.Box(content, "TopShade", 0f, 0f, Width, 26f), null, new Color(0f, 0f, 0f, 0.55f));
             PhoneUI.Image(PhoneUI.Box(content, "BottomShade", 0f, 212f, Width, 28f), null, new Color(0f, 0f, 0f, 0.55f));
             title.transform.SetAsLastSibling();
@@ -188,7 +187,21 @@ namespace NightPatrol.Phone
             flash = PhoneUI.Image(flashRect, null, new Color(1f, 1f, 1f, 0f));
             footer = PhoneUI.Label(content, "Footer", 4f, 214f, 352f, 24f, "", 12f, Color.white, TextAlignmentOptions.Center);
         }
-        private static RawImage PictureBox(RectTransform parent, string name)
+
+        /// <summary>가로 화면 바탕 (Width×Height, -90도 돌림): 상태 표시줄이 숨는 자리까지 씀. 갤러리도 쓴다</summary>
+        internal static RectTransform LandscapeRoot(RectTransform root, string name)
+        {
+            var content = PhoneUI.Rect(root, name);
+            content.anchorMin = content.anchorMax = new Vector2(0.5f, 0.5f);
+            content.pivot = new Vector2(0.5f, 0.5f);
+            content.sizeDelta = new Vector2(Width, Height);
+            content.anchoredPosition = new Vector2(0f, PhoneScreen.StatusHeight / 2f);
+            content.localRotation = Quaternion.Euler(0f, 0f, -90f);
+            return content;
+        }
+
+        /// <summary>사진 한 장 크기(Width×Height)의 그림 칸</summary>
+        internal static RawImage PictureBox(RectTransform parent, string name)
         {
             var rect = PhoneUI.Box(parent, name, 0f, 0f, Width, Height);
             var image = rect.gameObject.AddComponent<RawImage>();
@@ -210,46 +223,37 @@ namespace NightPatrol.Phone
 
         protected override void OnOpen()
         {
-            browsing = false;
             EnsureLens();
             Redraw();
         }
 
         protected override void OnClose()
         {
-            browsing = false;
+            reviewed = null;
             DropLens();
         }
 
-        // 휠: 뷰파인더 → 사진첩(마지막 사진부터) → 넘기기, 끝에서 한 번 더 넘기면 뷰파인더로
-        protected override void OnMove(int step)
-        {
-            if (pictures.Count == 0) return;
-            if (!browsing)
-            {
-                browsing = true;
-                index = pictures.Count - 1;
-            }
-            else
-            {
-                int next = index + (step < 0 ? 1 : -1);   // 휠 위 = 최근 쪽
-                if (next < 0 || next >= pictures.Count) browsing = false;
-                else index = next;
-            }
-            Redraw();
-        }
-
+        // 좌클릭: 뷰파인더면 찍기, 사진을 보여 주는 중이면 찍지 않고 뷰파인더로 (안 보고 찍히지 않게)
         protected override void OnConfirm()
         {
-            if (!browsing) Take();
+            if (reviewed != null) EndReview();
+            else Take();
         }
 
+        // 우클릭: 사진을 보여 주는 중이면 바로 뷰파인더로, 아니면 홈
         protected override bool OnBack()
         {
-            if (!browsing) return false;
-            browsing = false;
-            Redraw();
+            if (reviewed == null) return false;
+            EndReview();
             return true;
+        }
+
+        /// <summary>찍은 사진 보여 주기를 끝내고 뷰파인더로</summary>
+        public void EndReview()
+        {
+            if (reviewed == null) return;
+            reviewed = null;
+            Redraw();
         }
 
         /// <summary>
@@ -284,6 +288,11 @@ namespace NightPatrol.Phone
             if (run != null) run.Photos.Record(inShot, run.PlaySeconds);
             pictures.Add(picture);
             if (temporary && !IsOpen) DropLens();
+            if (IsOpen && reviewSeconds > 0f)
+            {
+                reviewed = picture;
+                reviewLeft = reviewSeconds;
+            }
 
             flashLeft = flashSeconds;
             retakeLeft = retakeSeconds;
@@ -304,6 +313,7 @@ namespace NightPatrol.Phone
             go.transform.SetParent(eye.transform, false);
             lens = go.AddComponent<Camera>();
             lens.CopyFrom(eye);
+            lens.cullingMask = CameraOnlyLayer.With(eye.cullingMask);   // 카메라로만 보이는 것(CameraOnly 레이어)은 뷰파인더에만
             lens.targetTexture = preview;
             lens.aspect = (float)Width / Height;   // 판정도 이 카메라로 하므로 뷰파인더와 조준 박스가 같은 자리
             lens.enabled = false;   // 보일 때만 손으로 그린다
@@ -347,7 +357,12 @@ namespace NightPatrol.Phone
                 if (count != null) count.color = Mathf.Repeat(emptyBlink, 0.2f) < 0.1f ? PhoneUI.Alert : Color.white;
                 if (emptyBlink <= 0f && count != null) count.color = Color.white;
             }
-            if (lens == null || browsing || !IsOpen || Time.timeScale <= 0f) return;
+            if (reviewed != null && Time.timeScale > 0f)   // ESC 메뉴 동안은 멈춤
+            {
+                reviewLeft -= Time.deltaTime;
+                if (reviewLeft <= 0f) EndReview();
+            }
+            if (lens == null || reviewed != null || !IsOpen || Time.timeScale <= 0f) return;
             if (Phone == null || !Phone.IsInHand || Screen.IsCallShown) return;
             lens.Render();
         }
@@ -356,20 +371,12 @@ namespace NightPatrol.Phone
         {
             if (footer == null) return;   // 아직 한 번도 안 열어 봄
             string interact = "좌클릭", back = "우클릭";
-            viewfinder.gameObject.SetActive(!browsing);
-            album.gameObject.SetActive(browsing);
-            if (!browsing)
-            {
-                title.text = Title;
-                count.text = $"남은 촬영 {ShotsLeft}장";
-                footer.text = pictures.Count > 0 ? $"{interact} 찍기 · 휠 사진첩 · {back} 홈" : $"{interact} 찍기 · {back} 홈";
-                return;
-            }
-            var picture = pictures[index];
-            title.text = $"사진 {index + 1}/{pictures.Count}";
-            shown.texture = picture.Image;
-            caption.text = $"{picture.Floor}층 · {PatrolRun.ClockText(picture.Minutes)}";
-            footer.text = $"휠 넘기기 · {back} 카메라";
+            title.text = Title;
+            count.text = $"남은 촬영 {ShotsLeft}장";
+            viewfinder.gameObject.SetActive(reviewed == null);
+            review.gameObject.SetActive(reviewed != null);
+            review.texture = reviewed != null ? reviewed.Image : null;
+            footer.text = reviewed != null ? $"{back} 카메라" : $"{interact} 찍기 · {back} 홈";
         }
     }
 }

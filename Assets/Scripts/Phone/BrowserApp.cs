@@ -10,7 +10,7 @@ namespace NightPatrol.Phone
 
         public override string Title => "인터넷";
         public override bool InDock => true;
-        public override int Order => 3;
+        public override int Order => 4;
         public override Color IconTop => new Color(0.5f, 0.76f, 1f);
         public override Color IconBottom => new Color(0.08f, 0.34f, 0.84f);
         public override bool HasSymbol => true;
