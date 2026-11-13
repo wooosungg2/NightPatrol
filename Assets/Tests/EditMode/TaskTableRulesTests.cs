@@ -100,6 +100,17 @@ namespace NightPatrol.Tests
             Assert.IsEmpty(problems, "예외 지시 줄에 패턴 Id (정확한 Id 하나로 쓸 것): " + string.Join(" / ", problems));
         }
 
+        // 00_18b: Floor5 표찰은 층마다 바뀐다 (송지우님 RoomNumberSigns: 4층에서 521 → 421).
+        // 일지의 {room}도 지금 층을 따라야 표찰과 같은 번호가 된다 (Room Floor 0)
+        [Test]
+        public void Floor5Table_RoomNumbersFollowTheFloor()
+        {
+            var table = AssetDatabase.LoadAssetAtPath<TaskTable>("Assets/Data/TaskTable_Floor5.asset");
+            Assert.IsNotNull(table, "Assets/Data/TaskTable_Floor5.asset 없음");
+            Assert.AreEqual(0, table.RoomFloor, "Room Floor가 0이 아니면 4층 일지가 표찰(421)과 다른 번호를 적음");
+            Assert.AreEqual("421호", table.RoomName("R21", 4));
+        }
+
         [Test]
         public void AreaNames_HaveOneRowPerArea()
         {

@@ -41,3 +41,7 @@ MonoBehaviour:
     action: {fileID: 346019026430069724, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     compositePart: 
     group: Keyboard&Mouse
+  - label: "\uC804\uD654"
+    action: {fileID: -2470428455532515359, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+    compositePart: 
+    group: Keyboard&Mouse

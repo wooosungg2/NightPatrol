@@ -9,31 +9,43 @@ namespace NightPatrol.Patrol
         private static readonly HashSet<PatrolObject> loggedErrors = new HashSet<PatrolObject>();
         private static Dictionary<string, PatrolObject> idMap;
 
-        public static List<PatrolObject> FindAbnormal(IEnumerable<PatrolObject> objects)
+        public static List<PatrolObject> FindAbnormal(IEnumerable<PatrolObject> objects) => Find(objects, IsClear);
+
+        /// <summary>씬의 켜진 점검 사물 중 비정상인 것, 이상현상이 걸린 것 포함 (Id 순). 씬 전체를 검색하므로 매 프레임 부르지 말 것</summary>
+        public static List<PatrolObject> FindAbnormal() => FindAbnormal(AllActive());
+
+        /// <summary>켜진 점검 사물이 전부 정상이고 이상현상도 없는지 (개발자 정보·테스트용. 엘리베이터 판정은 PatrolRun.Judge)</summary>
+        public static bool IsAllClear() => FindAbnormal().Count == 0;
+
+        /// <summary>엘리베이터 업무 판정: 일이 남은 점검 사물 (Id 순). 이상현상이 걸린 사물은 빠진다 (PatrolObject.IsTaskClear)</summary>
+        public static List<PatrolObject> FindUnfinished(IEnumerable<PatrolObject> objects) => Find(objects, IsTaskClear);
+
+        public static List<PatrolObject> FindUnfinished() => FindUnfinished(AllActive());
+
+        private static PatrolObject[] AllActive() => UnityEngine.Object.FindObjectsByType<PatrolObject>(FindObjectsInactive.Exclude);
+
+        private static List<PatrolObject> Find(IEnumerable<PatrolObject> objects, Func<PatrolObject, bool> clear)
         {
             var result = new List<PatrolObject>();
             if (objects == null) return result;
             foreach (var obj in objects)
             {
-                if (obj != null && obj.isActiveAndEnabled && !IsClear(obj))
+                if (obj != null && obj.isActiveAndEnabled && !clear(obj))
                     result.Add(obj);
             }
             result.Sort((a, b) => StringComparer.Ordinal.Compare(a.Id, b.Id));
             return result;
         }
 
-        /// <summary>씬의 켜진 점검 사물 중 비정상인 것 (Id 순). 씬 전체를 검색하므로 매 프레임 부르지 말 것</summary>
-        public static List<PatrolObject> FindAbnormal() => FindAbnormal(
-            UnityEngine.Object.FindObjectsByType<PatrolObject>(FindObjectsInactive.Exclude));
-
-        /// <summary>켜진 점검 사물이 전부 정상인지 (엘리베이터 판정)</summary>
-        public static bool IsAllClear() => FindAbnormal().Count == 0;
-
         // 판정과 점검 후보 선별에서 같은 오류 경계를 쓴다. 오류 사물은 정상으로 보지 않는다.
-        internal static bool IsClear(PatrolObject obj)
+        internal static bool IsClear(PatrolObject obj) => Guard(obj, o => o.IsClear);
+
+        internal static bool IsTaskClear(PatrolObject obj) => Guard(obj, o => o.IsTaskClear);
+
+        private static bool Guard(PatrolObject obj, Func<PatrolObject, bool> check)
         {
             if (obj == null) return false;
-            try { return obj.IsClear; }
+            try { return check(obj); }
             catch (Exception e)
             {
                 if (loggedErrors.Add(obj)) Debug.LogException(e, obj);

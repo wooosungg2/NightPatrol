@@ -88,6 +88,17 @@ namespace NightPatrol.Audio
             PlayCue(index);
         }
 
+        /// <summary>
+        /// 이 이름의 소리 묶음을 멈춘다 (긴 소리를 끊을 때 — 예: 전화를 받으면 벨). 묶음마다 소리 나는 곳이 하나라 그 묶음의 소리만 멈춘다.
+        /// 없는 이름이거나 아직 낸 적 없는 묶음이면 조용히 넘어간다
+        /// </summary>
+        public void Stop(string cueName)
+        {
+            int index = IndexOf(cueName);
+            if (index < 0 || index >= sources.Length || sources[index] == null) return;
+            sources[index].Stop();
+        }
+
         private void OnEnable()
         {
             if (!HasMoments()) return;

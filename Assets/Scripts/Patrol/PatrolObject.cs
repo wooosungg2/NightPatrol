@@ -20,8 +20,13 @@ namespace NightPatrol.Patrol
         /// 점검 항목 표에서 정하고, 층이 시작될 때 풀린다
         /// </summary>
         public bool IsException { get; internal set; }
-        /// <summary>판정 기준: 정상이면서(예외 지시면 반대) 이상현상도 없음</summary>
+        /// <summary>정상이면서(예외 지시면 반대) 이상현상도 없음. 점검 사항 고르기·개발자 정보의 "비정상"이 쓴다</summary>
         public bool IsClear => (IsException ? !IsNormal : IsNormal) && !HasAnomaly;
+        /// <summary>
+        /// 엘리베이터 업무 판정 기준: 이상현상이 걸린 사물은 업무에서 빠진다 (손대지 않고 휴대폰 카메라로 찍기만 하면 됨).
+        /// 아니면 정상 (예외 지시면 반대)
+        /// </summary>
+        public bool IsTaskClear => HasAnomaly || (IsException ? !IsNormal : IsNormal);
         /// <summary>이상현상을 건다. 걸려 있는 동안은 정상이어도 판정에 걸림</summary>
         public void AddAnomaly() => anomalyCount++;
         /// <summary>이상현상을 푼다 (0 아래로는 안 내려감)</summary>

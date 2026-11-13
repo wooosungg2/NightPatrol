@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Text;
+using NightPatrol.Phone;
 using NightPatrol.Run;
 using UnityEngine;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -21,14 +24,69 @@ namespace NightPatrol.Debugging
 
         /// <summary>F1 패널의 개발자 키 안내 (PatrolRun이 없으면 F5만)</summary>
         public static string HelpText(bool hasRun) => hasRun
-            ? "F1 표시 전환 · F2 하행 · F3 실패 · F4 층 재시작\nF5 기록 폴더 · PgUp/PgDn 층 이동"
+            ? "F1 표시 전환 · F2 하행 · F3 실패 · F4 층 재시작\nF5 기록 폴더 · F6 예약 바로 실행 · F7 시험 전화 · PgUp/PgDn 층 이동"
             : "F1 표시 전환 · F5 기록 폴더  (PatrolRun 없음)";
 
+        private const int MaxScheduleLines = 5;
+
+        /// <summary>F1 "예약" 구역: 구간·이번 구간에서 흐른 시간, 남은 예약을 남은 시간 순으로 5줄까지</summary>
+        public static string ScheduleText(FloorSchedule schedule)
+        {
+            if (schedule == null) return "PatrolRun 없음";
+            var text = new StringBuilder($"구간 {schedule.Segment} · {PlaytestLog.Clock(schedule.Elapsed)}");
+            var pending = schedule.Snapshot();
+            if (pending.Count == 0) return text.Append("\n없음").ToString();
+            int shown = Mathf.Min(MaxScheduleLines, pending.Count);
+            for (int i = 0; i < shown; i++)
+            {
+                string label = string.IsNullOrEmpty(pending[i].Label) ? "이름 없음" : pending[i].Label;
+                text.Append('\n').Append(label).Append(' ')
+                    .Append(pending[i].Remaining.ToString("F1", CultureInfo.InvariantCulture)).Append('초');
+            }
+            if (pending.Count > shown) text.Append($"\n외 {pending.Count - shown}개");
+            return text.ToString();
+        }
+
+        /// <summary>
+        /// F1 "사진": 이번 층 찍은 것/찍어야 할 것, 장수, 아직 안 찍은 이상현상(괄호 안 = 시스템이 찾은 찍을 곳),
+        /// 찍을 곳을 못 찾아 판정에서 뺀 이상현상 (개발용 — 플레이어에게는 안 보임)
+        /// </summary>
+        public static string PhotoText(PatrolRun run)
+        {
+            if (run == null) return "PatrolRun 없음";
+            var photos = run.Photos;
+            var unknown = new System.Collections.Generic.List<NightPatrol.Anomalies.Anomaly>();
+            var subjects = NightPatrol.Photo.PhotoSubjects.Active(unknown);
+            var notYet = new StringBuilder();
+            int captured = 0;
+            foreach (var subject in subjects)
+            {
+                if (photos.IsCaptured(subject.Source)) captured++;
+                else notYet.Append(notYet.Length > 0 ? ", " : "").Append(subject.Name).Append('(').Append(subject.Where).Append(')');
+            }
+            var text = new StringBuilder($"찍음 {captured}/{subjects.Count} · 장수 {photos.Shots} (일반 {photos.EmptyShots}, 다시 {photos.RepeatShots})");
+            if (notYet.Length > 0) text.Append("\n안 찍음: ").Append(notYet);
+            if (unknown.Count > 0)
+            {
+                text.Append('\n').Append(DevInfo.Paint("찍을 곳 못 찾음 (판정에서 뺌): ", DevInfo.BadColor));
+                for (int i = 0; i < unknown.Count; i++) text.Append(i > 0 ? ", " : "").Append(unknown[i].name);
+            }
+            return text.ToString();
+        }
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        // F7 시험 전화: 손에 드는 전화가 받기·자막·끊기까지 되는지 (통화 표 없이)
+        private static readonly PhoneCall TestCall = new PhoneCall
+        {
+            id = "시험",
+            lines = new[] { new PhoneLine { text = "시험 전화입니다." }, new PhoneLine { text = "Q로 끊을 수 있어요." } },
+        };
+
         private PatrolRun run;
         private FloorTransition transition;
         private PlaytestLog playtest;
         private InteractionDebugView debugView;
+        private PhoneHolder phone;
 
         /// <summary>개발자 키가 동작하는지: F1 디버그 표시가 켜져 있을 때만</summary>
         public bool KeysActive => debugView != null && debugView.IsVisible;
@@ -40,11 +98,14 @@ namespace NightPatrol.Debugging
             playtest = UnityEngine.Object.FindAnyObjectByType<PlaytestLog>();
             debugView = GetComponent<InteractionDebugView>();
             if (debugView == null) debugView = UnityEngine.Object.FindAnyObjectByType<InteractionDebugView>();
+            phone = UnityEngine.Object.FindAnyObjectByType<PhoneHolder>();
         }
 
         private void OnEnable()
         {
             if (showHelp) DevInfo.Register(this, "개발자 키", () => HelpText(run != null), 200);
+            if (run != null) DevInfo.Register(this, "예약", () => ScheduleText(run != null ? run.Schedule : null), 210);
+            if (run != null) DevInfo.Register(this, "사진", () => PhotoText(run), 215);
         }
 
         private void OnDisable() => DevInfo.Unregister(this);
@@ -77,6 +138,17 @@ namespace NightPatrol.Debugging
             {
                 Debug.Log("[Dev] 현재 층 다시 시작", this);
                 AsDev("F4 재시작", run.RestartFloor);
+            }
+            if (keyboard.f6Key.wasPressedThisFrame)
+            {
+                // 실행한 예약은 지워져 두 번 돌지 않는다. 이 로그가 게임 로그에 개발 개입으로 남는다
+                string label = run.Schedule.RunNext();
+                Debug.Log(label != null ? $"[Dev] 예약 바로 실행: {label}" : "[Dev] 남은 예약 없음", this);
+            }
+            if (keyboard.f7Key.wasPressedThisFrame)
+            {
+                if (phone == null) Debug.Log("[Dev] 전화 없음 (Player 프리팹에 PhoneHolder)", this);
+                else Debug.Log(phone.Ring(TestCall) ? "[Dev] 시험 전화" : "[Dev] 시험 전화 못 함 (통화 중·막힘)", this);
             }
             if (keyboard.pageUpKey.wasPressedThisFrame) Jump(-1);
             if (keyboard.pageDownKey.wasPressedThisFrame) Jump(1);

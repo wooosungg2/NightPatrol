@@ -28,5 +28,15 @@ namespace NightPatrol
                 catch (Exception e) { Debug.LogException(e, context); }
             }
         }
+
+        public static void Raise<T1, T2>(Action<T1, T2> evt, T1 first, T2 second, UnityEngine.Object context)
+        {
+            if (evt == null) return;
+            foreach (Action<T1, T2> handler in evt.GetInvocationList())
+            {
+                try { handler(first, second); }
+                catch (Exception e) { Debug.LogException(e, context); }
+            }
+        }
     }
 }

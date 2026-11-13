@@ -9,7 +9,7 @@ using UnityEngine;
 namespace NightPatrol.Run
 {
     /// <summary>
-    /// 층 이동 연출. 엘리베이터 E → 조작 잠금 → 문 닫힘 → 화면 어두워짐 → (어두운 동안) 판정·층 바꾸기 → "N층" →
+    /// 층 이동 연출. 엘리베이터 E → 조작 잠금·판정 고정 → 문 닫힘 → 화면 어두워짐 → (어두운 동안) 판정 적용·층 바꾸기 → "N층" →
     /// 화면 밝아짐 → 문 열림 → 잠금 해제. 실패하면 어두운 동안 시작 자리로 옮겨진 뒤 졸다 깨는 연출(기획서 3.3).
     /// 1층 도착(클리어) 뒤 엘리베이터를 한 번 더 타면 퇴근: 어두워짐 → "근무 종료" → 처음으로 (엔딩이 정해지기 전 임시 끝).
     /// 잠그는 것: 이동·시점·E·일지(들고 있었으면 내림). Player 프리팹의 HUD에 붙는다.
@@ -147,11 +147,12 @@ namespace NightPatrol.Run
         private IEnumerator DescendRoutine()
         {
             Begin();
+            var judgment = JudgeNow();   // 누른 순간의 상태로 고정 — 문이 닫히는 동안 켜진 이상현상까지 요구하지 않게
             SafeEvent.Raise(DescendStarted, this);
             yield return WaitDoors(false);
             if (fader != null) yield return fader.FadeTo(1f, fadeSeconds);
 
-            var result = JudgeInTheDark();
+            var result = ApplyInTheDark(judgment);
             if (result == DescendResult.Failed)
             {
                 if (HasDoors) doors.SetOpenImmediate(true);   // 다음 하행을 위해 문은 열어 둠
@@ -192,13 +193,24 @@ namespace NightPatrol.Run
             }
         }
 
-        // 판정 중 예외가 나면 정상 도착으로 알리지 않고, 화면·문·잠금만 복구한다. 층 상태 복원은 보장하지 않는다.
-        private DescendResult JudgeInTheDark()
+        // 판정 계산 중 예외가 나면 null — 어두워진 뒤 Apply가 다시 판정하고, 그때도 오류면 거기서 예외를 남긴다 (같은 오류를 두 번 남기지 않게 여기서는 경고만)
+        private FloorJudgment JudgeNow()
+        {
+            try { return run.Judge(); }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Transition] 판정 고정 중 오류 — 어두워진 뒤 다시 판정: {e.Message}", this);
+                return null;
+            }
+        }
+
+        // 적용 중 예외가 나면 정상 도착으로 알리지 않고, 화면·문·잠금만 복구한다. 층 상태 복원은 보장하지 않는다.
+        private DescendResult ApplyInTheDark(FloorJudgment judgment)
         {
             try
             {
                 int attemptBefore = run.Attempt;
-                run.TryDescend();
+                run.Apply(judgment);
                 return run.Attempt != attemptBefore ? DescendResult.Failed : DescendResult.Descended;
             }
             catch (Exception e)

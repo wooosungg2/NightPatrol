@@ -14,7 +14,9 @@ namespace NightPatrol.Debugging
 {
     /// <summary>
     /// 플레이테스트 기록 (재미 검증용, 기획서 3.4·7.3). 층마다 한 줄씩 CSV로 남긴다:
-    /// 회차, 층, 결과(통과·실패·중단, 개발자 키로 넘기면 키 이름), 걸린 시간, E 누른 횟수, 일지 본 횟수, 점검 항목.
+    /// 회차, 층, 결과(통과·실패·중단, 개발자 키로 넘기면 키 이름), 걸린 시간, E 누른 횟수, 일지 본 횟수, 점검 항목,
+    /// 그리고 엘리베이터 판정 때 고정한 카메라 칸(찍은 장수, 대상 없는 사진, 다시 찍은 사진, 찍힌·요구 이상현상, 첫 촬영 초, 실패 이유).
+    /// 판정 없이 넘긴 층(개발자 키·중단)은 카메라 칸이 빈칸.
     /// 에디터·개발 빌드에서만 기록한다. 파일 위치: persistentDataPath/playtest/ (개발자 메뉴 F5로 폴더 열기)
     /// </summary>
     [DisallowMultipleComponent]
@@ -54,6 +56,29 @@ namespace NightPatrol.Debugging
         /// <summary>초를 소수 첫째 자리까지 (컴퓨터 언어 설정과 상관없이 소수점은 ".")</summary>
         public static string Seconds(float seconds) => seconds.ToString("F1", CultureInfo.InvariantCulture);
 
+        /// <summary>CSV 머리줄 칸</summary>
+        public static readonly string[] Header =
+        {
+            "회차", "층", "결과", "소요(초)", "E 횟수", "일지 본 횟수", "점검 항목",
+            "찍은 장수", "대상 없는 사진", "다시 찍은 사진", "찍힌 이상현상", "요구 이상현상", "첫 촬영(초)", "실패 이유",
+        };
+
+        /// <summary>카메라 칸 7개 (판정이 없으면 빈칸)</summary>
+        public static string[] CameraCells(NightPatrol.Run.FloorJudgment judgment)
+        {
+            if (judgment == null) return new string[7];
+            return new[]
+            {
+                judgment.Shots.ToString(CultureInfo.InvariantCulture),
+                judgment.EmptyShots.ToString(CultureInfo.InvariantCulture),
+                judgment.RepeatShots.ToString(CultureInfo.InvariantCulture),
+                judgment.Captured.ToString(CultureInfo.InvariantCulture),
+                judgment.Required.ToString(CultureInfo.InvariantCulture),
+                judgment.FirstShotSeconds >= 0f ? Seconds(judgment.FirstShotSeconds) : string.Empty,
+                judgment.Reason,
+            };
+        }
+
         /// <summary>초를 "분:초"로 (F1 표시용)</summary>
         public static string Clock(float seconds)
         {
@@ -72,6 +97,7 @@ namespace NightPatrol.Debugging
         private JournalHolder subscribedJournal;
         private int attempt, floor, presses, journalViews;
         private string taskText = string.Empty;
+        private FloorJudgment judged;   // 지금 층의 엘리베이터 판정 (판정 없이 끝나면 null)
         private float runStart;
         private string path;
 
@@ -93,6 +119,7 @@ namespace NightPatrol.Debugging
             subscribedRun.FloorStarted += OnFloorStarted;
             subscribedRun.Failed += OnFailed;
             subscribedRun.Cleared += OnCleared;
+            subscribedRun.Judged += OnJudged;
             if (tasks != null)
             {
                 subscribedTasks = tasks;
@@ -118,6 +145,7 @@ namespace NightPatrol.Debugging
                 subscribedRun.FloorStarted -= OnFloorStarted;
                 subscribedRun.Failed -= OnFailed;
                 subscribedRun.Cleared -= OnCleared;
+                subscribedRun.Judged -= OnJudged;
             }
             if (!ReferenceEquals(subscribedTasks, null)) subscribedTasks.TasksChanged -= OnTasksChanged;
             if (!ReferenceEquals(subscribedInteractor, null)) subscribedInteractor.Interacted -= OnInteracted;
@@ -141,15 +169,22 @@ namespace NightPatrol.Debugging
             presses = 0;
             journalViews = 0;
             taskText = string.Empty;
+            judged = null;
         }
 
         private void OnFailed(int failedFloor) => Close("실패");
 
+        // 판정은 층이 바뀌기 전에 온다 — 지금 층 것만 받아 두었다가 그 층 줄을 닫을 때 쓴다
+        private void OnJudged(FloorJudgment judgment)
+        {
+            if (open && judgment != null && judgment.Floor == floor && judgment.Attempt == attempt) judged = judgment;
+        }
+
         private void OnCleared()
         {
             Close("통과");
-            Write(CsvRow(run.Attempt.ToString(), run.CurrentFloor.ToString(), "클리어",
-                Seconds(Time.time - runStart), "", "", ""));
+            Write(CsvRow(new[] { run.Attempt.ToString(), run.CurrentFloor.ToString(), "클리어",
+                Seconds(Time.time - runStart), "", "", "" }.Concat(CameraCells(null)).ToArray()));
         }
 
         private void OnTasksChanged(IReadOnlyList<PatrolTask> list)
@@ -171,8 +206,9 @@ namespace NightPatrol.Debugging
         {
             if (!open) return;
             open = false;
-            Write(CsvRow(attempt.ToString(), floor.ToString(), ResultOverride ?? result, Seconds(Time.time - segmentStart),
-                presses.ToString(), journalViews.ToString(), taskText));
+            Write(CsvRow(new[] { attempt.ToString(), floor.ToString(), ResultOverride ?? result, Seconds(Time.time - segmentStart),
+                presses.ToString(), journalViews.ToString(), taskText }.Concat(CameraCells(judged)).ToArray()));
+            judged = null;
         }
 
         private void Write(string row)
@@ -190,8 +226,7 @@ namespace NightPatrol.Debugging
                     path = Path.Combine(folder, stem + ".csv");
                     for (int i = 1; File.Exists(path); i++) path = Path.Combine(folder, $"{stem}_{i}.csv");
                     // BOM을 넣어야 엑셀에서 한글이 안 깨진다
-                    File.WriteAllText(path, CsvRow("회차", "층", "결과", "소요(초)", "E 횟수", "일지 본 횟수", "점검 항목") + "\n",
-                        new UTF8Encoding(true));
+                    File.WriteAllText(path, CsvRow(Header) + "\n", new UTF8Encoding(true));
                     Debug.Log($"[Playtest] 기록 파일: {path}", this);
                 }
                 File.AppendAllText(path, row + "\n", new UTF8Encoding(false));
