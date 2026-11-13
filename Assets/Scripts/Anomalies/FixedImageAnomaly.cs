@@ -1,16 +1,12 @@
-ï»¿
+
 using UnityEngine;
-using NightPatrol.Photo;
 
 namespace NightPatrol.Anomalies
 {
-    public class FixedImageAnomaly : Anomaly, IPhotoVisual
+    public class FixedImageAnomaly : Anomaly
     {
-        /// <summary>ì´ë¯¸ì§€ (ì´¬ì˜ìš©). êº¼ì ¸ ìˆìœ¼ë©´ null</summary>
-        public GameObject PhotoVisual => IsActive ? imageObject : null;
-
         [Header("Image Object")]
-        [Tooltip("Sceneì—ì„œ ìœ„ì¹˜ì™€ í¬ê¸°ë¥¼ ì¡°ì •í•œ ì´ë¯¸ì§€ ì˜¤ë¸Œì íŠ¸")]
+        [Tooltip("Scene¿¡¼­ À§Ä¡¿Í Å©±â¸¦ Á¶Á¤ÇÑ ÀÌ¹ÌÁö ¿ÀºêÁ§Æ®")]
         [SerializeField]
         private GameObject imageObject;
 
@@ -21,7 +17,7 @@ namespace NightPatrol.Anomalies
         }
 
         // ========================================
-        // ì´ìƒí˜„ìƒ í™œì„±í™”
+        // ÀÌ»óÇö»ó È°¼ºÈ­
         // ========================================
 
         public override void Activate()
@@ -39,12 +35,12 @@ namespace NightPatrol.Anomalies
                 return;
             }
 
-            // ì´ë¯¸ì§€ í‘œì‹œ
+            // ÀÌ¹ÌÁö Ç¥½Ã
             imageObject.SetActive(true);
 
             IsActive = true;
 
-            // ì ê²€ ëŒ€ìƒì— ì´ìƒí˜„ìƒ ë“±ë¡
+            // Á¡°Ë ´ë»ó¿¡ ÀÌ»óÇö»ó µî·Ï
             RegisterAnomaly();
 
             Debug.Log(
@@ -55,7 +51,7 @@ namespace NightPatrol.Anomalies
         }
 
         // ========================================
-        // ì´ìƒí˜„ìƒ ë¹„í™œì„±í™”
+        // ÀÌ»óÇö»ó ºñÈ°¼ºÈ­
         // ========================================
 
         public override void Deactivate()
@@ -64,12 +60,12 @@ namespace NightPatrol.Anomalies
 
             IsActive = false;
 
-            // ì ê²€ ëŒ€ìƒì—ì„œ ì´ìƒí˜„ìƒ í•´ì œ
+            // Á¡°Ë ´ë»ó¿¡¼­ ÀÌ»óÇö»ó ÇØÁ¦
             UnregisterAnomaly();
         }
 
         // ========================================
-        // ì¸µ ì´ˆê¸°í™”
+        // Ãş ÃÊ±âÈ­
         // ========================================
 
         public override void ResetAfterFloorReset()
@@ -89,7 +85,7 @@ namespace NightPatrol.Anomalies
         }
 
         // ========================================
-        // Inspector í…ŒìŠ¤íŠ¸
+        // Inspector Å×½ºÆ®
         // ========================================
 
         [ContextMenu("TEST - Activate Image")]

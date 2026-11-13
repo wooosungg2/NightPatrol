@@ -1,15 +1,11 @@
-﻿
+
 using UnityEngine;
 using NightPatrol.Patrol;
-using NightPatrol.Photo;
 
 namespace NightPatrol.Anomalies
 {
-    public class WallStainAnomaly : Anomaly, IPhotoVisual
+    public class WallStainAnomaly : Anomaly
     {
-        /// <summary>벽 얼룩 (촬영용). 꺼져 있으면 null</summary>
-        public GameObject PhotoVisual => IsActive ? stainOverlay : null;
-
         // ========================================
         // 1. 이상현상이 발생할 벽
         // ========================================

@@ -1,7 +1,6 @@
-﻿
+
 using UnityEngine;
 using NightPatrol.Patrol;
-using NightPatrol.Photo;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -9,11 +8,8 @@ using UnityEditor;
 
 namespace NightPatrol.Anomalies
 {
-    public class CeilingChairAnomaly : Anomaly, IPhotoVisual
+    public class CeilingChairAnomaly : Anomaly
     {
-        /// <summary>천장에 붙은 의자 (촬영용). 꺼져 있으면 null</summary>
-        public GameObject PhotoVisual => IsActive && chair != null ? chair.gameObject : null;
-
         // ========================================
         // 1. 의자 검색 설정
         // ========================================

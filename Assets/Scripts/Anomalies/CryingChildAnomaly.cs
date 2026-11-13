@@ -1,28 +1,24 @@
-ï»¿
+
 using UnityEngine;
-using NightPatrol.Photo;
 
 namespace NightPatrol.Anomalies
 {
     /// <summary>
-    /// ì±…ìƒì— ì—ë“œë ¤ í›Œì©ì´ëŠ” ì—¬í•™ìƒ ì´ìƒí˜„ìƒ.
+    /// Ã¥»ó¿¡ ¾şµå·Á ÈÇÂ½ÀÌ´Â ¿©ÇĞ»ı ÀÌ»óÇö»ó.
     ///
-    /// í‰ìƒì‹œ: ìºë¦­í„° ìˆ¨ê¹€
-    /// í™œì„±í™”: ìºë¦­í„° í‘œì‹œ + PatrolObjectì— ì´ìƒí˜„ìƒ ë“±ë¡
-    /// ë¹„í™œì„±í™”: ìºë¦­í„° ìˆ¨ê¹€ + ë“±ë¡ í•´ì œ
+    /// Æò»ó½Ã: Ä³¸¯ÅÍ ¼û±è
+    /// È°¼ºÈ­: Ä³¸¯ÅÍ Ç¥½Ã + PatrolObject¿¡ ÀÌ»óÇö»ó µî·Ï
+    /// ºñÈ°¼ºÈ­: Ä³¸¯ÅÍ ¼û±è + µî·Ï ÇØÁ¦
     /// </summary>
     [DisallowMultipleComponent]
-    public class CryingChildAnomaly : Anomaly, IPhotoVisual
+    public class CryingChildAnomaly : Anomaly
     {
-        /// <summary>ìš°ëŠ” ì—¬í•™ìƒ (ì´¬ì˜ìš©). êº¼ì ¸ ìˆìœ¼ë©´ null</summary>
-        public GameObject PhotoVisual => IsActive ? childCharacter : null;
-
-        [Header("ì´ìƒí˜„ìƒ ìºë¦­í„°")]
-        [Tooltip("CryingChild_Anomalyì˜ ìì‹ Casual1ì„ ì—°ê²°í•˜ì„¸ìš”.")]
+        [Header("ÀÌ»óÇö»ó Ä³¸¯ÅÍ")]
+        [Tooltip("CryingChild_AnomalyÀÇ ÀÚ½Ä Casual1À» ¿¬°áÇÏ¼¼¿ä.")]
         [SerializeField]
         private GameObject childCharacter;
 
-        [Header("ë””ë²„ê·¸")]
+        [Header("µğ¹ö±×")]
         [SerializeField]
         private bool showDebugLogs = true;
 
@@ -41,7 +37,7 @@ namespace NightPatrol.Anomalies
             if (childCharacter == null)
             {
                 Debug.LogError(
-                    "[CryingChildAnomaly] Casual1 ìºë¦­í„°ê°€ ì—°ê²°ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤.",
+                    "[CryingChildAnomaly] Casual1 Ä³¸¯ÅÍ°¡ ¿¬°áµÇÁö ¾Ê¾Ò½À´Ï´Ù.",
                     this
                 );
             }
@@ -61,7 +57,7 @@ namespace NightPatrol.Anomalies
             if (childCharacter == null)
             {
                 Debug.LogWarning(
-                    "[CryingChildAnomaly] ìºë¦­í„°ê°€ ì—†ì–´ í™œì„±í™”í•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤.",
+                    "[CryingChildAnomaly] Ä³¸¯ÅÍ°¡ ¾ø¾î È°¼ºÈ­ÇÒ ¼ö ¾ø½À´Ï´Ù.",
                     this
                 );
                 return;
@@ -69,7 +65,7 @@ namespace NightPatrol.Anomalies
 
             childCharacter.SetActive(true);
 
-            // ì ê²€ ëŒ€ìƒì— ì´ìƒí˜„ìƒ ë“±ë¡
+            // Á¡°Ë ´ë»ó¿¡ ÀÌ»óÇö»ó µî·Ï
             RegisterAnomaly();
 
             IsActive = true;
@@ -77,7 +73,7 @@ namespace NightPatrol.Anomalies
             if (showDebugLogs)
             {
                 Debug.Log(
-                    "[CryingChildAnomaly] ìš°ëŠ” ì—¬í•™ìƒ ì´ìƒí˜„ìƒ í™œì„±í™”",
+                    "[CryingChildAnomaly] ¿ì´Â ¿©ÇĞ»ı ÀÌ»óÇö»ó È°¼ºÈ­",
                     this
                 );
             }
@@ -90,7 +86,7 @@ namespace NightPatrol.Anomalies
                 childCharacter.SetActive(false);
             }
 
-            // ì ê²€ ëŒ€ìƒì˜ ì´ìƒí˜„ìƒ ì¹´ìš´íŠ¸ ê°ì†Œ
+            // Á¡°Ë ´ë»óÀÇ ÀÌ»óÇö»ó Ä«¿îÆ® °¨¼Ò
             UnregisterAnomaly();
 
             IsActive = false;
@@ -98,7 +94,7 @@ namespace NightPatrol.Anomalies
             if (showDebugLogs)
             {
                 Debug.Log(
-                    "[CryingChildAnomaly] ìš°ëŠ” ì—¬í•™ìƒ ì´ìƒí˜„ìƒ ë¹„í™œì„±í™”",
+                    "[CryingChildAnomaly] ¿ì´Â ¿©ÇĞ»ı ÀÌ»óÇö»ó ºñÈ°¼ºÈ­",
                     this
                 );
             }
@@ -111,8 +107,8 @@ namespace NightPatrol.Anomalies
                 childCharacter.SetActive(false);
             }
 
-            // ì¸µ ì´ˆê¸°í™” ê³¼ì •ì—ì„œ PatrolObjectì˜
-            // ì´ìƒí˜„ìƒ ìƒíƒœê°€ ì´ë¯¸ ì´ˆê¸°í™”ë˜ì—ˆë‹¤ëŠ” ì „ì œ
+            // Ãş ÃÊ±âÈ­ °úÁ¤¿¡¼­ PatrolObjectÀÇ
+            // ÀÌ»óÇö»ó »óÅÂ°¡ ÀÌ¹Ì ÃÊ±âÈ­µÇ¾ú´Ù´Â ÀüÁ¦
             ForgetRegistrationAfterFloorReset();
 
             IsActive = false;
@@ -124,7 +120,7 @@ namespace NightPatrol.Anomalies
             if (!Application.isPlaying)
             {
                 Debug.LogWarning(
-                    "Play ëª¨ë“œì—ì„œ í…ŒìŠ¤íŠ¸í•˜ì„¸ìš”.",
+                    "Play ¸ğµå¿¡¼­ Å×½ºÆ®ÇÏ¼¼¿ä.",
                     this
                 );
                 return;
