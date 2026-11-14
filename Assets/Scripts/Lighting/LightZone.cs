@@ -412,6 +412,22 @@ namespace NightPatrol.Lighting
         // 보조 함수
         // =====================================
 
+        /// <summary>
+        /// index번 조명 기구 (형광등 면·몸체가 들어 있는 오브젝트). 없으면 null.
+        /// 촬영 판정(IPhotoVisual)·이상현상이 등 하나를 가리킬 때 쓴다
+        /// </summary>
+        public GameObject GetFixture(int index)
+        {
+            if (!IsValidLightIndex(index))
+                return null;
+
+            Transform fixture = lights[index].transform.parent;
+            return fixture != null ? fixture.gameObject : lights[index].gameObject;
+        }
+
+        /// <summary>이 구역의 조명 개수</summary>
+        public int LightCount => lights.Count;
+
         private bool IsValidLightIndex(int index)
         {
             return index >= 0 &&

@@ -29,6 +29,7 @@ namespace NightPatrol
 				if (r == null) continue;
 				var mat = r.sharedMaterial;
 				if (mat == null || !mat.HasProperty(BaseMap) || mat.GetTexture(BaseMap) == null) continue;
+				if (mat.name.StartsWith("Poster_")) continue;   // 포스터 그림은 한 장에 한 번 (반복하면 잘림)
 
 				Vector3 s = mf.transform.lossyScale;
 				float ax = Mathf.Abs(s.x), ay = Mathf.Abs(s.y), az = Mathf.Abs(s.z);

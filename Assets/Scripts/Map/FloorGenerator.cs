@@ -150,6 +150,12 @@ namespace NightPatrol
 			MarkDirty();
 		}
 
+		[Header("밤 바깥: 어두운 하늘·땅·먼 불빛, 복도 반사 프로브, 동쪽 끝 화분 (2026-11 밤 사진)")]
+		public NightExteriorSettings nightExterior = new NightExteriorSettings();
+
+		[Header("1층 (도착 때만 보임): 동쪽 블록 101~103호 + 동쪽 끝 출구 (1층 피난 안내도, 2026-11 사진)")]
+		public GroundExitSettings groundExit = new GroundExitSettings();
+
 		[Header("복도 디테일: 천장 조명·걸레받이·표찰·소화기·유도등 (사진 기준)")]
 		public FloorDetailSettings details = new FloorDetailSettings();
 
@@ -185,6 +191,8 @@ namespace NightPatrol
 		public void Generate()
 		{
 			Clear();
+			FloorDetailBuilder.PosterTextures = PosterTexturesOrFolder();
+			FloorDetailBuilder.PosterScale = details != null ? details.posterScale : 1.5f;
 			doorLogN.Clear(); doorLogS.Clear(); openings.Clear();
 			var layout = FloorLayoutData.GetLayout(floorNumber);
 
@@ -239,6 +247,17 @@ namespace NightPatrol
 			}
 
 			AssignPatrolIds();
+			// 바깥 땅 묶음 (모든 층 공통, 층 높이만큼 내려감)
+			campusGround = new GameObject("Campus_Ground").transform;
+			campusGround.SetParent(transform, false);
+			var follower = campusGround.gameObject.AddComponent<GroundLevelFollower>();
+			follower.SetFloor(floorNumber);                                 // 에디터에서도 이 층 기준으로 보이게
+			ElevatorBoards(layout);                 // 모든 층 공통 (엘리베이터 자리는 층마다 같음)
+			BuildGroundFloor(layout, variants);   // Id를 따로 붙이므로 AssignPatrolIds 다음 (101 → R01이 501과 겹치지 않게)
+			BuildNightExterior(layout, variants);  // 1층 목록을 채운 다음 (화분을 1층에서 숨김)
+			BuildFloor2Exit(layout, variants);    // 2층만: 205호 옆(홀 남쪽) 비상문
+			ClearStatic(campusGround);
+			ApplyGeneratedMaterials();             // 색만 칠한 바깥·1층 소품에 텍스처 재질
 			// 텍스처가 늘어나 보이지 않게 크기에 맞춰 반복 (재질 Tiling = 1m당 반복)
 			var tiler = GetComponent<TextureTiler>();
 			if (tiler == null) tiler = gameObject.AddComponent<TextureTiler>();
@@ -247,6 +266,736 @@ namespace NightPatrol
 			if (GetComponent<RoomNumberSigns>() == null) gameObject.AddComponent<RoomNumberSigns>();
 			LogDoorPairs();
 			MarkDirty();
+		}
+
+		// ── 1층 ──
+		// 1층 피난 안내도 (2026-11 사진): 바깥 윤곽·복도·계단·화장실·엘리베이터 자리는 5층과 같고, 방 나누기만 다름. 날개(세로 복도)는 없음.
+		//   북쪽: 서쪽 계단 | 107-1 | 107 | 106 | 105 | 104-1 | 104 | 홀(북쪽 출구) | 동쪽 계단 | 103 | 102
+		//   남쪽: 화장실 남·여 | 108 | 109 | 110-2 | 110-1 | 110 | 111(홀 남쪽까지) | 코어(화장실·엘리베이터) | 101
+		//   출구: 동쪽 끝 유리 양문 (사진), 홀 북쪽 출구
+		// 1층에 도착하면(클리어) 5층 방·날개 입구·끝 통창·홀 북쪽 창을 숨기고 1층 방 앞벽·문·출구·걸레받이를 켠다 (FloorVariants).
+		// 방 경계·문 위치는 안내도에서 잰 값 (서쪽 블록: 서쪽 끝 ~ 홀 시작 = 5층 518호 끝으로 비례). 방 안은 만들지 않음.
+		static readonly string[] Hide5F =
+		{
+			"522", "521", "520", "519", "518", "517", "516", "515", "514", "513",
+			"501", "502", "503", "504", "505", "506", "507", "508", "509", "510", "511", "512",
+			"Window_E_End", "Window_Hall_N",
+		};
+		// 오목한 문 칸은 방이 아니라 층 루트에 붙어 있어 따로 숨김 (없으면 넘어감)
+		static readonly string[] Hide5FOptional = { "Recess_522", "Recess_521", "Recess_520", "Recess_502", "Recess_503", "Recess_504" };
+
+		enum Front1F { Wood, Steel, Store, Lounge }
+
+		struct Room1F
+		{
+			public string label; public float x0, x1; public Front1F kind; public float[] doors;
+			public Room1F(string label, float x0, float x1, Front1F kind, params float[] doors) { this.label = label; this.x0 = x0; this.x1 = x1; this.kind = kind; this.doors = doors; }
+		}
+
+		void BuildGroundFloor(FloorLayoutData.FloorLayout layout, FloorVariants variants)
+		{
+			variants.bottomFloorOnly.Clear(); variants.aboveBottomOnly.Clear();
+			if (groundExit == null || !groundExit.enabled) return;
+
+			RoomSlot stairW = FindSlot(layout, RowSide.MainNorth, "Stair-W"), n0 = FindSlot(layout, RowSide.MainNorth, "517"), nEnd = FindSlot(layout, RowSide.MainNorth, "513");
+			RoomSlot w0 = FindSlot(layout, RowSide.MainSouth, "501"), s0 = FindSlot(layout, RowSide.MainSouth, "509"), sEnd = FindSlot(layout, RowSide.MainSouth, "512");
+			if (stairW == null || n0 == null || nEnd == null || w0 == null || s0 == null || sEnd == null || layout.hallNorth.width <= 0f)
+			{
+				Debug.LogWarning("[FloorGenerator] 5층 방 자리를 찾지 못해 1층 구간을 만들지 않음", this);
+				return;
+			}
+			float S = n0.width, C = layout.corridorWidth;
+			float end = nEnd.start + nEnd.width;              // 건물 동쪽 끝
+			float hallX0 = layout.hallNorth.xMin, hallX1 = layout.hallNorth.xMax;
+			float hallZ = layout.hallNorth.yMax;               // 홀 북쪽 벽선
+			float core0 = layout.hallSouth.width > 0f ? layout.hallSouth.xMax : hallX1;
+			float westEnd = stairW.start + stairW.width;       // 서쪽 계단 동쪽 벽
+			float t = Mathf.Max(0.02f, shellWallThickness);
+			float k = hallX0 / 48.987f;                        // 안내도 값(5층 기준 m)을 지금 레이아웃 길이에 맞춤
+
+			// ── 5층 것 중 1층에서 숨길 것 ──
+			foreach (var name in Hide5F) HideOnGround(variants, name);
+			foreach (var name in Hide5FOptional) { var c = transform.Find(name); if (c != null) variants.aboveBottomOnly.Add(c.gameObject); }
+			// 5층 걸레받이(문 자리가 다름)·홀 소품(자판기·학습 테이블: 1층 홀은 출구 로비, 남쪽은 111호 자리)
+			foreach (var path in new[] { "Corridor_Details/Baseboards", "Corridor_Details/HallProps" })
+			{
+				var c = transform.Find(path);
+				if (c != null) variants.aboveBottomOnly.Add(c.gameObject);
+			}
+
+			var g = new GameObject("GroundFloor_1F").transform;
+			g.SetParent(transform, false);
+			g.gameObject.isStatic = true;
+			var newOpenings = new List<Vector3[]>();
+			int doorNo = 0;
+
+			// ── 서쪽 블록 (안내도에서 잰 경계·문, m) ──
+			// 문 모양: 사진 (1층 전체 동영상) — 나무문 / 회색 철문 / 106 편의점 유리 앞면 / 107 라운지 불투명 유리벽
+			var north = new[]
+			{
+				new Room1F("107-1", westEnd, 12.12f * k, Front1F.Wood, 7.6f * k),
+				new Room1F("107", 12.12f * k, 19.21f * k, Front1F.Lounge, 14.2f * k),
+				new Room1F("106", 19.21f * k, 29.06f * k, Front1F.Store, 25.7f * k),
+				new Room1F("105", 29.06f * k, 39.37f * k, Front1F.Steel, 30.5f * k, 37.9f * k),
+				new Room1F("104-1", 39.37f * k, 42.62f * k, Front1F.Steel, 40.2f * k),
+				new Room1F("104", 42.62f * k, hallX0, Front1F.Wood, 43.6f * k),
+			};
+			var south = new[]
+			{
+				new Room1F("108", w0.start, 13.15f * k, Front1F.Wood, 8.4f * k),
+				new Room1F("109", 13.15f * k, 26.77f * k, Front1F.Wood, 21.4f * k, 25.8f * k),
+				new Room1F("110-2", 26.77f * k, 29.83f * k, Front1F.Steel, 28.3f * k),
+				new Room1F("110-1", 29.83f * k, 36.43f * k, Front1F.Steel, 35.4f * k),
+				new Room1F("110", 36.43f * k, 42.82f * k, Front1F.Steel, 38.0f * k),
+				new Room1F("111", 42.82f * k, core0, Front1F.Wood, 43.9f * k, core0 - 1.3f),   // 홀 남쪽까지 차지
+			};
+			foreach (var r in north) BuildFront1F(g, r, true, C, t, ref doorNo, newOpenings);
+			foreach (var r in south) BuildFront1F(g, r, false, C, t, ref doorNo, newOpenings);
+
+			// ── 동쪽 블록: 103 (517+516), 102 (515~513), 101 (509~512) ──
+			float dx = S * 0.6f;                               // 5층 작은 방 문 위치와 같게
+			RoomFront(g, "103", true, n0.start, 2f * S, new[] { n0.start + dx }, C, t, ref doorNo, newOpenings);
+			RoomFront(g, "102", true, n0.start + 2f * S, 3f * S, new[] { n0.start + 2f * S + dx, n0.start + 4f * S + dx }, C, t, ref doorNo, newOpenings);
+			float d101a = s0.start + dx, d101b = sEnd.start + dx;
+			var wall101 = RoomFront(g, "101", false, s0.start, end - s0.start, new[] { d101a, d101b }, C, t, ref doorNo, newOpenings);
+			float cx101 = s0.start + (end - s0.start) * 0.5f;     // 남쪽 벽 프레임은 180° 돌아 있어 로컬 X = cx - 월드 X
+			if (groundExit.desks && wall101 != null)
+				// 사진: 두 문 사이 벽에 책상 한 줄, 모두 출구(동쪽 = 남쪽 프레임 로컬 -X)를 봄
+				GroundExitBuilder.DeskRow(wall101, cx101 - (d101a + 0.5f + groundExit.deskDoorClearance), cx101 - (d101b - 0.5f - groundExit.deskDoorClearance), -1f, groundExit);
+			if (groundExit.scheduleBoards && wall101 != null && details != null && details.enabled)
+			{
+				// 표찰은 문 오른쪽 (RoomFront: 문 로컬 x + 0.8). 그 아래 Schedule 판, 더 오른쪽에 좌석 배치도
+				float px = cx101 - d101a + 0.8f;
+				GroundExitBuilder.ScheduleBoard(wall101, px, px + 0.45f);
+			}
+
+			// ── 1층 안내도의 소화기·소화전 (5층 것은 5층 방에 딸려 같이 숨겨짐) ──
+			if (groundExit.fireEquipment && details != null && details.enabled)
+			{
+				var fire = new GameObject("Fire_1F").transform;
+				fire.SetParent(g, false);
+				void Ext(float x, bool northWall) => FloorDetailBuilder.Extinguisher(fire, new Vector3(x, 0f, northWall ? C - 0.12f : 0.12f), Quaternion.Euler(0f, northWall ? 180f : 0f, 0f));
+				void Hyd(float x, bool northWall) => FloorDetailBuilder.Hydrant(fire, new Vector3(x, 0f, northWall ? C : 0f), Quaternion.Euler(0f, northWall ? 180f : 0f, 0f));
+				Ext(22.7f * k, true);                       // 106호 앞
+				Hyd(15.3f * k, false); Ext(16.4f * k, false); // 109호 앞 소화전 + 소화기
+				Ext(22.7f * k, false);                      // 109호 앞
+				Ext(44.8f * k, false);                      // 111호 앞
+				Ext(Mathf.Min(75.5f, end - 1.2f), true);    // 102호 앞 (동쪽 끝)
+				Ext(Mathf.Min(d101b + 0.8f, end - 0.3f), false); // 101호 동쪽 문 옆 (책상 줄 다음)
+			}
+
+			// ── 출구 1: 동쪽 끝 유리 양문 (사진) ──
+			float wT = wallThickness, ew = Mathf.Min(groundExit.exitDoorWidth, C - 0.2f), eh = groundExit.exitDoorHeight;
+			var exitE = ExitWall(g, "Exit_E", new Vector3(end, 0f, C * 0.5f), Quaternion.Euler(0f, 90f, 0f), C, ew, eh, wT, "F1.Exit.01");
+			newOpenings.Add(new[] { new Vector3(end, 0f, C * 0.5f - ew * 0.5f), new Vector3(end, 0f, C * 0.5f + ew * 0.5f) });
+			GroundExitBuilder.ExitArea(exitE, groundExit, wT, ceilingHeight, C, 11);
+			// 숨긴 방 자리를 동쪽 출구 밖에서 들여다보지 않게 바깥벽을 이어 붙임
+			foreach (var row in layout.rows)
+			{
+				if (row.side == RowSide.MainNorth) BoxLocal(exitE, "Facade_N", -C * 0.5f - row.depth, -C * 0.5f, 0f, ceilingHeight, wT);
+				if (row.side == RowSide.MainSouth) BoxLocal(exitE, "Facade_S", C * 0.5f, C * 0.5f + row.depth, 0f, ceilingHeight, wT);
+			}
+
+
+			// ── 출구 2: 정문 (홀 북쪽, 104·103호 사이) ──
+			// 사진: 안쪽 유리문 → 바람막이(배너·휴지통) → 바깥 유리문 (건물 앞면과 나란히) → 벽돌 외벽 앞 아치 아케이드 → 광장, 맞은편 노란 건물
+			float dN = 0f, dS = 0f;
+			foreach (var row in layout.rows) { if (row.side == RowSide.MainNorth) dN = row.depth; if (row.side == RowSide.MainSouth) dS = row.depth; }
+			float hw = hallX1 - hallX0, hcx = (hallX0 + hallX1) * 0.5f, nw = Mathf.Min(groundExit.exitDoorWidth, hw - 0.4f);
+			float outerZ = Mathf.Max(hallZ + 2.5f, C + dN);
+			var exitN = ExitWall(g, "Exit_N", new Vector3(hcx, 0f, hallZ), Quaternion.identity, hw, nw, eh, wT, "F1.Exit.02");   // 안쪽 문
+			newOpenings.Add(new[] { new Vector3(hcx - nw * 0.5f, 0f, hallZ), new Vector3(hcx + nw * 0.5f, 0f, hallZ) });
+			{
+				float v0 = hallZ + wT, v1 = outerZ, vm = (v0 + v1) * 0.5f;
+				var vb = new GameObject("Vestibule").transform; vb.SetParent(g, false);
+				var vf = GroundExitBuilder.Box(vb, "Floor", new Vector3(hcx, -0.05f, vm), new Vector3(hw, 0.1f, v1 - v0), corridorFloorMaterial, new Color(0.62f, 0.62f, 0.60f));
+				var vc = GroundExitBuilder.Box(vb, "Ceiling", new Vector3(hcx, ceilingHeight + 0.05f, vm), new Vector3(hw, 0.1f, v1 - v0), corridorCeilingMaterial, new Color(0.92f, 0.92f, 0.90f));
+				GroundExitBuilder.NoCol(vc);
+				var vw = GroundExitBuilder.Box(vb, "Wall_W", new Vector3(hallX0 + 0.05f, ceilingHeight * 0.5f, vm), new Vector3(0.1f, ceilingHeight, v1 - v0), corridorWallMaterial, new Color(0.92f, 0.92f, 0.90f));
+				if (groundExit.tactile)
+					GroundExitBuilder.NoCol(GroundExitBuilder.Box(vb, "Tactile", new Vector3(hcx, 0.004f, vm), new Vector3(0.3f, 0.008f, v1 - v0), groundExit.tactileMaterial, new Color(0.93f, 0.74f, 0.12f)));
+			}
+			var exitOut = ExitWall(g, "Exit_N_Outer", new Vector3(hcx, 0f, outerZ), Quaternion.identity, hw, nw, eh, wT, "F1.Exit.03");
+			var outerDoor = exitOut.GetComponentInChildren<Door>(true);
+			if (outerDoor != null) { outerDoor.defaultLocked = false; outerDoor.defaultOpen = true; outerDoor.SetStateImmediate(false, true); }   // 바깥문은 열려 있음
+			{
+				bool keepWall = groundExit.retainingWall; float keepCanopy = groundExit.canopyDepth, keepDepth = groundExit.outsideDepth;
+				bool keepLouver = groundExit.louverCanopy, keepLamp = groundExit.outsideLamp;
+				groundExit.retainingWall = false; groundExit.canopyDepth = 0.6f; groundExit.outsideDepth = 5f;   // 화강석 + 벽돌 띠까지, 그 너머는 광장
+				groundExit.louverCanopy = false; groundExit.outsideLamp = false;        // 정문은 반원통 차양 (아래)
+				GroundExitBuilder.ExitArea(exitOut, groundExit, wT, ceilingHeight, hw, 12);
+				groundExit.retainingWall = keepWall; groundExit.canopyDepth = keepCanopy; groundExit.outsideDepth = keepDepth;
+				groundExit.louverCanopy = keepLouver; groundExit.outsideLamp = keepLamp;
+			}
+			Ground1FProps.Portico(exitOut, wT, eh, Mathf.Min(hw, 4.4f));
+			// 광장은 모든 층 공통 바깥 땅에 (위층 창에서도 내려다보임)
+			if (campusGround != null)
+			{
+				var pf = new GameObject("Plaza_Frame").transform;
+				pf.SetParent(campusGround, false);
+				pf.localPosition = new Vector3(hcx, 0f, outerZ);
+				Ground1FProps.Plaza(pf, wT, 5f);
+			}
+
+			// 엔딩 연출: 엘리베이터에서 나와 → 홀 → 안쪽 문 → 바람막이 → 바깥 아케이드로. 조작 잠금, 자동으로 걸음
+			var elevSlot = FindSlot(layout, RowSide.MainSouth, "ELEV");
+			if (groundExit.endingWalk && elevSlot != null)
+			{
+				float ex = elevSlot.start + elevSlot.width * 0.5f;
+				var walk = g.gameObject.AddComponent<EndingWalk>();
+				walk.Setup(new[]
+				{
+					new Vector3(ex, 0f, 1.1f),                     // 엘리베이터에서 한 걸음 나와 복도
+					new Vector3(hcx, 0f, C * 0.5f),                // 홀 쪽으로 돌기
+					new Vector3(hcx, 0f, hallZ - 1.2f),            // 안쪽 문 앞
+					new Vector3(hcx, 0f, outerZ - 0.8f),           // 바람막이 지나 바깥문 앞
+					new Vector3(hcx, 0f, outerZ + wT + 2.4f)       // 아케이드 밑
+				}, exitN.GetComponentInChildren<Door>(true), groundExit.endingWalkSpeed);
+			}
+
+			// 건물 덩어리: 숨긴 5층 방 자리(문 뒤 ~ 바깥벽)를 채우고, 위로 5층까지 외벽 (정문 밖에서 건물이 보이게)
+			var mass = new GameObject("Building_Mass").transform;
+			mass.SetParent(g, false);
+			float Back(Front1F kind) => t + (kind == Front1F.Store ? 4.15f : kind == Front1F.Lounge ? 1.6f : 0.7f);
+			foreach (var r in north) MassBox(mass, r.x0, r.x1, C + Back(r.kind), C + dN, 0f, ceilingHeight + 0.15f);
+			foreach (var r in south) MassBox(mass, r.x0, r.x1, -dS, -Back(r.kind), 0f, ceilingHeight + 0.15f);
+			MassBox(mass, n0.start, end, C + t + 0.7f, C + dN, 0f, ceilingHeight + 0.15f);      // 103·102
+			MassBox(mass, s0.start, end, -dS, -(t + 0.7f), 0f, ceilingHeight + 0.15f);          // 101
+			float top = 5f * 3.6f;
+			// 날개(523~528호·라운지): 1층엔 없음 (위층 날개는 언덕 위). 바깥에서 실내 불빛이 보이지 않게 날개 자리 전체를 덩어리로 덮음
+			{
+				var wb = new Bounds(); bool any = false;
+				void Add(Transform tr)
+				{
+					if (tr == null) return;
+					foreach (var rr in tr.GetComponentsInChildren<Renderer>(true))
+					{
+						var lb = new Bounds(transform.InverseTransformPoint(rr.bounds.center), rr.bounds.size);
+						if (!any) { wb = lb; any = true; } else wb.Encapsulate(lb);
+					}
+				}
+				foreach (var row in layout.rows)
+					if (row.side == RowSide.WingWest || row.side == RowSide.WingEast)
+						foreach (var sl in row.slots) { Add(transform.Find(sl.label)); Add(transform.Find("Recess_" + sl.label)); }
+				for (int ci = 0; ci < layout.corridors.Count; ci++)
+				{
+					var r = layout.corridors[ci];
+					if (r.yMin >= C - 0.01f && r.xMax <= hallX0 + 0.01f) Add(transform.Find($"Corridor_Floor_{ci}"));
+				}
+				Add(transform.Find("Window_W_Lounge")); Add(transform.Find("Window_E_Lounge"));
+				if (any) MassBox(mass, wb.min.x - 0.3f, wb.max.x + 0.3f, Mathf.Max(C + dN, wb.min.z - 0.3f), wb.max.z + 0.3f, -0.2f, top);
+			}
+			// 위층
+			MassBox(mass, 0f, hallX0, -dS, C + dN, ceilingHeight + 0.15f, top);
+			MassBox(mass, hallX0, hallX1, -dS, outerZ, ceilingHeight + 0.15f, top);   // 정문 위: 바람막이 위를 덮고 앞면에 유리탑
+			MassBox(mass, hallX1, end, -dS, C + dN, ceilingHeight + 0.15f, top);
+			// 외벽 (외관 사진: 벽돌 기둥으로 나뉜 칸마다 회색 틀 초록 유리창, 아래 콘크리트 받침, 위 밝은 띠). 입구 위는 꼭대기까지 유리벽
+			var rngW = new System.Random(77);
+			Facade(mass, 0f, hallX0, C + dN, +1f, top, rngW);
+			Facade(mass, hallX1, end, C + dN, +1f, top, rngW);
+			Facade(mass, 0f, end, -dS, -1f, top, rngW);
+			GlassTower(mass, hallX0, hallX1, outerZ, ceilingHeight + 0.15f, top);
+
+			Props1F(g, layout, C, k, hallX0, hallX1, hallZ, end);
+			WestExit1F(g, variants, C, end);
+
+			// ── 걸레받이·바닥 띠: 5층 것은 문 자리가 달라 1층 벽에 맞춰 다시 깜 ──
+			{
+				var corr = new List<Rect>();
+				foreach (var r in layout.corridors)
+				{
+					bool wing = r.yMin >= C - 0.01f && r.xMax <= hallX0 + 0.01f;      // 날개 복도·계단 앞 (1층엔 없음, 107-1 벽 뒤)
+					bool hallS = layout.hallSouth.width > 0f && r == layout.hallSouth; // 1층은 111호 자리
+					if (!wing && !hallS) corr.Add(r);
+				}
+				var ops = new List<Vector3[]>();
+				foreach (var o in openings)
+				{
+					Vector3 m = (o[0] + o[1]) * 0.5f;
+					bool northWest = m.z >= C - 0.05f && m.x > westEnd - 0.05f && m.x < hallX0;
+					bool southWest = m.z <= 0.05f && m.x > w0.start - 0.05f && m.x < core0;
+					bool northEast = m.z >= C - 0.05f && m.x > n0.start - 0.05f;
+					bool southEast = m.z <= 0.05f && m.x > s0.start - 0.05f;
+					if (!northWest && !southWest && !northEast && !southEast) ops.Add(o);
+				}
+				ops.AddRange(newOpenings);
+				var runs = FloorDetailBuilder.WallRuns(corr, ops);
+				// 5층 방 옆벽(518호 = 홀 서쪽 벽, 509호 = 남자화장실 앞 동쪽 벽 등)이 방과 같이 숨겨져 뚫리는 곳을 막음:
+				// 1층 복도 둘레 전부에 문 자리만 빼고 벽면 2mm 뒤로 한 겹 덧댐 (원래 벽이 있으면 그 뒤에 가려 안 보임)
+				var back = new GameObject("Backfill_Walls").transform;
+				back.SetParent(g, false);
+				back.gameObject.isStatic = true;
+				Material bm = corridorWallMaterial != null ? corridorWallMaterial : shellWallMaterial;
+				foreach (var w in runs)
+				{
+					Vector3 c = w.start + w.dir * (w.length * 0.5f) + w.outward * (0.002f + 0.05f) + Vector3.up * (ceilingHeight * 0.5f);
+					var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+					go.name = "Backfill";
+					go.isStatic = true;
+					go.transform.SetParent(back, false);
+					go.transform.localPosition = c;
+					go.transform.localScale = w.dir.x != 0f ? new Vector3(w.length, ceilingHeight, 0.1f) : new Vector3(0.1f, ceilingHeight, w.length);
+					if (bm != null) go.GetComponent<Renderer>().sharedMaterial = bm;
+					else DoorBuilder.Paint(go.GetComponent<Renderer>(), null, new Color(0.92f, 0.92f, 0.90f));
+				}
+				if (details != null && details.enabled && details.baseboards) FloorDetailBuilder.Baseboards(g, corr, ops, details);
+			}
+
+			g.gameObject.SetActive(false);
+			variants.bottomFloorOnly.Add(g.gameObject);
+			Debug.Log($"[FloorGenerator] 1층 구간 생성 (방 {north.Length + south.Length + 3}개, 문 {doorNo}개, 출구 2곳)", this);
+		}
+
+		// 출구 벽: frame 로컬 X = 벽 방향, +Z = 바깥. span = 벽 길이 (복도 폭·홀 폭), 가운데에 유리 양문
+		Transform ExitWall(Transform parent, string name, Vector3 pos, Quaternion rot, float span, float doorW, float doorH, float wT, string id)
+		{
+			var f = new GameObject(name).transform;
+			f.SetParent(parent, false);
+			f.localPosition = pos;
+			f.localRotation = rot;
+			BoxLocal(f, "Wall_L", -span * 0.5f - 0.1f, -doorW * 0.5f, 0f, ceilingHeight, wT);
+			BoxLocal(f, "Wall_R", doorW * 0.5f, span * 0.5f + 0.1f, 0f, ceilingHeight, wT);
+			BoxLocal(f, "Lintel", -doorW * 0.5f, doorW * 0.5f, doorH, ceilingHeight, wT);
+			var d = DoorBuilder.Build(f, doorW, doorH, wT, DoorStyle.GlassClear, doorSettings, name);
+			if (d != null) { d.playerCanUnlock = true; d.Id = id; }
+			return f;
+		}
+
+		void BuildFront1F(Transform g, Room1F r, bool north, float C, float t, ref int doorNo, List<Vector3[]> ops)
+		{
+			if (r.kind == Front1F.Wood || r.kind == Front1F.Steel)
+			{
+				RoomFront(g, r.label, north, r.x0, r.x1 - r.x0, r.doors, C, t, ref doorNo, ops, r.kind == Front1F.Steel ? DoorStyle.SteelSingle : DoorStyle.WoodSingle);
+				return;
+			}
+			var f = new GameObject($"Room_{r.label}").transform;
+			f.SetParent(g, false);
+			float cx = (r.x0 + r.x1) * 0.5f, zLine = north ? C : 0f, w = r.x1 - r.x0;
+			f.localPosition = new Vector3(cx, 0f, zLine);
+			f.localRotation = Quaternion.Euler(0f, north ? 0f : 180f, 0f);
+			float lx = north ? r.doors[0] - cx : cx - r.doors[0];
+			Material wm = shellWallMaterial != null ? shellWallMaterial : corridorWallMaterial;
+			Material clear = doorSettings != null ? doorSettings.clearGlassMaterial : null;
+			Material frosted = doorSettings != null ? doorSettings.frostedGlassMaterial : null;
+			if (r.kind == Front1F.Store) Ground1FProps.StoreFront(f, w, lx, ceilingHeight, t, clear, wm);
+			else Ground1FProps.LoungeFront(f, w, lx, ceilingHeight, t, frosted, wm);
+			// 걸레받이는 유리면 전체를 비움
+			ops.Add(new[] { new Vector3(r.x0 + 0.4f, 0f, zLine), new Vector3(r.x1 - 0.4f, 0f, zLine) });
+		}
+
+		// 1층 복도 소품 (1층 전체 동영상 순서대로: 동쪽 끝 → 엘리베이터 → 정문 → 서쪽 끝). 위치는 영상 순서와 안내도로 추정
+		void Props1F(Transform g, FloorLayoutData.FloorLayout layout, float C, float k, float hallX0, float hallX1, float hallZ, float end)
+		{
+			var props = new GameObject("Props_1F").transform;
+			props.SetParent(g, false);
+			// 벽 프레임: 북쪽 벽 (로컬 X = 월드 X), 남쪽 벽 (180° → 로컬 X = -월드 X). 둘 다 로컬 -Z = 복도
+			var nw = new GameObject("NorthWall").transform; nw.SetParent(props, false); nw.localPosition = new Vector3(0f, 0f, C);
+			var sw = new GameObject("SouthWall").transform; sw.SetParent(props, false); sw.localRotation = Quaternion.Euler(0f, 180f, 0f);
+
+			// 동쪽: 102호 벽 원목 옷장 5개 (사진), 103호 벽 파란 사물함
+			Ground1FProps.Wardrobes(nw, 70.2f, 5);
+			var furn = new List<FloorLayoutData.Furniture>
+			{
+				FloorLayoutData.Furniture.Locker(64.2f, C - 0.25f, 180f, 8, 5, 0.41f, 2.05f),
+			};
+			// 정문 (홀 북쪽): 세움 배너·휴지통·안내 TV (사진)
+			float hcx = (hallX0 + hallX1) * 0.5f;
+			var bc = Ground1FProps.BannerColors;
+			// 바람막이 안 (사진): 배너는 안쪽 문 바로 밖, 휴지통은 바깥문 앞 양옆
+			Ground1FProps.BannerStand(props, new Vector3(hcx - 1.4f, 0f, hallZ + 1.0f), 15f, bc[0]);
+			Ground1FProps.BannerStand(props, new Vector3(hcx + 1.4f, 0f, hallZ + 1.0f), -15f, bc[1]);
+			Ground1FProps.TrashBin(props, new Vector3(hallX0 + 0.4f, 0f, hallZ + 2.0f), Ground1FProps.BinColor);
+			Ground1FProps.TrashBin(props, new Vector3(hallX1 - 0.4f, 0f, hallZ + 2.0f), Ground1FProps.BinColor);
+			// 104·111 앞 학과 게시판, 105·110 쪽 연구 포스터 (사진)
+			FloorDetailBuilder.BulletinBoard(nw, 46.4f * k, 0f, 1.5f);
+			FloorDetailBuilder.BulletinBoard(sw, -47.5f * k, 0f, 1.5f);
+			Ground1FProps.PosterRow(nw, 31.75f * k, 37.3f * k, 0);    // 105호 표찰(문 오른쪽 0.8m) 피함
+			Ground1FProps.PosterRow(sw, -34.15f * k, -30.3f * k, 1);  // 110-1호 표찰 피함
+			Ground1FProps.PosterRow(sw, -42.4f * k, -38.8f * k, 2);
+			// 파란 의자 (사진: 벽 따라 3~4석)
+			Ground1FProps.SeatRow(sw, -24.0f * k, 3);
+			Ground1FProps.SeatRow(nw, 41.5f * k, 3);
+			// 서쪽: 연구센터 나무 틀 벽 (108호 앞), 안내 TV
+			Ground1FProps.CenterSignWall(sw, -11.2f * k, 2.6f);
+			Ground1FProps.TvStand(props, new Vector3(5.0f * k, 0f, C - 0.5f), 180f);
+			Ground1FProps.TrashBin(props, new Vector3(1.0f, 0f, C - 0.4f), Ground1FProps.BinColor);
+			if (details != null && details.enabled) FloorDetailBuilder.Furniture(props, furn, details);
+		}
+
+		// 서쪽 끝 출구: 5층 발코니 유리문 자리. 1층에서는 난간을 숨기고 바깥 아케이드(사진: 기둥 + 지붕, 앞은 광장)
+		void WestExit1F(Transform g, FloorVariants variants, float C, float end)
+		{
+			for (int i = 0; i < transform.childCount; i++)
+			{
+				var c = transform.GetChild(i);
+				if (c.name.StartsWith("Balcony_Parapet") || c.name.StartsWith("Balcony_Rail") || c.name.StartsWith("Balcony_Post"))
+					variants.aboveBottomOnly.Add(c.gameObject);
+			}
+			var doorWall = transform.Find("Balcony_W_Door");
+			var door = doorWall != null ? doorWall.GetComponentInChildren<Door>(true) : null;
+			if (door != null) g.gameObject.AddComponent<GroundDoorAccess>().Setup(door);
+			var f = new GameObject("Exit_W").transform;
+			f.SetParent(g, false);
+			f.localPosition = new Vector3(0f, 0f, C * 0.5f);
+			f.localRotation = Quaternion.Euler(0f, -90f, 0f);     // 로컬 +Z = 서쪽 (바깥)
+			var ge = groundExit;
+			bool keepWall = ge.retainingWall;
+			ge.retainingWall = false;                                // 서쪽은 광장 (옹벽 없음)
+			float canopy = ge.canopyDepth;
+			ge.canopyDepth = 4f;
+			GroundExitBuilder.ExitArea(f, ge, 0.1f + 1.4f, ceilingHeight, C + 3f, 13);   // 발코니 바닥(1.4m) 바깥부터
+			ge.retainingWall = keepWall; ge.canopyDepth = canopy;
+			// 아케이드 기둥 (사진: 둥근 기둥 줄)
+			for (int i = 0; i < 3; i++)
+				for (int side = -1; side <= 1; side += 2)
+				{
+					var col = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+					col.name = "Arcade_Column";
+					col.transform.SetParent(f, false);
+					col.transform.localPosition = new Vector3(side * (C * 0.5f + 1.2f), ceilingHeight * 0.5f, 1.5f + 0.5f + i * 1.6f);
+					col.transform.localScale = new Vector3(0.35f, ceilingHeight * 0.5f, 0.35f);
+					col.isStatic = true;
+					DoorBuilder.Paint(col.GetComponent<Renderer>(), null, new Color(0.85f, 0.84f, 0.80f));
+				}
+		}
+
+		// 엘리베이터 양옆 벽(각 1.4m)에 포스터가 빽빽한 게시판 (1층 사진, 5층도 같은 자리)
+		void ElevatorBoards(FloorLayoutData.FloorLayout layout)
+		{
+			if (details == null || !details.enabled) return;
+			var elev = FindSlot(layout, RowSide.MainSouth, "ELEV");
+			if (elev == null) return;
+			var g = new GameObject("Elevator_Boards").transform;
+			g.SetParent(transform, false);
+			g.localRotation = Quaternion.Euler(0f, 180f, 0f);     // 남쪽 벽 프레임: 로컬 X = -월드 X, 로컬 -Z = 복도
+			g.gameObject.isStatic = true;
+			float wl = -(elev.start - 0.71f), wr = -(elev.start + elev.width + 0.71f);
+			FloorDetailBuilder.BulletinBoard(g, wl, 0f, 1.3f, true);
+			FloorDetailBuilder.BulletinBoard(g, wr, 0f, 1.3f, true);
+		}
+
+		static readonly Color ExteriorWall = new Color(0.66f, 0.38f, 0.27f);   // 외관 사진: 주황빛 붉은 벽돌
+
+		// 건물 바깥 덩어리 상자 (층 루트 기준 x0~x1, z0~z1, y0~y1). 안쪽 면은 방 앞벽·문 뒤판에 가려 안 보임
+		void MassBox(Transform parent, float x0, float x1, float z0, float z1, float y0, float y1)
+		{
+			if (x1 - x0 < 0.05f || z1 - z0 < 0.05f || y1 - y0 < 0.05f) return;
+			var go = GroundExitBuilder.Box(parent, "Mass", new Vector3((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, (z0 + z1) * 0.5f), new Vector3(x1 - x0, y1 - y0, z1 - z0), null, ExteriorWall);
+			GroundExitBuilder.NoCol(go);
+		}
+
+		static readonly Color BrickPier = new Color(0.60f, 0.34f, 0.24f);
+		static readonly Color WindowFrame = new Color(0.62f, 0.64f, 0.64f);
+		static readonly Color WindowGlass = new Color(0.10f, 0.16f, 0.15f);    // 짙은 초록빛 유리 (밤)
+		static readonly Color WindowLit = new Color(0.95f, 0.86f, 0.62f);
+		static readonly Color BaseConcrete = new Color(0.62f, 0.62f, 0.60f);
+		static readonly Color CapBand = new Color(0.80f, 0.79f, 0.76f);
+
+		// 외벽 한 면: zFace = 벽면, outward = 바깥 방향(+1 북쪽 / -1 남쪽).
+		// 창은 칸(3m)마다 5층 높이 그림 판 1장 (M_Gen_Facade: 3m × 3.6m에 창 하나) — 창마다 조각을 만들면 씬이 너무 커짐.
+		// 칸은 월드 X 3m 배수에 맞춰야 그림 창과 벽돌 기둥이 어긋나지 않음 (TextureTiler가 월드 좌표로 그림을 맞춤)
+		void Facade(Transform parent, float x0, float x1, float zFace, float outward, float top, System.Random rng)
+		{
+			if (x1 - x0 < 3.2f) return;
+			var g = new GameObject("Facade").transform;
+			g.SetParent(parent, false);
+			g.gameObject.isStatic = true;
+			float o = outward;
+			GameObject Part(string n, float cx, float cy, float w, float h, float protrude, Color c)
+			{
+				var go = GroundExitBuilder.Box(g, n, new Vector3(cx, cy, zFace + o * protrude * 0.5f), new Vector3(w, h, protrude), null, c);
+				GroundExitBuilder.NoCol(go);
+				return go;
+			}
+			const float bay = 3f;
+			float xs = Mathf.Ceil(x0 / bay) * bay;
+			int bays = Mathf.FloorToInt((x1 - xs) / bay);
+			if (bays < 1) return;
+			Part("Base", (x0 + x1) * 0.5f, 0.5f, x1 - x0, 1.0f, 0.08f, BaseConcrete);
+			Part("Cap", (x0 + x1) * 0.5f, top - 0.15f, x1 - x0 + 0.1f, 0.3f, 0.12f, CapBand);
+			// 창 그림 판 (받침 위 ~ 띠 아래), 벽면에서 2cm
+			int floors = Mathf.Max(1, Mathf.RoundToInt(top / 3.6f));
+			float bandTop = Mathf.Min(top - 0.3f, floors * 3.6f);
+			Part("WindowBand", xs + bays * bay * 0.5f, (1.0f + bandTop) * 0.5f, bays * bay, bandTop - 1.0f, 0.02f, WindowGlass);
+			for (int i = 0; i <= bays; i++)
+				Part("Pier", xs + i * bay, (top - 0.3f) * 0.5f + 0.5f, 0.38f, top - 1.3f, 0.12f, BrickPier);
+			// 불 켜진 창 몇 칸만 따로 (그림 창 위에 겹침)
+			for (int i = 0; i < bays; i++)
+				for (int f = 0; f < floors; f++)
+					if (rng.NextDouble() < 0.04)
+						Part("WinLit", xs + (i + 0.5f) * bay, f * 3.6f + 1.8f, 2.1f, 1.5f, 0.035f, WindowLit);
+		}
+
+		// 입구 위 세로 유리벽 (외관 사진): 홀 북쪽 면, 회색 격자 + 짙은 유리
+		void GlassTower(Transform parent, float x0, float x1, float zFace, float y0, float y1)
+		{
+			if (x1 - x0 < 0.5f) return;
+			var g = new GameObject("GlassTower").transform;
+			g.SetParent(parent, false);
+			g.gameObject.isStatic = true;
+			GroundExitBuilder.NoCol(GroundExitBuilder.Box(g, "Glass", new Vector3((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, zFace + 0.03f), new Vector3(x1 - x0, y1 - y0, 0.04f), null, new Color(0.12f, 0.18f, 0.20f)));
+			for (float x = x0; x <= x1 + 0.01f; x += (x1 - x0) / Mathf.Max(1, Mathf.RoundToInt((x1 - x0) / 1.2f)))
+				GroundExitBuilder.NoCol(GroundExitBuilder.Box(g, "Mullion", new Vector3(x, (y0 + y1) * 0.5f, zFace + 0.07f), new Vector3(0.06f, y1 - y0, 0.06f), null, WindowFrame));
+			for (float y = y0; y <= y1 + 0.01f; y += 1.2f)
+				GroundExitBuilder.NoCol(GroundExitBuilder.Box(g, "Transom", new Vector3((x0 + x1) * 0.5f, y, zFace + 0.07f), new Vector3(x1 - x0, 0.06f, 0.06f), null, WindowFrame));
+		}
+
+		/// <summary>층을 다시 만들지 않고 모든 포스터의 그림만 Poster Textures에서 다시 고름 (70%는 그림, 나머지는 인쇄물 모양)</summary>
+		[ContextMenu("포스터 그림만 다시 섞기")]
+		void ShufflePosterImages()
+		{
+			var tex = PosterTexturesOrFolder();
+			var rng = new System.Random(System.Environment.TickCount);
+			int n = 0;
+			foreach (var ps in GetComponentsInChildren<PosterSheet>(true))
+			{
+#if UNITY_EDITOR
+				UnityEditor.Undo.RegisterFullObjectHierarchyUndo(ps.gameObject, "포스터 섞기");
+#endif
+				ps.image = tex != null && tex.Length > 0 && rng.NextDouble() < 0.9 ? tex[rng.Next(tex.Length)] : null;
+				ps.seed = rng.Next();
+				ps.Rebuild();
+				n++;
+			}
+#if UNITY_EDITOR
+			if (n > 0) UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
+#endif
+			Debug.Log($"[FloorGenerator] 포스터 {n}장 그림 다시 섞음", this);
+		}
+
+		Transform campusGround;
+
+		// 바깥 땅 묶음 아래는 정적이면 안 됨 (정적 묶음은 층마다 내려가지 않음)
+		static void ClearStatic(Transform t)
+		{
+			if (t == null) return;
+			foreach (var tr in t.GetComponentsInChildren<Transform>(true)) tr.gameObject.isStatic = false;
+		}
+
+		// 포스터 그림: Details의 Poster Textures, 비어 있으면 Assets/Textures/Posters 폴더 (하위 폴더 포함)
+		Texture2D[] PosterTexturesOrFolder()
+		{
+			var t = details != null ? details.posterTextures : null;
+			if (t != null && t.Length > 0) return t;
+#if UNITY_EDITOR
+			var list = new List<Texture2D>();
+			if (AssetDatabase.IsValidFolder("Assets/Textures/Posters"))
+				foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/Textures/Posters" }))
+				{
+					var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(AssetDatabase.GUIDToAssetPath(guid));
+					if (tex != null) list.Add(tex);
+				}
+			return list.ToArray();
+#else
+			return null;
+#endif
+		}
+
+		// ── 2층 비상문 ──
+		// 2층 안내도(다른 층과 180° 뒤집혀 그려짐): 205호 옆 홀 위쪽 "비상구 ↑" = 5층 기준 홀 남쪽 벽 (5층은 창 + 학습 테이블 자리).
+		// 2층에서만 홀 남쪽 창·홀 소품을 숨기고 철제 양문 비상문(잠김)을 켬
+		void BuildFloor2Exit(FloorLayoutData.FloorLayout layout, FloorVariants variants)
+		{
+			variants.floorSets.Clear();
+			var hs = layout.hallSouth;
+			if (hs.width <= 0.5f) return;
+			var g2 = new GameObject("Floor2_EmergencyDoor").transform;
+			g2.SetParent(transform, false);
+			g2.localPosition = new Vector3(hs.center.x, 0f, hs.yMin);
+			g2.localRotation = Quaternion.Euler(0f, 180f, 0f);        // 로컬 +Z = 바깥 (남쪽), -Z = 홀
+			float span = hs.width, dw = Mathf.Min(1.8f, span - 0.6f), dh = stairDoorHeight, wT = wallThickness;
+			BoxLocal(g2, "Wall_L", -span * 0.5f, -dw * 0.5f, 0f, ceilingHeight, wT);
+			BoxLocal(g2, "Wall_R", dw * 0.5f, span * 0.5f, 0f, ceilingHeight, wT);
+			BoxLocal(g2, "Lintel", -dw * 0.5f, dw * 0.5f, dh, ceilingHeight, wT);
+			var door = DoorBuilder.Build(g2, dw, dh, wT, DoorStyle.SteelDouble, doorSettings, "Emergency_2F");
+			if (door != null) { door.playerCanUnlock = false; door.Id = "F2.EmergencyDoor.01"; }
+			FloorDetailBuilder.ExitSign(g2, new Vector3(0f, Mathf.Min(dh + 0.2f, ceilingHeight - 0.1f), -0.01f), Quaternion.Euler(0f, 180f, 0f));
+			var set = new FloorVariants.FloorSet { floor = 2 };
+			set.show.Add(g2.gameObject);
+			foreach (var path in new[] { "Window_Hall_S", "Corridor_Details/HallProps" })
+			{
+				var c = transform.Find(path);
+				if (c != null) set.hide.Add(c.gameObject);
+			}
+			variants.floorSets.Add(set);
+			g2.gameObject.SetActive(floorNumber == 2);
+		}
+
+		// ── 재질 ──
+		// 색만 칠한 바깥·1층 소품에 텍스처 재질 (Assets/Textures/Generated 의 그림 → Materials/Generated/M_Gen_*.mat).
+		// 텍스처 크기 = 1m(또는 지정 m)당 반복으로 넣어 두면 TextureTiler가 상자 크기에 맞춰 반복함
+		void ApplyGeneratedMaterials()
+		{
+#if UNITY_EDITOR
+			Material M(string name, string file, float meters, Color tint, float smooth) => M2(name, file, new Vector2(meters, meters), tint, smooth);
+			Material M2(string name, string file, Vector2 meters, Color tint, float smooth)
+			{
+				string path = $"Assets/Materials/Generated/M_Gen_{name}.mat";
+				var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+				var tex = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Textures/Generated/{file}");
+				if (tex == null) return null;
+				if (m == null)
+				{
+					var sh = Shader.Find("Universal Render Pipeline/Lit");
+					if (sh == null) return null;
+					if (!AssetDatabase.IsValidFolder("Assets/Materials/Generated"))
+					{
+						if (!AssetDatabase.IsValidFolder("Assets/Materials")) AssetDatabase.CreateFolder("Assets", "Materials");
+						AssetDatabase.CreateFolder("Assets/Materials", "Generated");
+					}
+					m = new Material(sh) { name = $"M_Gen_{name}" };
+					AssetDatabase.CreateAsset(m, path);
+				}
+				m.SetTexture("_BaseMap", tex);
+				m.SetColor("_BaseColor", tint);
+				m.SetTextureScale("_BaseMap", new Vector2(1f / Mathf.Max(0.05f, meters.x), 1f / Mathf.Max(0.05f, meters.y)));
+				m.SetFloat("_Smoothness", smooth);
+				EditorUtility.SetDirty(m);
+				return m;
+			}
+			var brick = M("Brick", "brick.png", 1f, Color.white, 0.1f);
+			var brickDark = M("BrickDark", "brick.png", 1f, new Color(0.86f, 0.84f, 0.84f), 0.1f);
+			var granite = M("Granite", "granite_tile.png", 0.6f, Color.white, 0.35f);
+			var concrete = M("Concrete", "concrete.png", 2f, Color.white, 0.1f);
+			var asphalt = M("Asphalt", "asphalt.png", 2f, Color.white, 0.05f);
+			var pavers = M("Pavers", "pavers.png", 1f, Color.white, 0.1f);
+			var tactile = M("Tactile", "tactile.png", 0.3f, Color.white, 0.2f);
+			var woodL = M("WoodLight", "wood_light.png", 1f, Color.white, 0.3f);
+			var woodD = M("WoodDark", "wood_dark.png", 1f, Color.white, 0.25f);
+			var facade = M2("Facade", "facade_bay.png", new Vector2(3f, 3.6f), Color.white, 0.2f);
+			var books = new[]
+			{
+				M2("Books0", "books_0.png", new Vector2(0.84f, 0.30f), Color.white, 0.15f),
+				M2("Books1", "books_1.png", new Vector2(0.84f, 0.30f), Color.white, 0.15f),
+				M2("Books2", "books_2.png", new Vector2(0.84f, 0.30f), Color.white, 0.15f),
+			};
+			if (brick == null) { Debug.LogWarning("[FloorGenerator] Assets/Textures/Generated 텍스처가 없어 재질을 넣지 않음", this); return; }
+
+			int n = 0;
+			foreach (var r in GetComponentsInChildren<MeshRenderer>(true))
+			{
+				string nm = r.gameObject.name, pn = r.transform.parent != null ? r.transform.parent.name : "";
+				Material m = null;
+				if (nm == "WindowBand") m = facade;
+				else if (nm.StartsWith("BookRow_") && nm.Length > 8 && int.TryParse(nm.Substring(8), out int bi) && bi >= 0 && bi < books.Length) m = books[bi];
+				else if (nm == "Mass" && (pn == "Building_Mass" || pn == "BrickBuilding")) m = brick;
+				else if (nm == "Mass" && pn == "LightBuilding") m = concrete;
+				else if (nm == "Pier") m = brickDark;
+				else if (pn == "Facade" && nm == "Base") m = granite;
+				else if ((pn == "Facade" && nm == "Cap") || (pn == "BrickBuilding" && (nm == "Base" || nm == "Cap"))) m = concrete;
+				else if (nm == "Brick_Strip" || nm == "Brick_Out") m = pavers;
+				else if (nm == "Asphalt") m = asphalt;
+				else if (nm == "Apron_Out" || nm == "Step" || nm == "ColumnBase" || nm == "GraniteWall") m = granite;
+				else if (nm.StartsWith("Tactile")) m = tactile;
+				else if ((nm == "Box" && pn == "Planter") || (nm == "Wall" && pn == "Retaining_Wall") || nm == "Canopy" || nm == "Roof") m = concrete;
+				else if ((nm == "Top" && pn.StartsWith("Desk_")) || (nm == "Body" && pn.StartsWith("Wardrobe_")) || nm.StartsWith("Slat_")) m = woodL;
+				else if ((nm == "Seat" || nm == "Back") && pn == "Bench") m = woodD;
+				if (m == null) continue;
+				r.sharedMaterial = m;
+				n++;
+			}
+			Debug.Log($"[FloorGenerator] 텍스처 재질 {n}개", this);
+#endif
+		}
+
+		void HideOnGround(FloorVariants variants, string childName)
+		{
+			var c = transform.Find(childName);
+			if (c != null) variants.aboveBottomOnly.Add(c.gameObject);
+			else Debug.LogWarning($"[FloorGenerator] 1층에서 숨길 {childName}이 없음", this);
+		}
+
+		static RoomSlot FindSlot(FloorLayoutData.FloorLayout layout, RowSide side, string label)
+		{
+			foreach (var row in layout.rows)
+				if (row.side == side)
+					foreach (var sl in row.slots) if (sl.label == label) return sl;
+			return null;
+		}
+
+		// 방 앞벽 (복도 쪽 벽면 = 복도선, 두께는 방 쪽). 문은 잠긴 나무문 + 채광창, 문 뒤는 어두운 판(방 안은 만들지 않음).
+		// 돌려주는 프레임: 로컬 X = 벽 방향, 로컬 +Z = 방 안쪽, 벽면 z = 0. 문 구멍은 outOpenings에 (걸레받이용)
+		Transform RoomFront(Transform parent, string label, bool north, float x0, float width, float[] doorXs, float C, float t, ref int doorNo, List<Vector3[]> outOpenings, DoorStyle style = DoorStyle.WoodSingle)
+		{
+			var f = new GameObject($"Room_{label}").transform;
+			f.SetParent(parent, false);
+			float cx = x0 + width * 0.5f, zLine = north ? C : 0f;
+			f.localPosition = new Vector3(cx, 0f, zLine);
+			f.localRotation = Quaternion.Euler(0f, north ? 0f : 180f, 0f);
+			float hw = width * 0.5f, dw = 1.0f, dh = officeDoorHeight;
+			var xs = new List<float>();
+			foreach (var wx in doorXs)
+			{
+				float lx = north ? wx - cx : cx - wx;
+				lx = Mathf.Clamp(lx, -hw + dw * 0.5f + 0.15f, hw - dw * 0.5f - 0.15f);   // 방 끝에 너무 붙지 않게
+				xs.Add(lx);
+				float w = north ? cx + lx : cx - lx;
+				outOpenings?.Add(new[] { new Vector3(w - dw * 0.5f, 0f, zLine), new Vector3(w + dw * 0.5f, 0f, zLine) });
+			}
+			xs.Sort();
+			float cursor = -hw;
+			foreach (var x in xs)
+			{
+				BoxLocal(f, $"Wall_{doorNo}", cursor, x - dw * 0.5f, 0f, ceilingHeight, t);
+				BoxLocal(f, $"Lintel_{doorNo}", x - dw * 0.5f, x + dw * 0.5f, dh, ceilingHeight, t);
+				var ds = new GameObject($"DoorSlot_{doorNo}").transform;
+				ds.SetParent(f, false);
+				ds.localPosition = new Vector3(x, 0f, 0f);
+				var d = DoorBuilder.Build(ds, dw, dh, t, style, doorSettings, label);
+				if (d != null) { d.playerCanUnlock = false; d.Id = $"F1.Door.{++doorNo:00}"; }
+				GroundExitBuilder.Box(f, $"Backdrop_{doorNo}", new Vector3(x, dh * 0.5f + 0.1f, t + 0.6f), new Vector3(dw + 0.6f, dh + 0.2f, 0.05f), null, new Color(0.10f, 0.10f, 0.11f));
+				if (details != null && details.enabled)
+				{
+					FloorDetailBuilder.Nameplate(f, label, x + dw * 0.5f + 0.3f, 0f, style == DoorStyle.WoodSingle, details);
+					// RoomNumberSigns가 층 번호로 바꾸지 않게 이름을 바꿈 (1층 도착 때는 FloorStarted가 없어 2xx로 남음)
+					var np = f.Find($"Nameplate_{label}");
+					if (np != null) np.name = $"Plate1F_{label}_{doorNo}";
+				}
+				cursor = x + dw * 0.5f;
+			}
+			BoxLocal(f, "Wall_End", cursor, hw, 0f, ceilingHeight, t);
+			return f;
+		}
+
+		// 로컬 X x0~x1, 높이 y0~y1, 두께 t (로컬 z 0 ~ t)
+		void BoxLocal(Transform parent, string name, float x0, float x1, float y0, float y1, float t)
+		{
+			if (x1 - x0 < 0.01f || y1 - y0 < 0.01f) return;
+			var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+			go.name = name;
+			go.isStatic = true;
+			go.transform.SetParent(parent, false);
+			go.transform.localPosition = new Vector3((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, t * 0.5f);
+			go.transform.localRotation = Quaternion.identity;
+			go.transform.localScale = new Vector3(x1 - x0, y1 - y0, t);
+			Material wm = shellWallMaterial != null ? shellWallMaterial : corridorWallMaterial;
+			if (wm != null) go.GetComponent<Renderer>().sharedMaterial = wm;
+			else DoorBuilder.Paint(go.GetComponent<Renderer>(), null, new Color(0.92f, 0.92f, 0.90f));
+		}
+
+		void BuildNightExterior(FloorLayoutData.FloorLayout layout, FloorVariants variants)
+		{
+			if (nightExterior == null || !nightExterior.enabled) return;
+			// 지금까지 생성된 것의 범위 (층 루트 기준)
+			var b = new Bounds(Vector3.zero, Vector3.zero);
+			bool any = false;
+			foreach (var r in GetComponentsInChildren<Renderer>(true))
+			{
+				if (campusGround != null && r.transform.IsChildOf(campusGround)) continue;   // 광장 등 바깥 땅은 건물 범위가 아님
+				var lb = new Bounds(transform.InverseTransformPoint(r.bounds.center), r.bounds.size);
+				if (!any) { b = lb; any = true; } else b.Encapsulate(lb);
+			}
+			if (!any) return;
+			// 동쪽 끝 창 앞 (화분 자리): 메인 복도 동쪽 끝, 창에서 0.35m 안쪽
+			var endWin = new Rect();
+			var last = FindSlot(layout, RowSide.MainNorth, "513");
+			if (last != null)
+			{
+				float end = last.start + last.width, C = layout.corridorWidth;
+				endWin = new Rect(end - 0.5f, 0.35f, 0.3f, C - 0.7f);
+			}
+			var plants = NightExteriorBuilder.Build(transform, nightExterior, b, layout.corridors, ceilingHeight, endWin, campusGround);
+			if (plants != null) variants.aboveBottomOnly.Add(plants);
 		}
 
 		// 생성된 문·창문·블라인드·모니터·TV에 Id를 붙인다 (구역.종류.번호, 예: R21.Door.01, R21.Monitor.03). 번호는 생성 순서
@@ -583,6 +1332,12 @@ namespace NightPatrol
 							windowWall ? WindowBuilder.Inset(classroomWindows, slot.label) : 0f);
 						break;
 					}
+
+			// 교수님 방 (나무문 작은 방, 내용물·내부 빌더 없음): 문이 열려 안이 보이므로 책장·책상 등으로 꾸밈
+			if (classroom && c == null && ResolveDoorStyle(slot) == DoorStyle.WoodSingle && details != null && details.enabled
+				&& !(classroomInteriors != null && classroomInteriors.Exists(ci => ci != null && ci.enabled && ci.label == slot.label))
+				&& !(tieredRooms != null && tieredRooms.Exists(lr => lr != null && lr.enabled && lr.label == slot.label)))
+				OfficeInteriorBuilder.Build(root, W, D, t, doors, windowWall ? WindowBuilder.Inset(classroomWindows, slot.label) : 0f, slot.label);
 
 			// 강의실 천장 조명 + 앞문 옆 스위치
 			if (classroom && FloorDetailBuilder.WantsRoomLights(details, slot.label))
