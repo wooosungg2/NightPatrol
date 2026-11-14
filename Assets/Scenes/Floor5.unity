@@ -797132,7 +797132,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NightPatrol::BellColorAnomaly
   patrolTarget: {fileID: 0}
-  bellRenderer: {fileID: 0}
+  bellRenderer: {fileID: 2050620447}
   blueMaterial: {fileID: 2100000, guid: 84fbf0e788ac1944aa432e52d5a5a752, type: 2}
 --- !u!4 &1796926370
 Transform:
