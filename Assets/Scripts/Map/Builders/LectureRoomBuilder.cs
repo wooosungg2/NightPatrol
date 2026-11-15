@@ -430,9 +430,7 @@ namespace NightPatrol
 				Box(desk, "Rack", new Vector3(0f, H - 0.17f, d * 0.12f), new Vector3(w - 0.02f, 0.26f, d * 0.72f), null, GreyBody);
 				Box(desk, "Leg_L", new Vector3(-w * 0.5f + 0.03f, (H - 0.3f) * 0.5f, d * 0.3f), new Vector3(0.035f, H - 0.3f, 0.035f), null, GreyBody);
 				Box(desk, "Leg_R", new Vector3(w * 0.5f - 0.03f, (H - 0.3f) * 0.5f, d * 0.3f), new Vector3(0.035f, H - 0.3f, 0.035f), null, GreyBody);
-				// 바퀴 달린 다리 받침 (사진)
-				Box(desk, "Foot_L", new Vector3(-w * 0.5f + 0.03f, 0.04f, 0f), new Vector3(0.04f, 0.04f, d * 0.9f), null, GreyBody);
-				Box(desk, "Foot_R", new Vector3(w * 0.5f - 0.03f, 0.04f, 0f), new Vector3(0.04f, 0.04f, d * 0.9f), null, GreyBody);
+				// (바퀴 다리 받침은 상자 수를 줄이려고 뺌 — 줄 사이에서는 거의 안 보임)
 			}
 			if (s.chairPrefab != null) Spawn(s.chairPrefab, seat, "Chair", new Vector3(0f, 0f, -s.chairOffset));
 			else
@@ -442,17 +440,20 @@ namespace NightPatrol
 				// 사진: 회색 메시 등받이 + 검은 방석, 팔걸이, 바퀴 다리
 				Box(ch, "Seat", new Vector3(0f, 0.45f, 0f), new Vector3(0.46f, 0.06f, 0.44f), null, SeatBlack);
 				Box(ch, "Back", new Vector3(0f, 0.75f, -0.21f), new Vector3(0.44f, 0.48f, 0.03f), null, MeshGrey);
-				Box(ch, "Arm_L", new Vector3(-0.24f, 0.62f, -0.02f), new Vector3(0.03f, 0.03f, 0.32f), null, GreyBody);
-				Box(ch, "Arm_R", new Vector3(0.24f, 0.62f, -0.02f), new Vector3(0.03f, 0.03f, 0.32f), null, GreyBody);
 				Box(ch, "Stem", new Vector3(0f, 0.23f, 0f), new Vector3(0.05f, 0.4f, 0.05f), null, GreyBody);
-				Box(ch, "Base_A", new Vector3(0f, 0.04f, 0f), new Vector3(0.55f, 0.04f, 0.05f), null, GreyBody);
-				Box(ch, "Base_B", new Vector3(0f, 0.04f, 0f), new Vector3(0.05f, 0.04f, 0.55f), null, GreyBody);
+				var baseX = Box(ch, "Base_A", new Vector3(0f, 0.04f, 0f), new Vector3(0.55f, 0.04f, 0.05f), null, GreyBody);
+				baseX.transform.localRotation = Quaternion.Euler(0f, 45f, 0f);   // 십자 받침 2개 → 비스듬한 1개
 			}
 			if (!s.chairColliders)
 			{
 				var chair = seat.Find("Chair");
 				if (chair != null)
-					foreach (var col in chair.GetComponentsInChildren<Collider>(true)) col.enabled = false;   // 프리팹 인스턴스도 되도록 끄기만
+					foreach (var col in chair.GetComponentsInChildren<Collider>(true))
+					{
+						// 프리팹 인스턴스는 끄기만, 생성기가 만든 상자는 아예 지움 (꺼진 충돌체도 씬 파일에 저장돼 용량만 차지)
+						if (s.chairPrefab == null && !Application.isPlaying) Object.DestroyImmediate(col);
+						else col.enabled = false;
+					}
 			}
 		}
 
