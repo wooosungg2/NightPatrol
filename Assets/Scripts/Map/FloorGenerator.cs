@@ -241,7 +241,10 @@ namespace NightPatrol
 				var zones = FloorDetailBuilder.CeilingLights(det, layout.corridors, ceilingHeight, details, layout.skylights);
 				foreach (var kv in zones) if (kv.Value != null) kv.Value.Id = $"Corridor.Lights.{kv.Key:00}";   // 이상현상이 찾을 이름
 				FloorDetailBuilder.Baseboards(det, layout.corridors, openings, details);
-				FloorDetailBuilder.LightSwitches(det, layout.corridors, openings, zones, details);
+				var windowSegs = new List<Vector3[]>();
+				foreach (var ww in layout.windowWalls)
+					windowSegs.Add(new[] { new Vector3(ww.a.x, 0f, ww.a.y), new Vector3(ww.b.x, 0f, ww.b.y) });
+				FloorDetailBuilder.LightSwitches(det, layout.corridors, openings, zones, details, windowSegs);
 				FloorDetailBuilder.HallProps(det, layout.hallNorth, layout.hallSouth, details);
 				FloorDetailBuilder.Furniture(det, layout.furniture, details);
 			}
@@ -863,6 +866,13 @@ namespace NightPatrol
 			var woodL = M("WoodLight", "wood_light.png", 1f, Color.white, 0.3f);
 			var woodD = M("WoodDark", "wood_dark.png", 1f, Color.white, 0.25f);
 			var facade = M2("Facade", "facade_bay.png", new Vector2(3f, 3.6f), Color.white, 0.2f);
+			var bookcases = new[]
+			{
+				M2("Bookcase0", "bookcase_0.png", Vector2.one, Color.white, 0.15f),
+				M2("Bookcase1", "bookcase_1.png", Vector2.one, Color.white, 0.15f),
+				M2("Bookcase2", "bookcase_2.png", Vector2.one, Color.white, 0.15f),
+			};
+			var lockerDoor = M2("LockerDoor", "locker_door.png", Vector2.one, Color.white, 0.35f);
 			var books = new[]
 			{
 				M2("Books0", "books_0.png", new Vector2(0.84f, 0.30f), Color.white, 0.15f),
@@ -877,6 +887,8 @@ namespace NightPatrol
 				string nm = r.gameObject.name, pn = r.transform.parent != null ? r.transform.parent.name : "";
 				Material m = null;
 				if (nm == "WindowBand") m = facade;
+				else if (nm.StartsWith("BookcaseFront_") && nm.Length > 14 && int.TryParse(nm.Substring(14), out int bci) && bci >= 0 && bci < bookcases.Length) m = bookcases[bci];
+				else if (nm.StartsWith("LockerFront_")) m = lockerDoor;
 				else if (nm.StartsWith("BookRow_") && nm.Length > 8 && int.TryParse(nm.Substring(8), out int bi) && bi >= 0 && bi < books.Length) m = books[bi];
 				else if (nm == "Mass" && (pn == "Building_Mass" || pn == "BrickBuilding")) m = brick;
 				else if (nm == "Mass" && pn == "LightBuilding") m = concrete;

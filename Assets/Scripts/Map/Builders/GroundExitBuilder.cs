@@ -171,8 +171,7 @@ namespace NightPatrol
 					NoCol(Box(rw, "Fence_Post", new Vector3(x, fy + fh * 0.5f, fz), new Vector3(0.05f, fh, 0.05f), null, FenceGrey));
 				NoCol(Box(rw, "Fence_Top", new Vector3(0f, fy + fh, fz), new Vector3(len, 0.04f, 0.04f), null, FenceGrey));
 				NoCol(Box(rw, "Fence_Mid", new Vector3(0f, fy + 0.15f, fz), new Vector3(len, 0.04f, 0.04f), null, FenceGrey));
-				for (float x = -len * 0.5f + 0.1f; x <= len * 0.5f; x += 0.15f)
-					NoCol(Box(rw, "Fence_Bar", new Vector3(x, fy + fh * 0.5f, fz), new Vector3(0.012f, fh, 0.012f), null, FenceGrey));
+				NoCol(Box(rw, "Fence_Mesh", new Vector3(0f, fy + fh * 0.5f, fz), new Vector3(len, fh, 0.008f), null, FenceGrey * 0.7f));   // 세로살을 판 1장으로
 				// 비상구 표지 (파란 띠 + 흰 판, 펜스에 묶음)
 				for (int k = -1; k <= 1; k += 2)
 				{
@@ -259,32 +258,22 @@ namespace NightPatrol
 		// 1인용 책상 (사진): 원목 상판 + 회색 철제 다리 4개 + 상판 아래 책받침. 기준점 = 바닥 가운데, 앞 = +Z
 		static void StudentDesk(Transform g, GroundExitSettings s)
 		{
-			float w = s.deskWidth, d = s.deskDepth, h = s.deskHeight, leg = 0.03f;
+			// 상판 + 책받침 + 양옆 다리판 (다리 4개·가로대를 판 2장으로: 상자 수 줄이기)
+			float w = s.deskWidth, d = s.deskDepth, h = s.deskHeight;
 			Box(g, "Top", new Vector3(0f, h - 0.012f, 0f), new Vector3(w, 0.025f, d), s.deskTopMaterial, DeskTop);
-			Box(g, "Shelf", new Vector3(0f, h - 0.16f, -0.02f), new Vector3(w - 0.06f, 0.015f, d - 0.08f), s.deskFrameMaterial, FrameGrey);
-			NoCol(Box(g, "Shelf_Back", new Vector3(0f, h - 0.1f, -d * 0.5f + 0.03f), new Vector3(w - 0.06f, 0.12f, 0.01f), s.deskFrameMaterial, FrameGrey));
+			NoCol(Box(g, "Shelf", new Vector3(0f, h - 0.16f, -0.02f), new Vector3(w - 0.06f, 0.015f, d - 0.08f), s.deskFrameMaterial, FrameGrey));
 			for (int sx = -1; sx <= 1; sx += 2)
-				for (int sz = -1; sz <= 1; sz += 2)
-					Box(g, $"Leg_{(sx < 0 ? "L" : "R")}{(sz < 0 ? "B" : "F")}",
-						new Vector3(sx * (w * 0.5f - 0.03f), (h - 0.025f) * 0.5f, sz * (d * 0.5f - 0.03f)),
-						new Vector3(leg, h - 0.025f, leg), s.deskFrameMaterial, FrameGrey);
-			NoCol(Box(g, "Bar", new Vector3(0f, 0.12f, -d * 0.5f + 0.03f), new Vector3(w - 0.06f, 0.02f, 0.02f), s.deskFrameMaterial, FrameGrey));
+				Box(g, sx < 0 ? "Legs_L" : "Legs_R", new Vector3(sx * (w * 0.5f - 0.03f), (h - 0.025f) * 0.5f, 0f), new Vector3(0.03f, h - 0.025f, d - 0.04f), s.deskFrameMaterial, FrameGrey);
 		}
 
-		// 남색 플라스틱 의자 + 크롬 다리. 기준점 = 바닥 가운데, 앞(앉는 사람이 보는 쪽) = +Z
+		// 남색 플라스틱 의자 + 크롬 다리판. 기준점 = 바닥 가운데, 앞(앉는 사람이 보는 쪽) = +Z
 		static void Chair(Transform g, GroundExitSettings s)
 		{
 			const float seatH = 0.44f, sw = 0.44f, sd = 0.42f;
 			Box(g, "Seat", new Vector3(0f, seatH, 0f), new Vector3(sw, 0.03f, sd), s.chairMaterial, ChairNavy);
 			NoCol(Box(g, "Back", new Vector3(0f, seatH + 0.25f, -sd * 0.5f + 0.02f), new Vector3(sw - 0.02f, 0.3f, 0.03f), s.chairMaterial, ChairNavy));
 			for (int sx = -1; sx <= 1; sx += 2)
-				for (int sz = -1; sz <= 1; sz += 2)
-					NoCol(Box(g, $"Leg_{(sx < 0 ? "L" : "R")}{(sz < 0 ? "B" : "F")}",
-						new Vector3(sx * (sw * 0.5f - 0.03f), seatH * 0.5f, sz * (sd * 0.5f - 0.03f)),
-						new Vector3(0.02f, seatH, 0.02f), null, Chrome));
-			for (int sx = -1; sx <= 1; sx += 2)
-				NoCol(Box(g, $"BackPost_{(sx < 0 ? "L" : "R")}", new Vector3(sx * (sw * 0.5f - 0.03f), seatH + 0.15f, -sd * 0.5f + 0.01f),
-					new Vector3(0.02f, 0.3f, 0.02f), null, Chrome));
+				NoCol(Box(g, sx < 0 ? "Legs_L" : "Legs_R", new Vector3(sx * (sw * 0.5f - 0.03f), seatH * 0.5f, 0f), new Vector3(0.02f, seatH, sd - 0.06f), null, Chrome));
 		}
 
 		static void Flat(Transform parent, string name, Vector3 c, Vector3 size, Material mat, Color col, bool collide = false)

@@ -106,23 +106,22 @@ namespace NightPatrol
 		// 책장 한 칸 (0.9 × 0.35 × 2.0). pos = 바닥 가운데, yaw로 앞(책 보이는 쪽)이 방 안을 보게
 		static void Bookshelf(Transform parent, Vector3 pos, float yaw, System.Random rng)
 		{
+			// 몸통 상자 1개 + 앞면 그림 판 1장 (선반·책을 하나씩 만들면 책장 하나에 상자 15개가 넘어 씬이 커짐).
+			// 앞면 재질은 생성기가 이름(BookcaseFront_0~2)을 보고 M_Gen_Bookcase0~2를 입힘
 			var s = GroundExitBuilder.Group(parent, "Bookshelf");
 			s.localPosition = pos; s.localRotation = Quaternion.Euler(0f, yaw, 0f);
 			const float w = 0.9f, d = 0.35f, h = 2.0f;
 			// 로컬: 앞 = +Z
-			Box(s, "Back", new Vector3(0f, h * 0.5f, -d * 0.5f + 0.01f), new Vector3(w, h, 0.02f), WoodDark, true);
-			for (int k = -1; k <= 1; k += 2) NoCol(Box(s, "Side", new Vector3(k * (w * 0.5f - 0.01f), h * 0.5f, 0f), new Vector3(0.02f, h, d), WoodDark, false));
-			for (int i = 0; i <= 5; i++)
-			{
-				float y = 0.05f + i * (h - 0.1f) / 5f;
-				NoCol(Box(s, "Shelf", new Vector3(0f, y, 0f), new Vector3(w - 0.04f, 0.02f, d), WoodDark, false));
-				if (i == 5) break;
-				// 책: 칸마다 책등 그림이 그려진 판 1장 (책 한 권씩 만들면 씬이 너무 커짐). 재질은 생성기가 M_Gen_Books0~2로 입힘
-				NoCol(Box(s, $"BookRow_{rng.Next(3)}", new Vector3(0f, y + 0.01f + 0.15f, 0.02f), new Vector3(0.84f, 0.30f, d - 0.08f), new Color(0.35f, 0.25f, 0.2f), false));
-				float end = w * 0.5f - 0.05f;
-				if (rng.NextDouble() < 0.35)
-					NoCol(Box(s, "LyingBooks", new Vector3(end - 0.08f, y + 0.05f, 0.02f), new Vector3(0.22f, 0.08f, d - 0.1f), BookCols[rng.Next(BookCols.Length)], false));
-			}
+			Box(s, "Body", new Vector3(0f, h * 0.5f, 0f), new Vector3(w, h, d), WoodDark, true);
+			var front = GameObject.CreatePrimitive(PrimitiveType.Quad);   // 쿼드는 그림이 똑바로 붙음 (정육면체 면은 뒤집힘)
+			front.name = $"BookcaseFront_{rng.Next(3)}";
+			front.transform.SetParent(s, false);
+			front.transform.localPosition = new Vector3(0f, h * 0.5f, d * 0.5f + 0.003f);
+			front.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);   // 쿼드 앞면이 +Z(방 안)를 보게
+			front.transform.localScale = new Vector3(w, h, 1f);
+			front.isStatic = true;
+			DoorBuilder.Paint(front.GetComponent<Renderer>(), null, new Color(0.35f, 0.25f, 0.2f));
+			NoCol(front);
 		}
 
 		// 사무용 의자 (바퀴 다리 5개 + 좌석 + 등받이). yaw 0 = 앉은 사람이 +Z를 봄
@@ -130,10 +129,10 @@ namespace NightPatrol
 		{
 			var c = GroundExitBuilder.Group(parent, "OfficeChair");
 			c.localPosition = pos; c.localRotation = Quaternion.Euler(0f, yaw, 0f);
-			for (int i = 0; i < 5; i++)
+			for (int i = 0; i < 2; i++)   // 바퀴 다리: 십자 2개 (5개 → 2개, 멀리선 같아 보임)
 			{
 				var leg = Box(c, "Leg", new Vector3(0f, 0.06f, 0f), new Vector3(0.04f, 0.03f, 0.55f), Black, false);
-				leg.transform.localRotation = Quaternion.Euler(0f, i * 72f, 0f);
+				leg.transform.localRotation = Quaternion.Euler(0f, 45f + i * 90f, 0f);
 				NoCol(leg);
 			}
 			NoCol(Box(c, "Column", new Vector3(0f, 0.27f, 0f), new Vector3(0.05f, 0.4f, 0.05f), Metal, false));

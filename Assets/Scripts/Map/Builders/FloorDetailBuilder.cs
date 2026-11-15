@@ -296,12 +296,22 @@ namespace NightPatrol
 		}
 
 		// ── 벽 스위치: 조명 구간마다, 그 복도의 긴 쪽 벽 중 가장 긴 벽 구간 시작 근처 ──
+		/// <param name="avoid">스위치를 달면 안 되는 벽 (창문 벽 등). 양 끝점 (x, 0, z), 생성기 로컬</param>
 		public static void LightSwitches(Transform parent, IList<Rect> corridors, IList<Vector3[]> openings,
-										 Dictionary<int, Lighting.LightZone> zones, FloorDetailSettings s)
+										 Dictionary<int, Lighting.LightZone> zones, FloorDetailSettings s, IList<Vector3[]> avoid = null)
 		{
 			if (s == null || !s.enabled || !s.lightSwitches || zones == null || zones.Count == 0) return;
 			var root = Group(parent, "LightSwitches");
 			var runs = WallRuns(corridors, openings);
+			// 창문 벽 위에 놓인 벽 구간은 뺌 (홀 통창·계단실 옆 창에 스위치가 붙던 문제)
+			if (avoid != null && avoid.Count > 0)
+				runs.RemoveAll(w =>
+				{
+					Vector3 m = w.start + w.dir * (w.length * 0.5f);
+					foreach (var seg in avoid)
+						if (seg != null && seg.Length >= 2 && DistToSegment(m, seg[0], seg[1]) < 0.25f) return true;
+					return false;
+				});
 			foreach (var kv in zones)
 			{
 				Rect r = corridors[kv.Key];
@@ -333,6 +343,14 @@ namespace NightPatrol
 				var ls = sw.gameObject.AddComponent<Lighting.LightSwitch>();
 				ls.Setup(kv.Value, rocker);
 			}
+		}
+
+		static float DistToSegment(Vector3 p, Vector3 a, Vector3 b)
+		{
+			p.y = a.y = b.y = 0f;
+			Vector3 ab = b - a;
+			float t = ab.sqrMagnitude < 1e-6f ? 0f : Mathf.Clamp01(Vector3.Dot(p - a, ab) / ab.sqrMagnitude);
+			return Vector3.Distance(p, a + ab * t);
 		}
 
 		static bool InsideOther(IList<Rect> rs, int self, Vector3 p)
@@ -453,16 +471,10 @@ namespace NightPatrol
 			const float depth = 0.5f, baseH = 0.08f;
 			float len = cols * colW;
 			Box(g, "Body", new Vector3(0f, height * 0.5f, 0f), new Vector3(len, height, depth), null, LockerBody);
-			float doorH = (height - baseH - 0.05f) / rows;
-			for (int c = 0; c < cols; c++)
-				for (int r = 0; r < rows; r++)
-				{
-					float x = -len * 0.5f + (c + 0.5f) * colW;
-					float y = baseH + (r + 0.5f) * doorH;
-					NoCol(Box(g, "Door", new Vector3(x, y, depth * 0.5f + 0.003f), new Vector3(colW - 0.025f, doorH - 0.025f, 0.006f), null, LockerDoor));
-					NoCol(Box(g, "Handle", new Vector3(x - colW * 0.28f, y - doorH * 0.05f, depth * 0.5f + 0.012f), new Vector3(0.035f, 0.08f, 0.012f), null, LockerHandle));
-					NoCol(Box(g, "Tag", new Vector3(x - colW * 0.2f, y + doorH * 0.3f, depth * 0.5f + 0.008f), new Vector3(0.05f, 0.025f, 0.003f), null, PlateWhite));
-				}
+			// 문짝: 칸마다 상자 3개(문·손잡이·이름표)를 만들지 않고 앞면 판 1장 + 문짝 그림 반복 (TextureTiler가 이름의 Tiles_열x단을 읽어 반복)
+			float doorsH = height - baseH - 0.05f;
+			var front = Box(g, $"LockerFront_Tiles_{cols}x{rows}", new Vector3(0f, baseH + doorsH * 0.5f, depth * 0.5f + 0.003f), new Vector3(len - 0.01f, doorsH, 0.006f), null, LockerDoor);
+			NoCol(front);
 		}
 
 		// 벤치 (짙은 회색 쿠션 + 은색 다리). 앞 = +Z
@@ -669,17 +681,19 @@ namespace NightPatrol
 
 			Vector3 wp = g.position;
 			var rng = new System.Random(Mathf.RoundToInt(wp.x * 97f) ^ Mathf.RoundToInt(wp.z * 131f) ^ (dense ? 7 : 0));
-			// 칸을 나눠 한 칸에 한 장씩 (사람이 붙인 것처럼 칸 안에서 조금씩 어긋나고 살짝 기욺). 빈 칸도 조금
+			// 칸을 나눠 한 칸에 한 장씩, 칸을 거의 채우는 크기로 (사람이 붙인 것처럼 조금씩 어긋나고 살짝 기욺). 빈 칸도 조금.
+			// Poster Scale 1.3 이상이면 판 높이를 다 쓰는 한 줄(큰 포스터), 아래면 두 줄
 			float bw = width - 0.08f;
-			int cols = Mathf.Max(1, Mathf.FloorToInt(bw / (0.27f * Mathf.Max(1f, PosterScale))));
-			float cw = bw / cols, rh = (y1 - y0) / 2f;
+			int rows = PosterScale >= 1.3f ? 1 : 2;
+			int cols = Mathf.Max(1, Mathf.FloorToInt(bw / (0.3f * Mathf.Max(1f, PosterScale))));
+			float cw = bw / cols, rh = (y1 - y0) / rows;
 			int k = 0;
-			for (int row = 0; row < 2; row++)
+			for (int row = 0; row < rows; row++)
 				for (int c = 0; c < cols; c++)
 				{
-					if (rng.NextDouble() < (dense ? 0.08 : 0.25)) continue;
+					if (rng.NextDouble() < (dense ? 0.05 : 0.15)) continue;
 					float cx = -bw * 0.5f + (c + 0.5f) * cw, cy = y0 + (row + 0.5f) * rh;
-					PosterInCell(g, rng, cx, cy, cw - 0.04f, rh - 0.04f, -0.046f - (k % 3) * 0.0012f, k);
+					PosterInCell(g, rng, cx, cy, cw - 0.03f, rh - 0.04f, -0.046f - (k % 3) * 0.0012f, k);
 					k++;
 				}
 		}
@@ -688,11 +702,11 @@ namespace NightPatrol
 		public static void PosterInCell(Transform parent, System.Random rng, float cx, float cy, float maxW, float maxH, float z, int index)
 		{
 			float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
-			Vector2[] sizes = { new Vector2(0.21f, 0.297f), new Vector2(0.182f, 0.257f), new Vector2(0.148f, 0.21f) };
-			Vector2 sz = sizes[rng.Next(sizes.Length)] * PosterScale;
-			if (rng.NextDouble() < 0.12) sz = new Vector2(sz.y, sz.x);
-			float k = Mathf.Min(1f, maxW / sz.x, maxH / sz.y);
-			sz *= k;
+			// 칸의 85~97%를 채움 (세로 포스터 비율 1:1.414). 가로로 돌리지 않음 (그림이 세로라 돌리면 작아짐)
+			float fill = R(0.85f, 0.97f);
+			Vector2 sz = new Vector2(maxW, maxW * 1.414f);
+			if (sz.y > maxH) sz = new Vector2(maxH / 1.414f, maxH);
+			sz *= fill;
 			float jx = Mathf.Max(0f, (maxW - sz.x) * 0.5f), jy = Mathf.Max(0f, (maxH - sz.y) * 0.5f);
 			float tilt = rng.NextDouble() < 0.85 ? R(-1.2f, 1.2f) : R(-3f, 3f);
 			MakePoster(parent, rng, new Vector3(cx + R(-jx, jx), cy + R(-jy, jy), z), sz, tilt, index);
