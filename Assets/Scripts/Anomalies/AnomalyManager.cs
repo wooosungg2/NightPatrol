@@ -51,6 +51,10 @@ namespace NightPatrol.Anomalies
         [SerializeField]
         private Anomaly[] vendingMachineAnomalies;
 
+        [Header("화분 교체 이상현상 후보")]
+        [SerializeField]
+        private Anomaly[] plantReplaceAnomalies;
+
         // ========================================
         // 2. 층별 랜덤 이상현상 개수 설정
         // ========================================
@@ -261,6 +265,13 @@ namespace NightPatrol.Anomalies
             // 10. 자판기 
             AddCandidates(
                 vendingMachineAnomalies,
+                candidates,
+                visited
+            );
+
+            // 11. 브로콜리 화분 
+            AddCandidates(
+                plantReplaceAnomalies,
                 candidates,
                 visited
             );
