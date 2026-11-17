@@ -11,9 +11,9 @@ namespace NightPatrol.Anomalies
         // 1. 이상현상 후보 목록
         // ========================================
 
-        [Header("빨간 모니터 이상현상 후보")]
-        [SerializeField]
-        private Anomaly[] redMonitorAnomalies;
+        //[Header("빨간 모니터 이상현상 후보")]
+        //[SerializeField]
+        //private Anomaly[] redMonitorAnomalies;
 
         [Header("Glitch 모니터 이상현상 후보")]
         [SerializeField]
@@ -58,6 +58,14 @@ namespace NightPatrol.Anomalies
         [Header("주전자 소화기 이상현상 후보")]
         [SerializeField]
         private Anomaly[] kettleExtinguisherAnomalies;
+
+        [Header("권투 글러브 쓰레기통 이상현상 후보")]
+        [SerializeField]
+        private Anomaly[] boxingGloveAnomalies;
+
+        [Header("계란 프라이 이상현상 후보")]
+        [SerializeField]
+        private Anomaly[] friedEggAnomalies;
 
 
         // ========================================
@@ -205,11 +213,13 @@ namespace NightPatrol.Anomalies
             // ------------------------------------
 
             // 1. 빨간 모니터
+            /*
             AddCandidates(
                 redMonitorAnomalies,
                 candidates,
                 visited
             );
+            */
 
             // 2. Glitch 모니터
             AddCandidates(
@@ -284,6 +294,20 @@ namespace NightPatrol.Anomalies
             // 12. 주전자 소화기
             AddCandidates(
                 kettleExtinguisherAnomalies,
+                candidates,
+                visited
+            );
+
+            // 13. 쓰레기통 
+            AddCandidates(
+                boxingGloveAnomalies,
+                candidates,
+                visited
+            );
+
+            // 14. 벽 계란 
+            AddCandidates(
+                friedEggAnomalies,
                 candidates,
                 visited
             );
