@@ -55,6 +55,11 @@ namespace NightPatrol.Anomalies
         [SerializeField]
         private Anomaly[] plantReplaceAnomalies;
 
+        [Header("주전자 소화기 이상현상 후보")]
+        [SerializeField]
+        private Anomaly[] kettleExtinguisherAnomalies;
+
+
         // ========================================
         // 2. 층별 랜덤 이상현상 개수 설정
         // ========================================
@@ -275,6 +280,14 @@ namespace NightPatrol.Anomalies
                 candidates,
                 visited
             );
+
+            // 12. 주전자 소화기
+            AddCandidates(
+                kettleExtinguisherAnomalies,
+                candidates,
+                visited
+            );
+
 
             // ------------------------------------
             // 후보가 없는 경우
