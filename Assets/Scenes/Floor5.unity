@@ -328198,6 +328198,37 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1064646258}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1064868343
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1064868344}
+  m_Layer: 0
+  m_Name: CanSpawnPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1064868344
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1064868343}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.074, y: 0.211, z: 0.37}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1305341874}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1065028183
 GameObject:
   m_ObjectHideFlags: 0
@@ -400446,6 +400477,7 @@ Transform:
   - {fileID: 1691211488}
   - {fileID: 600785177}
   - {fileID: 180069213}
+  - {fileID: 1064868344}
   m_Father: {fileID: 613851172}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1305395032
@@ -458069,6 +458101,58 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1490151184}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1490541566
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1490541568}
+  - component: {fileID: 1490541567}
+  m_Layer: 0
+  m_Name: VendingMachineAnomaly
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1490541567
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1490541566}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2be364970589f7d468a79e3a08ce582f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NightPatrol::NightPatrol.Anomalies.VendingMachineAnomaly
+  patrolTarget: {fileID: 0}
+  canPrefab: {fileID: 4638898990233571563, guid: 8fd4ab178bb06f54caa808bd7055663b, type: 3}
+  spawnPoint: {fileID: 1064868344}
+  spawnInterval: 0.7
+  launchForce: 3
+  maxCanCount: 40
+  canLifetime: 10
+  shrinkDuration: 1
+--- !u!4 &1490541568
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1490541566}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1008274700}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1490864448
 GameObject:
   m_ObjectHideFlags: 0
@@ -673055,11 +673139,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1377034625345163328, guid: 63222f72b668bc5439f5e240af7c40a0, type: 3}
       propertyPath: maxAnomalyCount
-      value: 10
+      value: 17
       objectReference: {fileID: 0}
     - target: {fileID: 1377034625345163328, guid: 63222f72b668bc5439f5e240af7c40a0, type: 3}
       propertyPath: minAnomalyCount
-      value: 3
+      value: 17
       objectReference: {fileID: 0}
     - target: {fileID: 1377034625345163328, guid: 63222f72b668bc5439f5e240af7c40a0, type: 3}
       propertyPath: bellColorAnomalies.Array.size
@@ -673142,9 +673226,17 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 1369611822}
     - target: {fileID: 1377034625345163328, guid: 63222f72b668bc5439f5e240af7c40a0, type: 3}
+      propertyPath: vendingMachineAnomalies.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1377034625345163328, guid: 63222f72b668bc5439f5e240af7c40a0, type: 3}
       propertyPath: 'ceilingChairAnomalies.Array.data[0]'
       value: 
       objectReference: {fileID: 733489580}
+    - target: {fileID: 1377034625345163328, guid: 63222f72b668bc5439f5e240af7c40a0, type: 3}
+      propertyPath: 'vendingMachineAnomalies.Array.data[0]'
+      value: 
+      objectReference: {fileID: 1490541567}
     - target: {fileID: 1663918972055878015, guid: 63222f72b668bc5439f5e240af7c40a0, type: 3}
       propertyPath: m_IsActive
       value: 1
@@ -673250,6 +673342,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 7669006141125211457, guid: 63222f72b668bc5439f5e240af7c40a0, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1369611821}
+    - targetCorrespondingSourceObject: {fileID: 7669006141125211457, guid: 63222f72b668bc5439f5e240af7c40a0, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1490541568}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 63222f72b668bc5439f5e240af7c40a0, type: 3}
 --- !u!1660057539 &9223372036854775807

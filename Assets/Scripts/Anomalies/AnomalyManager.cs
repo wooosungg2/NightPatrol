@@ -47,6 +47,10 @@ namespace NightPatrol.Anomalies
         [SerializeField]
         private Anomaly[] cryingChildAnomalies;
 
+        [Header("자판기 폭주 이상현상 후보")]
+        [SerializeField]
+        private Anomaly[] vendingMachineAnomalies;
+
         // ========================================
         // 2. 층별 랜덤 이상현상 개수 설정
         // ========================================
@@ -250,6 +254,13 @@ namespace NightPatrol.Anomalies
             // 9. 우는 아이 
             AddCandidates(
                 cryingChildAnomalies,
+                candidates,
+                visited
+            );
+
+            // 10. 자판기 
+            AddCandidates(
+                vendingMachineAnomalies,
                 candidates,
                 visited
             );
