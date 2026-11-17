@@ -96,11 +96,22 @@ namespace NightPatrol.Photo
         private static Vector3 ProjectOnSurface(Vector3 point, PhotoShape shape) =>
             point - shape.Normal * Vector3.Dot(point - shape.Center, shape.Normal);
 
-        // 카메라 → 점 사이를 다른 충돌체가 막는지. 대상 자신(Owner 아래)의 충돌체에 닿은 것은 막힌 게 아님. 트리거는 무시
+        // 카메라 → 점 사이의 충돌체를 모두 확인한다. 대상 자신·촬영 통과 물체·트리거는 가림에서 제외.
+        // 유리가 여러 장이어도 통과하지만, 그 뒤의 벽·문틀은 여전히 막는다.
         private static bool Blocked(Vector3 from, Vector3 to, Transform owner, int occluders)
         {
-            if (!Physics.Linecast(from, to, out var hit, occluders, QueryTriggerInteraction.Ignore)) return false;
-            return owner == null || !hit.transform.IsChildOf(owner);
+            var direction = to - from;
+            float distance = direction.magnitude;
+            if (distance <= 0f) return false;
+
+            // 결과 순서에 의존하지 않고 전부 검사한다. 길이는 판정 지점까지만 — 뒤쪽 벽은 검사하지 않는다.
+            foreach (var hit in Physics.RaycastAll(from, direction / distance, distance, occluders, QueryTriggerInteraction.Ignore))
+            {
+                if (owner != null && hit.collider.transform.IsChildOf(owner)) continue;
+                if (PhotoOcclusion.AllowsPhotos(hit.collider)) continue;
+                return true;
+            }
+            return false;
         }
 
         // 가림에 쓰는 레이어: 기본 레이어에서 손에 든 물체(FirstPerson)를 뺌
