@@ -99,5 +99,43 @@ namespace NightPatrol.Tests
             StringAssert.Contains("F3 실패", DevMenu.HelpText(true));
             StringAssert.DoesNotContain("F3", DevMenu.HelpText(false));
         }
+
+        // 05_01c "자세히" 칸 나누기: 위에서 아래로 쌓다가 넘치면 다음 칸, 구역은 쪼개지 않음
+        [Test]
+        public void SectionColumns_StartANewColumn_WhenTheNextSectionWouldOverflow()
+        {
+            var columns = DevInfo.SectionColumns(new float[] { 40, 40, 40, 40 }, 100f, 10f, 3, 20f, out int hidden);
+            CollectionAssert.AreEqual(new[] { 0, 0, 1, 1 }, columns, "40+10+40=90 ≤ 100, 셋째는 넘침");
+            Assert.AreEqual(0, hidden);
+        }
+
+        [Test]
+        public void SectionColumns_ASectionTallerThanTheScreen_GetsItsOwnColumn()
+        {
+            var columns = DevInfo.SectionColumns(new float[] { 30, 250, 30 }, 100f, 10f, 3, 20f, out int hidden);
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, columns);
+            Assert.AreEqual(0, hidden);
+        }
+
+        // 칸이 모자라면 남은 구역은 -1, 마지막 칸에 안내 자리(footer)를 남긴다
+        [Test]
+        public void SectionColumns_WhenColumnsRunOut_CountsTheHiddenOnes()
+        {
+            var columns = DevInfo.SectionColumns(new float[] { 60, 60, 45, 45, 45 }, 100f, 10f, 2, 20f, out int hidden);
+            CollectionAssert.AreEqual(new[] { 0, 1, -1, -1, -1 }, columns, "둘째 칸은 안내 자리 20을 빼고 80: 60+10+45 넘침");
+            Assert.AreEqual(3, hidden);
+
+            columns = DevInfo.SectionColumns(new float[] { 30, 30 }, 100f, 10f, 0, 20f, out hidden);
+            CollectionAssert.AreEqual(new[] { -1, -1 }, columns, "칸이 하나도 없으면 전부 숨김");
+            Assert.AreEqual(2, hidden);
+        }
+
+        [Test]
+        public void SectionColumns_AllFit_NoFooterSpaceTaken()
+        {
+            var columns = DevInfo.SectionColumns(new float[] { 45, 45 }, 100f, 10f, 1, 20f, out int hidden);
+            CollectionAssert.AreEqual(new[] { 0, 0 }, columns, "다 들어가면 안내 자리를 빼지 않음 (45+10+45=100)");
+            Assert.AreEqual(0, hidden);
+        }
     }
 }

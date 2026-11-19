@@ -1,31 +1,32 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using NightPatrol.Anomalies;
 using UnityEngine;
 
 namespace NightPatrol.Photo
 {
-    /// <summary>촬영 판정 설정. 카메라 앱 Inspector에서 바꾸고 플레이테스트로 맞춘다</summary>
     [Serializable]
     public sealed class PhotoRules
     {
-        [Tooltip("조준 박스: 뷰파인더 가운데 이 비율 안에 대상의 가운데가 있어야 함 (0.4 = 가로·세로 40%)")]
+        [Tooltip("조준 박스: 가운데에서 레이를 쏘는 가로·세로 비율 (0.4 = 40%)")]
         [Range(0.1f, 1f)] public float aimBox = 0.4f;
-        [Tooltip("인정 거리 = 크기(m) × 이 값")]
+        [Tooltip("인정 거리 = 부품 크기(m, 바운드 대각선) × 이 값")]
         [Min(0.1f)] public float distancePerSize = 6f;
-        [Tooltip("인정 거리 최소(m) — 아주 작은 것도 이만큼은 떨어져서 찍을 수 있음")]
+        [Tooltip("아주 작은 부품도 찍을 수 있는 최소 인정 거리(m)")]
         [Min(0.1f)] public float minDistance = 2f;
-        [Tooltip("인정 거리 최대(m) — 아무리 큰 것도 이보다 멀면 안 찍힘")]
+        [Tooltip("촬영과 가림 레이의 최대 거리(m)")]
         [Min(0.1f)] public float maxDistance = 15f;
-        [Tooltip("가림: 가운데와 주변 4점, 5점 중 이만큼이 안 막혀야 찍힘")]
-        [Range(1, 5)] public int pointsNeeded = 3;
-        [Tooltip("벽·바닥에 붙은 대상은 면에서 이만큼(m) 띄운 점을 본다 (자기 벽에 막히지 않게)")]
+        [Tooltip("부품 앞의 충돌체를 가림으로 보는 여유 거리(m)")]
         [Min(0f)] public float surfaceLift = 0.05f;
+        [Tooltip("안쪽부터 각 링의 레이 수. 가운데 레이 1발은 항상 추가됨")]
+        public int[] raysPerRing = { 8, 12, 16 };
+        [Tooltip("가운데와 이 번호까지의 안쪽 링은 1발만 보여도 찍힘 (0 = 가운데만)")]
+        [Min(0)] public int innerRings = 1;
+        [Tooltip("바깥 링에서만 보일 때 찍힘에 필요한 레이 수 (여러 링 합산)")]
+        [Min(1)] public int outerMinHits = 3;
 
-        /// <summary>그 크기의 대상을 찍을 수 있는 최대 거리</summary>
         public float AllowedDistance(float size) => Mathf.Clamp(size * distancePerSize, minDistance, Mathf.Max(minDistance, maxDistance));
 
-        /// <summary>뷰포트 좌표(0~1)가 가운데 조준 박스 안인지</summary>
         public bool InAimBox(Vector2 viewport)
         {
             float half = aimBox * 0.5f;
@@ -33,94 +34,157 @@ namespace NightPatrol.Photo
         }
     }
 
-    /// <summary>
-    /// 한 장에 어떤 이상현상이 찍혔는지. 카메라 앱이 셔터 때 부른다 (화면 없이도 테스트할 수 있게 따로 둠).
-    /// 찍힘 = 가운데가 조준 박스 안 + 크기에 비례한 거리 안 + 5점 중 N점이 안 가림 (+ 면 대상은 앞쪽에서)
-    /// </summary>
+    /// <summary>셔터 레이 하나. Ring 0은 가운데, 빗나간 Distance는 +Infinity.
+    /// TooFar는 본 부품이 인정 거리 밖이라 집계에서 빠졌다는 뜻이다.
+    /// UsedForCapture는 거리 안의 레이가 본 이상현상이 이번 사진에 찍혔다는 뜻이다.</summary>
+    public readonly struct PhotoRayResult
+    {
+        public readonly Vector2 Viewport;
+        public readonly int Ring;
+        public readonly Anomaly Seen;
+        public readonly float Distance;
+        public readonly bool TooFar;
+        public readonly bool UsedForCapture;
+
+        public PhotoRayResult(Vector2 viewport, int ring, Anomaly seen, float distance, bool usedForCapture, bool tooFar = false)
+        {
+            Viewport = viewport;
+            Ring = ring;
+            Seen = seen;
+            Distance = distance;
+            TooFar = tooFar;
+            UsedForCapture = usedForCapture && !tooFar;
+        }
+    }
+
+    /// <summary>한 장의 판정 스냅샷. 레이는 가운데부터 바깥 링 순서다.</summary>
+    public sealed class PhotoCaptureResult
+    {
+        public IReadOnlyList<Anomaly> Captured { get; }
+        public IReadOnlyList<PhotoRayResult> Rays { get; }
+
+        internal PhotoCaptureResult(List<Anomaly> captured, List<PhotoRayResult> rays)
+        {
+            Captured = captured.AsReadOnly();
+            Rays = rays.AsReadOnly();
+        }
+    }
+
     public static class PhotoJudge
     {
-        /// <summary>그 카메라로 지금 찍으면 찍히는 이상현상 (subjects 순서대로)</summary>
-        public static List<Anomaly> Capture(Camera camera, PhotoRules rules, IReadOnlyList<PhotoSubject> subjects)
+        /// <summary>각 레이에서 처음 보이는 부품을 찾고 안쪽 1발 또는 바깥 N발로 판정한다.</summary>
+        public static PhotoCaptureResult Capture(Camera camera, PhotoRules rules, IReadOnlyList<PhotoSubject> subjects)
         {
-            var result = new List<Anomaly>();
-            if (camera == null || rules == null || subjects == null) return result;
-            int occluders = Occluders();
+            var captured = new List<Anomaly>();
+            var rays = new List<PhotoRayResult>();
+            if (camera == null || rules == null || subjects == null) return new PhotoCaptureResult(captured, rays);
+            var inner = new HashSet<Anomaly>();
+            var outer = new Dictionary<Anomaly, int>();
+            int mask = Occluders();
+            Physics.SyncTransforms();   // 이번 프레임에 움직인 문·물체의 가림도 셔터 순간 위치로 확인
+            foreach (var sample in Samples(rules))
+            {
+                var ray = CameraRay(camera, sample.viewport);
+                var blockers = Physics.RaycastAll(ray, Mathf.Max(0f, rules.maxDistance), mask, QueryTriggerInteraction.Ignore);
+                Anomaly seen = null;
+                float nearest = float.PositiveInfinity;
+                float allowedDistance = 0f;
+                foreach (var subject in subjects)
+                {
+                    if (subject.Source == null || !subject.Source.IsActive) continue;
+                    foreach (var shape in subject.Shapes)
+                    {
+                        if (!Visible(ray, shape, rules, blockers, out float distance) || distance >= nearest) continue;
+                        nearest = distance;
+                        allowedDistance = rules.AllowedDistance(shape.Size);
+                        seen = subject.Source;
+                    }
+                }
+                // 가까운 작은 부품이 거리 밖이라고 그 뒤의 큰 이상현상으로 넘어가지는 않는다.
+                bool tooFar = seen != null && nearest > allowedDistance;
+                rays.Add(new PhotoRayResult(sample.viewport, sample.ring, seen, nearest, false, tooFar));
+                if (seen == null || tooFar) continue;
+                if (sample.ring <= Mathf.Max(0, rules.innerRings)) inner.Add(seen);
+                else outer[seen] = outer.TryGetValue(seen, out int count) ? count + 1 : 1;
+            }
+            var accepted = new HashSet<Anomaly>();
             foreach (var subject in subjects)
             {
-                foreach (var shape in subject.Shapes)
-                {
-                    if (!Sees(camera, shape, rules, occluders)) continue;
-                    result.Add(subject.Source);
-                    break;
-                }
+                var source = subject.Source;
+                if (source == null) continue;
+                if ((inner.Contains(source) || outer.TryGetValue(source, out int count) && count >= Mathf.Max(1, rules.outerMinHits))
+                    && accepted.Add(source)) captured.Add(source);
             }
-            return result;
+            for (int i = 0; i < rays.Count; i++)
+            {
+                var ray = rays[i];
+                rays[i] = new PhotoRayResult(ray.Viewport, ray.Ring, ray.Seen, ray.Distance,
+                    !ray.TooFar && ray.Seen != null && accepted.Contains(ray.Seen), ray.TooFar);
+            }
+            return new PhotoCaptureResult(captured, rays);
         }
 
-        /// <summary>그 카메라로 지금 찍으면 이 모양이 찍히는지</summary>
-        public static bool Sees(Camera camera, PhotoShape shape, PhotoRules rules) => Sees(camera, shape, rules, Occluders());
-
-        private static bool Sees(Camera camera, PhotoShape shape, PhotoRules rules, int occluders)
+        /// <summary>부품 하나에 같은 링 규칙을 적용한다 (유리·가림 확인에도 사용).</summary>
+        public static bool Sees(Camera camera, PhotoShape shape, PhotoRules rules)
         {
             if (camera == null || rules == null) return false;
-            var eye = camera.transform.position;
-            var center = shape.Center;
-            if (shape.IsSurface)
+            int outer = 0, mask = Occluders();
+            Physics.SyncTransforms();
+            foreach (var sample in Samples(rules))
             {
-                if (Vector3.Dot(eye - center, shape.Normal) <= 0f) return false;   // 면 뒤쪽 (벽 너머)
-                center += shape.Normal * rules.surfaceLift;
-            }
-
-            var viewport = camera.WorldToViewportPoint(center);
-            if (viewport.z <= camera.nearClipPlane || !rules.InAimBox(viewport)) return false;
-            if (Vector3.Distance(eye, center) > rules.AllowedDistance(shape.Size)) return false;
-
-            // 가운데와 카메라 기준 좌우·위아래로 크기의 1/3 떨어진 4점
-            var right = camera.transform.right * (shape.Size / 3f);
-            var up = camera.transform.up * (shape.Size / 3f);
-            var lift = shape.IsSurface ? shape.Normal * rules.surfaceLift : Vector3.zero;
-            int needed = Mathf.Clamp(rules.pointsNeeded, 1, 5), seen = 0, left = 5;
-            foreach (var point in new[] { center, center + right, center - right, center + up, center - up })
-            {
-                // 면 대상은 옆 점도 면에서 띄운다 (카메라가 비스듬하면 옆 점이 벽 안으로 들어갈 수 있어서)
-                var target = shape.IsSurface ? ProjectOnSurface(point, shape) + lift : point;
-                if (!Blocked(eye, target, shape.Owner, occluders)) seen++;
-                left--;
-                if (seen >= needed) return true;
-                if (seen + left < needed) return false;
+                var ray = CameraRay(camera, sample.viewport);
+                var blockers = Physics.RaycastAll(ray, Mathf.Max(0f, rules.maxDistance), mask, QueryTriggerInteraction.Ignore);
+                if (!Visible(ray, shape, rules, blockers, out float distance) || distance > rules.AllowedDistance(shape.Size)) continue;
+                if (sample.ring <= Mathf.Max(0, rules.innerRings)) return true;
+                if (++outer >= Mathf.Max(1, rules.outerMinHits)) return true;
             }
             return false;
         }
 
-        // 면 위로 내린 점 (면 대상의 옆 점용)
-        private static Vector3 ProjectOnSurface(Vector3 point, PhotoShape shape) =>
-            point - shape.Normal * Vector3.Dot(point - shape.Center, shape.Normal);
-
-        // 카메라 → 점 사이의 충돌체를 모두 확인한다. 대상 자신·촬영 통과 물체·트리거는 가림에서 제외.
-        // 유리가 여러 장이어도 통과하지만, 그 뒤의 벽·문틀은 여전히 막는다.
-        private static bool Blocked(Vector3 from, Vector3 to, Transform owner, int occluders)
+        private static IEnumerable<(Vector2 viewport, int ring)> Samples(PhotoRules rules)
         {
-            var direction = to - from;
-            float distance = direction.magnitude;
-            if (distance <= 0f) return false;
-
-            // 결과 순서에 의존하지 않고 전부 검사한다. 길이는 판정 지점까지만 — 뒤쪽 벽은 검사하지 않는다.
-            foreach (var hit in Physics.RaycastAll(from, direction / distance, distance, occluders, QueryTriggerInteraction.Ignore))
+            yield return (new Vector2(0.5f, 0.5f), 0);
+            int rings = rules.raysPerRing?.Length ?? 0;
+            for (int ring = 1; ring <= rings; ring++)
             {
-                if (owner != null && hit.collider.transform.IsChildOf(owner)) continue;
-                if (PhotoOcclusion.AllowsPhotos(hit.collider)) continue;
-                return true;
+                int count = Mathf.Max(0, rules.raysPerRing[ring - 1]);
+                float radius = Mathf.Clamp01(rules.aimBox) * 0.5f * ring / rings;
+                for (int i = 0; i < count; i++)
+                {
+                    float angle = (i + 0.5f * ring) * 2f * Mathf.PI / count;
+                    yield return (new Vector2(0.5f + Mathf.Cos(angle) * radius, 0.5f + Mathf.Sin(angle) * radius), ring);
+                }
             }
-            return false;
         }
 
-        // 가림에 쓰는 레이어: 기본 레이어에서 손에 든 물체(FirstPerson)를 뺌
+        private static Ray CameraRay(Camera camera, Vector2 viewport)
+        {
+            var ray = camera.ViewportPointToRay(new Vector3(viewport.x, viewport.y, 0f));
+            if (!camera.orthographic) ray.origin = camera.transform.position;
+            return ray;
+        }
+
+        private static bool Visible(Ray ray, PhotoShape shape, PhotoRules rules, RaycastHit[] blockers, out float distance)
+        {
+            distance = 0f;
+            if (shape.IsSurface && Vector3.Dot(ray.origin - shape.Center, shape.Normal) <= 0f) return false;
+            if (!shape.Bounds.IntersectRay(ray, out distance) || distance < 0f ||
+                distance > rules.maxDistance) return false;
+            foreach (var hit in blockers)
+            {
+                if (hit.distance >= distance - Mathf.Max(0f, rules.surfaceLift)) continue;
+                if (shape.Owner != null && hit.collider.transform.IsChildOf(shape.Owner)) continue;
+                if (PhotoOcclusion.AllowsPhotos(hit.collider)) continue;
+                return false;
+            }
+            return true;
+        }
+
         private static int Occluders()
         {
             int mask = Physics.DefaultRaycastLayers;
             int firstPerson = LayerMask.NameToLayer("FirstPerson");
-            if (firstPerson >= 0) mask &= ~(1 << firstPerson);
-            return mask;
+            return firstPerson < 0 ? mask : mask & ~(1 << firstPerson);
         }
     }
 }

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using NightPatrol.Anomalies;
+using NightPatrol.Patrol;
 using NightPatrol.Photo;
 using NightPatrol.Run;
 using TMPro;
@@ -9,8 +11,8 @@ using UnityEngine.UI;
 namespace NightPatrol.Phone
 {
     /// <summary>
-    /// 카메라 앱: 이상현상은 고치지 않고 찍는다. 가운데 조준 박스에 대상을 넣고 좌클릭 또는 E로 찍는다.
-    /// 무엇이 찍혔는지는 보여 주지 않는다 — 엘리베이터 판정 때만 안다 (찍는 순간 알려 주면 탐지기가 된다).
+    /// 카메라 앱: 가운데 조준 박스에 대상을 넣고 좌클릭 또는 E로 찍는다.
+    /// 촬영으로 기록한 이상현상은 VanishOnCapture가 켜져 있으면 즉시 끈다.
     /// 한 층에 찍을 수 있는 장수가 정해져 있고, 이상현상이 아닌 것을 찍어도 장수만 준다.
     /// 전화·메시지 다음 독 세 번째 칸. 찍으면 그 사진을 잠깐(1.5초) 보여 주고 뷰파인더로 돌아온다 (우클릭이면 바로).
     /// 지난 사진은 갤러리 앱에서 본다 (홈에서 연다).
@@ -18,7 +20,7 @@ namespace NightPatrol.Phone
     public sealed class CameraApp : PhoneApp
     {
         /// <summary>촬영 장수를 정하는 방식 (기획서 v3 M01 — 팀이 정하면 고르기만)</summary>
-        public enum ShotLimit { PerFloor, CountPlusSlack, Fixed }
+        public enum ShotLimit { PerFloor, CountPlusSlack, Fixed, Unlimited }
 
         [Serializable]
         public struct FloorShots
@@ -40,8 +42,10 @@ namespace NightPatrol.Phone
 
         [Tooltip("촬영 판정 (조준 박스·인정 거리·가림)")]
         [SerializeField] private PhotoRules rules = new PhotoRules();
-        [Tooltip("층마다 찍을 수 있는 장수를 정하는 방식")]
-        [SerializeField] private ShotLimit limit = ShotLimit.PerFloor;
+        [Tooltip("찍힌 이상현상을 바로 끈다. 끄면 예전처럼 엘리베이터에서만 판정")]
+        [SerializeField] private bool vanishOnCapture = true;
+        [Tooltip("층마다 찍을 수 있는 장수를 정하는 방식. Unlimited = 제한 없음 (11/19 기본값)")]
+        [SerializeField] private ShotLimit limit = ShotLimit.Unlimited;
         [Tooltip("PerFloor: 층별 장수. 표에 없는 층은 Default Shots")]
         [SerializeField] private FloorShots[] perFloor = new FloorShots[0];
         [Tooltip("PerFloor에서 표에 없는 층, Fixed에서는 모든 층의 장수. 임시값 12 = 한 층 이상현상 최대 10개 + 여유 2 (못 깨는 층이 없게, 플레이테스트 뒤 팀이 정함)")]
@@ -78,6 +82,9 @@ namespace NightPatrol.Phone
         public override bool SymbolAt(Vector2 p) => IconShape(p);
 
         public PhotoRules Rules => rules;
+        public bool VanishOnCapture { get => vanishOnCapture; set => vanishOnCapture = value; }
+        /// <summary>마지막 셔터의 레이와 촬영 결과 (개발용 표시에서 사용). 층 전환 시 비운다.</summary>
+        public PhotoCaptureResult LastCapture { get; private set; }
         /// <summary>이번 층에 찍은 사진 (오래된 것이 앞, 갤러리가 보여 준다)</summary>
         public IReadOnlyList<Picture> Pictures => pictures;
         /// <summary>방금 찍은 사진을 보여 주는 중인지 (아니면 뷰파인더)</summary>
@@ -88,6 +95,11 @@ namespace NightPatrol.Phone
         public bool HasLens => lens != null;
         /// <summary>뷰파인더·판정에 쓰는 카메라 (없으면 null)</summary>
         public Camera Lens => lens;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>개발용 UI만 겹치는 칸. 렌즈를 그릴 때는 잠시 숨긴다.</summary>
+        public RectTransform DebugOverlay { get; private set; }
+        public Camera DebugEye => eye != null ? eye : GetComponentInParent<Camera>();
+#endif
         /// <summary>이번 층에 찍을 수 있는 장수</summary>
         public int ShotsAllowed => ShotsFor(limit, run != null ? run.CurrentFloor : 0, run != null ? run.Photos.RequiredAtStart : 0);
         /// <summary>이번 층 남은 장수</summary>
@@ -95,6 +107,8 @@ namespace NightPatrol.Phone
 
         /// <summary>찍었을 때 (사진, 그 장에 찍힌 이상현상 수 — 판정용이라 화면에는 안 씀)</summary>
         public event Action<Picture, int> Taken;
+        /// <summary>한 개 이상 찍혔을 때, 기록·사라지기 처리가 끝난 뒤 알린다.</summary>
+        public event Action<IReadOnlyList<Anomaly>> Captured;
 
         /// <summary>그 방식으로 그 층에 찍을 수 있는 장수</summary>
         public int ShotsFor(ShotLimit mode, int floor, int required)
@@ -103,6 +117,7 @@ namespace NightPatrol.Phone
             {
                 case ShotLimit.CountPlusSlack: return Mathf.Max(0, required) + slack;
                 case ShotLimit.Fixed: return defaultShots;
+                case ShotLimit.Unlimited: return int.MaxValue;
                 default:
                     foreach (var row in perFloor)
                         if (row.floor == floor) return row.shots;
@@ -186,6 +201,10 @@ namespace NightPatrol.Phone
             var flashRect = PhoneUI.Fill(content, "Flash");
             flash = PhoneUI.Image(flashRect, null, new Color(1f, 1f, 1f, 0f));
             footer = PhoneUI.Label(content, "Footer", 4f, 214f, 352f, 24f, "", 12f, Color.white, TextAlignmentOptions.Center);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            DebugOverlay = PhoneUI.Fill(content, "PhotoDebugOverlay");
+            DebugOverlay.gameObject.SetActive(false);
+#endif
         }
 
         /// <summary>가로 화면 바탕 (Width×Height, -90도 돌림): 상태 표시줄이 숨는 자리까지 씀. 갤러리도 쓴다</summary>
@@ -271,7 +290,7 @@ namespace NightPatrol.Phone
             }
             bool temporary = lens == null;
             if (!EnsureLens()) return null;
-            lens.Render();
+            RenderLens();
             var picture = new Picture
             {
                 Image = new Texture2D(Width, Height, TextureFormat.RGB24, false),
@@ -284,8 +303,11 @@ namespace NightPatrol.Phone
             picture.Image.Apply();
             RenderTexture.active = previous;
 
-            var inShot = PhotoJudge.Capture(lens, rules, PhotoSubjects.Active());
+            var subjects = run != null ? run.RefreshPhotos() : PhotoSubjects.Refresh();
+            LastCapture = PhotoJudge.Capture(lens, rules, subjects);
+            var inShot = LastCapture.Captured;
             if (run != null) run.Photos.Record(inShot, run.PlaySeconds);
+            if (vanishOnCapture) DeactivateCaptured(inShot);
             pictures.Add(picture);
             if (temporary && !IsOpen) DropLens();
             if (IsOpen && reviewSeconds > 0f)
@@ -293,13 +315,40 @@ namespace NightPatrol.Phone
                 reviewed = picture;
                 reviewLeft = reviewSeconds;
             }
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            PhotoDebugView.ShowCapture(this, LastCapture, reviewSeconds);
+#endif
 
             flashLeft = flashSeconds;
             retakeLeft = retakeSeconds;
             if (Phone != null) Phone.PlaySound(PhoneHolder.ShutterSound);
-            Taken?.Invoke(picture, inShot.Count);
+            if (inShot.Count > 0) SafeEvent.Raise(Captured, inShot, this);
+            SafeEvent.Raise(Taken, picture, inShot.Count, this);
             Redraw();
             return picture;
+        }
+
+        private void DeactivateCaptured(IReadOnlyList<Anomaly> inShot)
+        {
+            foreach (var anomaly in inShot)
+            {
+                if (anomaly == null) continue;
+                var affected = new List<PatrolObject>();
+                foreach (var obj in FindObjectsByType<PatrolObject>(FindObjectsInactive.Include))
+                    if (obj != null && obj.HasAnomaly) affected.Add(obj);
+                string anomalyName = anomaly.name;
+                try { anomaly.Deactivate(); }
+                catch (Exception exception)
+                {
+                    Debug.LogError($"[Photo] {anomalyName} 끄기 실패", this);
+                    Debug.LogException(exception, this);
+                }
+                finally
+                {
+                    foreach (var obj in affected)
+                        if (obj != null && !obj.HasAnomaly) obj.MarkClearedByPhoto();
+                }
+            }
         }
 
         private bool EnsureLens()
@@ -336,6 +385,7 @@ namespace NightPatrol.Phone
 
         private void ClearPictures()
         {
+            LastCapture = null;
             foreach (var picture in pictures)
                 if (picture.Image != null) Destroy(picture.Image);
             pictures.Clear();
@@ -364,7 +414,20 @@ namespace NightPatrol.Phone
             }
             if (lens == null || reviewed != null || !IsOpen || Time.timeScale <= 0f) return;
             if (Phone == null || !Phone.IsInHand || Screen.IsCallShown) return;
+            RenderLens();
+        }
+
+        private void RenderLens()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // 레이어 설정과 무관하게 개발 표시가 뷰파인더 원본·갤러리에 들어가지 않게 한다.
+            bool restore = DebugOverlay != null && DebugOverlay.gameObject.activeSelf;
+            if (restore) DebugOverlay.gameObject.SetActive(false);
+            try { lens.Render(); }
+            finally { if (restore && DebugOverlay != null) DebugOverlay.gameObject.SetActive(true); }
+#else
             lens.Render();
+#endif
         }
 
         private void Redraw()
@@ -372,7 +435,9 @@ namespace NightPatrol.Phone
             if (footer == null) return;   // 아직 한 번도 안 열어 봄
             string interact = "좌클릭", back = "우클릭";
             title.text = Title;
-            count.text = $"남은 촬영 {ShotsLeft}장";
+            count.text = limit == ShotLimit.Unlimited
+                ? $"촬영 {(run != null ? run.Photos.Shots : pictures.Count)}장"
+                : $"남은 촬영 {ShotsLeft}장";
             viewfinder.gameObject.SetActive(reviewed == null);
             review.gameObject.SetActive(reviewed != null);
             review.texture = reviewed != null ? reviewed.Image : null;

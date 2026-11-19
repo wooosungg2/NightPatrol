@@ -1,5 +1,8 @@
 using System.Globalization;
+using System.Collections.Generic;
 using System.Text;
+using NightPatrol.Anomalies;
+using NightPatrol.Photo;
 using NightPatrol.Phone;
 using NightPatrol.Run;
 using UnityEngine;
@@ -22,10 +25,10 @@ namespace NightPatrol.Debugging
         [SerializeField] private bool showHelp = true;
 #pragma warning restore 0414
 
-        /// <summary>F1 패널의 개발자 키 안내 (PatrolRun이 없으면 F5만)</summary>
+        /// <summary>F1 패널의 개발자 키 안내.</summary>
         public static string HelpText(bool hasRun) => hasRun
-            ? "F1 표시 전환 · F2 하행 · F3 실패 · F4 층 재시작\nF5 기록 폴더 · F6 예약 바로 실행 · F7 시험 전화 · PgUp/PgDn 층 이동"
-            : "F1 표시 전환 · F5 기록 폴더  (PatrolRun 없음)";
+            ? "F1 표시 전환 · F2 하행 · F3 실패 · F4 층 재시작\nF5 기록 폴더 · F6 예약 바로 실행 · F7 시험 전화 · F8 찍힘 표시 · F9 찍으면 사라짐 · F10 레이 점 · PgUp/PgDn 층 이동"
+            : "F1 표시 전환 · F5 기록 폴더 · F8 찍힘 표시 · F9 찍으면 사라짐 · F10 레이 점  (PatrolRun 없음)";
 
         private const int MaxScheduleLines = 5;
 
@@ -49,27 +52,37 @@ namespace NightPatrol.Debugging
 
         /// <summary>
         /// F1 "사진": 이번 층 찍은 것/찍어야 할 것, 장수, 아직 안 찍은 이상현상(괄호 안 = 시스템이 찾은 찍을 곳),
-        /// 찍을 곳을 못 찾아 판정에서 뺀 이상현상 (개발용 — 플레이어에게는 안 보임)
+        /// 아직 안 나타나 요구하지 않는 이상현상과 촬영 후 사라짐 설정 (개발용 — 플레이어에게는 안 보임)
         /// </summary>
         public static string PhotoText(PatrolRun run)
         {
             if (run == null) return "PatrolRun 없음";
             var photos = run.Photos;
-            var unknown = new System.Collections.Generic.List<NightPatrol.Anomalies.Anomaly>();
-            var subjects = NightPatrol.Photo.PhotoSubjects.Active(unknown);
+            var subjects = PhotoSubjects.Active();
+            var where = new Dictionary<Anomaly, string>();
+            foreach (var subject in subjects) where[subject.Source] = subject.Where;
+            var unknown = new List<string>();
             var notYet = new StringBuilder();
-            int captured = 0;
-            foreach (var subject in subjects)
+            int remaining = 0;
+            foreach (var anomaly in PhotoSubjects.ActiveAnomalies())
             {
-                if (photos.IsCaptured(subject.Source)) captured++;
-                else notYet.Append(notYet.Length > 0 ? ", " : "").Append(subject.Name).Append('(').Append(subject.Where).Append(')');
+                if (photos.IsCaptured(anomaly)) continue;
+                if (!PhotoSubjects.HasAppeared(anomaly)) { unknown.Add(anomaly.name); continue; }
+                remaining++;
+                notYet.Append(notYet.Length > 0 ? ", " : "").Append(anomaly.name).Append('(')
+                    .Append(where.TryGetValue(anomaly, out string description) ? description : "현재 보이는 물체 없음").Append(')');
             }
-            var text = new StringBuilder($"찍음 {captured}/{subjects.Count} · 장수 {photos.Shots} (일반 {photos.EmptyShots}, 다시 {photos.RepeatShots})");
-            if (notYet.Length > 0) text.Append("\n안 찍음: ").Append(notYet);
+            var camera = UnityEngine.Object.FindAnyObjectByType<CameraApp>(FindObjectsInactive.Include);
+            string vanish = camera != null ? (camera.VanishOnCapture ? "켜짐" : "꺼짐") : "카메라 앱 없음";
+            var text = new StringBuilder($"이번 층 {run.RequiredPhotos().Count} (찍음 {photos.Captured.Count}, 남음 {remaining}) · 장수 {photos.Shots} (일반 {photos.EmptyShots}, 다시 {photos.RepeatShots}) · 사라짐 {vanish} (F9)");
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            text.Append(PhotoDebugView.IsVisible ? " · 표시 켜짐 (F8)" : " · 표시 꺼짐 (F8)");
+            text.Append(PhotoDebugView.RaysVisible ? " · 점 켜짐 (F10)" : " · 점 꺼짐 (F10)");
+#endif
+            if (notYet.Length > 0) text.Append("\n남음: ").Append(notYet);
             if (unknown.Count > 0)
             {
-                text.Append('\n').Append(DevInfo.Paint("찍을 곳 못 찾음 (판정에서 뺌): ", DevInfo.BadColor));
-                for (int i = 0; i < unknown.Count; i++) text.Append(i > 0 ? ", " : "").Append(unknown[i].name);
+                text.Append('\n').Append(DevInfo.Paint("아직 안 나타남 (요구 안 함): " + string.Join(", ", unknown), DevInfo.DimColor));
             }
             return text.ToString();
         }
@@ -119,6 +132,26 @@ namespace NightPatrol.Debugging
                 // logs/(게임 로그)와 playtest/(플레이테스트 기록)가 있는 폴더
                 Debug.Log($"[Dev] 기록 폴더 열기: {Application.persistentDataPath}", this);
                 Application.OpenURL("file:///" + Application.persistentDataPath);
+            }
+            if (keyboard.f8Key.wasPressedThisFrame)
+            {
+                PhotoDebugView.SetVisible(!PhotoDebugView.IsVisible);
+                Debug.Log(PhotoDebugView.IsVisible ? "[Dev] 찍힘 표시 켬" : "[Dev] 찍힘 표시 끔", this);
+            }
+            if (keyboard.f9Key.wasPressedThisFrame)
+            {
+                var camera = UnityEngine.Object.FindAnyObjectByType<CameraApp>(FindObjectsInactive.Include);
+                if (camera == null) Debug.Log("[Dev] 카메라 앱 없음", this);
+                else
+                {
+                    camera.VanishOnCapture = !camera.VanishOnCapture;
+                    Debug.Log(camera.VanishOnCapture ? "[Dev] 찍으면 사라짐 켬" : "[Dev] 찍으면 사라짐 끔", this);
+                }
+            }
+            if (keyboard.f10Key.wasPressedThisFrame)
+            {
+                PhotoDebugView.SetRaysVisible(!PhotoDebugView.RaysVisible);
+                Debug.Log(PhotoDebugView.RaysVisible ? "[Dev] 레이 점 켬" : "[Dev] 레이 점 끔", this);
             }
             if (run == null) return;
             // 층 이동 연출 중에 층을 바꾸면 연출이 끝날 때 판정이 엉키므로 기다린다.

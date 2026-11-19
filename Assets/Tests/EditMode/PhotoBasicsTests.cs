@@ -11,8 +11,8 @@ using UnityEngine;
 
 namespace NightPatrol.Tests
 {
-    // 06_04 카메라: 이번 층 사진 기록, 판정 결과, 촬영 규칙 수치, 업무 판정(이상현상이 걸린 사물은 빠짐),
-    // 플레이 기록 카메라 칸, 촬영 장수 세 방식 — 화면·물리 없이
+    // 06_04 카메라: 이번 층 사진 기록, 판정 결과, 촬영 규칙 수치(06_04q 레이 링), 업무 판정(이상현상이 걸린 사물·찍혀서 풀린 사물은 빠짐),
+    // 플레이 기록 카메라 칸, 촬영 장수 세 방식, 찍으면 사라짐 켜고 끄기 — 화면·물리 없이
     public class PhotoBasicsTests
     {
         private class FakeAnomaly : Anomaly
@@ -134,6 +134,68 @@ namespace NightPatrol.Tests
             Assert.IsFalse(obj.IsClear, "점검 사항 고르기·개발자 정보에서는 그대로 비정상");
         }
 
+        // 06_04q: 찍혀서 걸림이 풀린 사물은 그 층 업무에서 계속 빠진다 (층이 시작될 때 풀림)
+        [Test]
+        public void TaskClear_StaysClear_AfterAPhotoReleasedIt_UntilTheFloorStarts()
+        {
+            var obj = New("Monitor").AddComponent<FakeObject>();
+            obj.normal = false;
+            obj.MarkClearedByPhoto();
+            Assert.IsTrue(obj.ClearedByPhoto);
+            Assert.IsTrue(obj.IsTaskClear, "이상현상일 때 켜 둔 모니터로 실패하지 않게");
+            Assert.IsFalse(obj.IsClear, "점검 사항 고르기·일지에서는 그대로");
+
+            obj.ClearFloorState();
+            Assert.IsFalse(obj.ClearedByPhoto);
+            Assert.IsFalse(obj.IsTaskClear);
+        }
+
+        [Test]
+        public void Rules_AreACenterRayAndRingsOf8_12_16_InnerOneOuterThree()
+        {
+            var rules = new PhotoRules();
+            CollectionAssert.AreEqual(new[] { 8, 12, 16 }, rules.raysPerRing);
+            Assert.AreEqual(1, rules.innerRings);
+            Assert.AreEqual(3, rules.outerMinHits);
+            Assert.AreEqual(0.4f, rules.aimBox, 1e-6f);
+            Assert.AreEqual(0.05f, rules.surfaceLift, 1e-6f);
+        }
+
+        // 부품 크기 = 바운드 대각선 (최소 0.3m). 가운데·크기로 만들면 그 대각선의 정육면체
+        [Test]
+        public void PhotoShape_SizeIsTheBoundsDiagonal()
+        {
+            var shape = new PhotoShape(new Bounds(Vector3.one, new Vector3(1f, 2f, 2f)), null);
+            Assert.AreEqual(3f, shape.Size, 1e-4f);
+            Assert.AreEqual(Vector3.one, shape.Center);
+            Assert.AreEqual(PhotoShape.MinSize, new PhotoShape(new Bounds(Vector3.zero, Vector3.one * 0.01f), null).Size, 1e-6f);
+
+            var fromSize = new PhotoShape(new Vector3(0f, 1f, 0f), 1.5f, null);
+            Assert.AreEqual(1.5f, fromSize.Bounds.size.magnitude, 1e-4f);
+            Assert.AreEqual(1.5f, fromSize.Size, 1e-4f);
+            Assert.AreEqual(new Vector3(0f, 1f, 0f), fromSize.Bounds.center);
+        }
+
+        [Test]
+        public void VanishOnCapture_IsOnByDefault_AndCanBeSwitched()
+        {
+            var app = New("Camera").AddComponent<CameraApp>();
+            Assert.IsTrue(app.VanishOnCapture);
+            app.VanishOnCapture = false;
+            Assert.IsFalse(app.VanishOnCapture);
+        }
+
+        [Test]
+        public void HelpText_ListsF8F9AndF10()
+        {
+            foreach (bool hasRun in new[] { true, false })
+            {
+                StringAssert.Contains("F8 찍힘 표시", DevMenu.HelpText(hasRun));
+                StringAssert.Contains("F9 찍으면 사라짐", DevMenu.HelpText(hasRun));
+                StringAssert.Contains("F10 레이 점", DevMenu.HelpText(hasRun));
+            }
+        }
+
         [Test]
         public void TaskClear_FollowsExceptionInstructions()
         {
@@ -173,6 +235,16 @@ namespace NightPatrol.Tests
             Assert.AreEqual(6, app.ShotsFor(CameraApp.ShotLimit.PerFloor, 5, 9), "표에 없는 층은 기본값");
             Assert.AreEqual(11, app.ShotsFor(CameraApp.ShotLimit.CountPlusSlack, 5, 9), "이상현상 수 + 여유 2");
             Assert.AreEqual(6, app.ShotsFor(CameraApp.ShotLimit.Fixed, 2, 9));
+            Assert.AreEqual(int.MaxValue, app.ShotsFor(CameraApp.ShotLimit.Unlimited, 2, 9), "제한 없음");
+        }
+
+        // 11/19 사용자 "사진 한계 풀어": 기본은 제한 없음
+        [Test]
+        public void ShotLimit_IsUnlimitedByDefault()
+        {
+            var app = New("Camera").AddComponent<CameraApp>();
+            Assert.AreEqual(int.MaxValue, app.ShotsAllowed);
+            Assert.Greater(app.ShotsLeft, 1000000);
         }
 
         [Test]
