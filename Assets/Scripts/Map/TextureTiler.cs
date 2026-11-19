@@ -29,6 +29,22 @@ namespace NightPatrol
 				if (r == null) continue;
 				var mat = r.sharedMaterial;
 				if (mat == null || !mat.HasProperty(BaseMap) || mat.GetTexture(BaseMap) == null) continue;
+				if (mat.name.StartsWith("Poster_")) continue;   // 포스터 그림은 한 장에 한 번 (반복하면 잘림)
+				// 이름에 Tiles_열x단 이 있으면 그 횟수만큼 정확히 반복 (사물함 문짝 그림 등)
+				string goName = mf.gameObject.name;
+				int ti = goName.IndexOf("Tiles_", System.StringComparison.Ordinal);
+				if (ti >= 0)
+				{
+					var parts = goName.Substring(ti + 6).Split('x');
+					if (parts.Length == 2 && int.TryParse(parts[0], out int tu) && int.TryParse(parts[1], out int tv))
+					{
+						r.GetPropertyBlock(mpb);
+						mpb.SetVector(BaseMapST, new Vector4(tu, tv, 0f, 0f));
+						r.SetPropertyBlock(mpb);
+						n++;
+						continue;
+					}
+				}
 
 				Vector3 s = mf.transform.lossyScale;
 				float ax = Mathf.Abs(s.x), ay = Mathf.Abs(s.y), az = Mathf.Abs(s.z);

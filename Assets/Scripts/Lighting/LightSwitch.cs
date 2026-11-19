@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace NightPatrol.Lighting
 {
-	/// <summary>벽 스위치. E로 연결된 LightZone을 켜고 끔 (점검 판정과는 무관)</summary>
+	/// <summary>벽 스위치. E로 연결된 LightZone을 켜고 끔 (점검 판정과는 무관). 정전 구역(PowerOutage)이면 눌러도 안 켜짐</summary>
 	public sealed class LightSwitch : MonoBehaviour, IInteractable
 	{
 		[SerializeField] private LightZone zone;
@@ -19,11 +19,22 @@ namespace NightPatrol.Lighting
 			Sync();
 		}
 
-		public string Prompt => zone == null ? string.Empty : zone.IsOn ? "E - 불 끄기" : "E - 불 켜기";
+		public string Prompt => zone == null ? string.Empty
+			: PowerOutage.IsCut(zone) ? "E - 스위치 (전기가 안 들어옴)"
+			: zone.IsOn ? "E - 불 끄기" : "E - 불 켜기";
 
 		public void Interact(PlayerInteractor who)
 		{
-			if (zone != null) zone.Toggle();
+			if (zone == null) return;
+			if (PowerOutage.IsCut(zone))
+			{
+				// 판만 딸깍 넘어갔다 돌아옴 (불은 그대로)
+				if (rocker != null) rocker.localRotation = Quaternion.Euler(-rocker.localRotation.eulerAngles.x, 0f, 0f);
+				CancelInvoke(nameof(Sync));
+				Invoke(nameof(Sync), 0.25f);
+				return;
+			}
+			zone.Toggle();
 		}
 
 		void OnEnable()

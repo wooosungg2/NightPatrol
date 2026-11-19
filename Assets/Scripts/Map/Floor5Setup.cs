@@ -26,7 +26,7 @@ namespace NightPatrol
 			// 1) 플레이어
 			var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPath);
 			Vector3 pos = Vector3.zero; Quaternion rot = Quaternion.identity; bool hadPlayer = false;
-			foreach (var cc in Object.FindObjectsByType<CharacterController>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+			foreach (var cc in Object.FindObjectsByType<CharacterController>(FindObjectsInactive.Include))
 			{
 				var go = cc.gameObject;
 				if (PrefabUtility.GetCorrespondingObjectFromSource(go) == playerPrefab) { log.AppendLine("Player 프리팹이 이미 있음"); hadPlayer = true; continue; }
@@ -36,7 +36,7 @@ namespace NightPatrol
 			}
 			var mainCam = GameObject.Find("Main Camera");
 			if (mainCam == null)
-				foreach (var cam in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+				foreach (var cam in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include))
 					if (cam.gameObject.name == "Main Camera") mainCam = cam.gameObject;
 			if (mainCam != null && mainCam.transform.root.GetComponentInChildren<CharacterController>() == null)
 			{

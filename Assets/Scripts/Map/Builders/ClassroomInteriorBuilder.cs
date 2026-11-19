@@ -280,8 +280,10 @@ namespace NightPatrol
 			{
 				float cx = scx - spanS * 0.5f + sw * 0.5f + i * (sw + s.screenGap);
 				var g = Group(screens, $"Screen_{i}");
-				Box(g, "Cloth", new Vector3(cx, (sb + st) * 0.5f, zs + u * 0.06f),
+				var cloth = Box(g, "Cloth", new Vector3(cx, (sb + st) * 0.5f, zs + u * 0.06f),
 					new Vector3(sw, st - sb, 0.01f), s.projectionScreenMaterial);
+				// 재질이 비어 있으면 기본 재질(회색)이 되므로 흰 스크린 천 색으로
+				if (s.projectionScreenMaterial == null) DoorBuilder.Paint(cloth.GetComponent<Renderer>(), null, new Color(0.97f, 0.97f, 0.96f));
 				Box(g, "Case", new Vector3(cx, st + 0.05f, zs + u * 0.06f),
 					new Vector3(sw + 0.2f, 0.1f, 0.1f), s.metalMaterial);
 				Box(g, "BottomBar", new Vector3(cx, sb - 0.01f, zs + u * 0.06f),
