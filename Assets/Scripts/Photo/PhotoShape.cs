@@ -13,14 +13,22 @@ namespace NightPatrol.Photo
 
         public readonly Vector3 Center;
         public readonly float Size;
+        /// <summary>셔터 순간의 월드 바운드. 부품끼리 합치지 않고 각 부품에 레이를 쏜다.</summary>
+        public readonly Bounds Bounds;
         /// <summary>면 대상이면 보이는 쪽(단위 벡터), 아니면 zero</summary>
         public readonly Vector3 Normal;
         public readonly Transform Owner;
 
         public PhotoShape(Vector3 center, float size, Transform owner, Vector3 normal = default)
+            : this(new Bounds(center, Vector3.one * (Mathf.Max(MinSize, size) / Mathf.Sqrt(3f))), owner, normal)
         {
-            Center = center;
-            Size = Mathf.Max(MinSize, size);
+        }
+
+        public PhotoShape(Bounds bounds, Transform owner, Vector3 normal = default)
+        {
+            Bounds = bounds;
+            Center = bounds.center;
+            Size = Mathf.Max(MinSize, bounds.size.magnitude);
             Owner = owner;
             Normal = normal.sqrMagnitude > 0f ? normal.normalized : Vector3.zero;
         }
@@ -44,7 +52,7 @@ namespace NightPatrol.Photo
                 else bounds.Encapsulate(renderer.bounds);
                 found = true;
             }
-            if (found) shape = new PhotoShape(bounds.center, bounds.size.magnitude, root.transform, normal);
+            if (found) shape = new PhotoShape(bounds, root.transform, normal);
             return found;
         }
     }

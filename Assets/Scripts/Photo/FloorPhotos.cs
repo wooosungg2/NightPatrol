@@ -20,7 +20,7 @@ namespace NightPatrol.Photo
         public int RepeatShots { get; private set; }
         /// <summary>층 시작부터 첫 셔터까지(초). 아직 안 찍었으면 -1</summary>
         public float FirstShotSeconds { get; private set; } = -1f;
-        /// <summary>층 준비가 끝났을 때(이상현상이 켜진 뒤) 찍어야 할 이상현상 수. 촬영 장수 계산·일지에 쓴다</summary>
+        /// <summary>이번 층에 지금까지 나타난 이상현상 수 (찍힌 것 포함). CountPlusSlack·일지에 쓴다</summary>
         public int RequiredAtStart { get; private set; }
         /// <summary>이번 층에 찍힌 이상현상</summary>
         public IReadOnlyCollection<Anomaly> Captured => captured;
@@ -28,7 +28,7 @@ namespace NightPatrol.Photo
         public bool IsCaptured(Anomaly anomaly) => anomaly != null && captured.Contains(anomaly);
 
         /// <summary>
-        /// 한 장 기록. inShot = 그 장에 찍힌 이상현상(PhotoJudge.Capture), playSeconds = 지금 근무 시간(PatrolRun.PlaySeconds)
+        /// 한 장 기록. inShot = PhotoJudge.Capture(...).Captured, playSeconds = 지금 근무 시간(PatrolRun.PlaySeconds)
         /// </summary>
         public void Record(IEnumerable<Anomaly> inShot, float playSeconds)
         {
@@ -55,7 +55,7 @@ namespace NightPatrol.Photo
             floorStart = playSeconds;
         }
 
-        /// <summary>층 준비가 끝났을 때 찍어야 할 수를 적는다 (PatrolRun이 부름)</summary>
+        /// <summary>이번 층에 지금까지 나타난 수를 적는다 (PatrolRun이 갱신)</summary>
         public void SetRequired(int count) => RequiredAtStart = count < 0 ? 0 : count;
 
         public void Clear()

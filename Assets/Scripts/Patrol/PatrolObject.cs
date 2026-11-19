@@ -15,6 +15,9 @@ namespace NightPatrol.Patrol
         private int anomalyCount;
         /// <summary>이상현상이 하나라도 걸려 있는지</summary>
         public bool HasAnomaly => anomalyCount > 0;
+        /// <summary>이번 층에서 촬영으로 이상현상이 풀렸으면 남은 업무 판정에서도 제외한다.</summary>
+        public bool ClearedByPhoto { get; private set; }
+        public void MarkClearedByPhoto() => ClearedByPhoto = true;
         /// <summary>
         /// 이번 층 예외 지시 대상인지 (일지: "…끄지 말 것"). true면 비정상 상태가 오히려 정상 (기획서 3.5 내용 판단형).
         /// 점검 항목 표에서 정하고, 층이 시작될 때 풀린다
@@ -24,9 +27,9 @@ namespace NightPatrol.Patrol
         public bool IsClear => (IsException ? !IsNormal : IsNormal) && !HasAnomaly;
         /// <summary>
         /// 엘리베이터 업무 판정 기준: 이상현상이 걸린 사물은 업무에서 빠진다 (손대지 않고 휴대폰 카메라로 찍기만 하면 됨).
-        /// 아니면 정상 (예외 지시면 반대)
+        /// 촬영으로 풀린 사물도 이번 층에서는 계속 제외한다. 나머지는 정상 (예외 지시면 반대).
         /// </summary>
-        public bool IsTaskClear => HasAnomaly || (IsException ? !IsNormal : IsNormal);
+        public bool IsTaskClear => HasAnomaly || ClearedByPhoto || (IsException ? !IsNormal : IsNormal);
         /// <summary>이상현상을 건다. 걸려 있는 동안은 정상이어도 판정에 걸림</summary>
         public void AddAnomaly() => anomalyCount++;
         /// <summary>이상현상을 푼다 (0 아래로는 안 내려감)</summary>
@@ -34,11 +37,12 @@ namespace NightPatrol.Patrol
         {
             if (anomalyCount > 0) anomalyCount--;
         }
-        // 층이 시작될 때 PatrolRun이 부른다: 이상 카운트 0, 예외 지시 해제. 이상현상은 FloorStarted에서 다시 켠다
+        // 층 시작: 이상 카운트·촬영 해결 표시·예외 지시 해제. 이상현상은 FloorStarted에서 다시 켠다
         internal void ClearFloorState()
         {
             anomalyCount = 0;
             IsException = false;
+            ClearedByPhoto = false;
         }
 
         /// <summary>규정상 정상 상태인지 (예: 전등 꺼짐, 문 잠김)</summary>

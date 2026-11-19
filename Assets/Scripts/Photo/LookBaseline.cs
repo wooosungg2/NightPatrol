@@ -24,6 +24,30 @@ namespace NightPatrol.Photo
         /// <summary>적어 둔 렌더러·빛 수</summary>
         public int Count => renderers.Count + lights.Count;
 
+        /// <summary>이 부품의 현재 모습을 정상 기준으로 다시 적는다.</summary>
+        public void Remember(Renderer renderer)
+        {
+            if (renderer != null) renderers[renderer] = (Look(renderer, null), Place(renderer));
+        }
+
+        public void Remember(Light light)
+        {
+            if (light != null) lights[light] = Look(light);
+        }
+
+        /// <summary>실행 중 없어지는 캔 등의 참조를 붙잡지 않는다.</summary>
+        public void PruneDestroyed()
+        {
+            var deadRenderers = new List<Renderer>();
+            foreach (var renderer in renderers.Keys)
+                if (renderer == null) deadRenderers.Add(renderer);
+            foreach (var renderer in deadRenderers) renderers.Remove(renderer);
+            var deadLights = new List<Light>();
+            foreach (var light in lights.Keys)
+                if (light == null) deadLights.Add(light);
+            foreach (var light in deadLights) lights.Remove(light);
+        }
+
         /// <summary>지금 씬의 모든 렌더러·빛의 모습을 적는다 (꺼진 것 포함). 층마다 한두 번만 부를 것</summary>
         public static LookBaseline Capture()
         {

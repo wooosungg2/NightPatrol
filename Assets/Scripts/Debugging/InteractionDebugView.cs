@@ -24,7 +24,7 @@ namespace NightPatrol.Debugging
 
         /// <summary>지금 단계</summary>
         public DevView View => view;
-        /// <summary>끔이 아닌지. 개발자 키(F2~F5, PgUp/PgDn)는 이때만 동작한다 (테스터가 실수로 누르지 않게)</summary>
+        /// <summary>끔이 아닌지. 개발자 키(F2~F10, PgUp/PgDn)는 이때만 동작한다 (테스터가 실수로 누르지 않게)</summary>
         public bool IsVisible => view != DevView.Off;
 
         /// <summary>단계를 바로 정한다 (F1 대신, 테스트·다른 도구용)</summary>
@@ -44,9 +44,14 @@ namespace NightPatrol.Debugging
         private const float RebuildSeconds = 0.25f;
         private const float SearchSeconds = 0.5f;
         private const int AbnormalShown = 6;
+        private const float PanelMargin = 12f;
+        private const float ColumnGap = 8f;
 
         private readonly GUIContent compactContent = new GUIContent();
-        private readonly GUIContent fullContent = new GUIContent();
+        private readonly List<GUIContent> fullSections = new List<GUIContent>();
+        private readonly List<PanelColumn> fullColumns = new List<PanelColumn>();
+        private bool fullLayoutDirty = true;
+        private int layoutWidth, layoutHeight;
         private readonly List<string> abnormalIds = new List<string>();
         private PlayerInteractor interactor;
         private PatrolRun run;
@@ -55,7 +60,17 @@ namespace NightPatrol.Debugging
         private float smoothedFrameSeconds;
         private double nextRebuild, nextSearch;
         private GUIStyle textStyle;
+        private GUIStyle footerStyle;
         private Texture2D background;
+
+        private sealed class PanelColumn
+        {
+            public Rect Box, ContentRect, FooterRect;
+            public GUIContent Footer;
+            public float UsedHeight;
+            public readonly List<GUIContent> Sections = new List<GUIContent>();
+            public readonly List<Rect> Labels = new List<Rect>();
+        }
 
         private void Awake()
         {
@@ -103,7 +118,7 @@ namespace NightPatrol.Debugging
             if (now < nextRebuild) return;
             nextRebuild = now + RebuildSeconds;
             compactContent.text = ProgressText() + DevInfo.Paint("   F1: 자세히", DevInfo.DimColor);
-            fullContent.text = view == DevView.Full ? FullText() : string.Empty;
+            RebuildFullSections();
         }
 
         /// <summary>조준 대상 (일반 글): "이름 — 거리 m" / 문구 / 상태. 대상이 없으면 "없음"</summary>
@@ -178,34 +193,100 @@ namespace NightPatrol.Debugging
             return $"{where}\n{shownPrompt}\n{DevInfo.Paint(state, usable ? DevInfo.OkColor : DevInfo.NoteColor)}";
         }
 
-        private string FullText()
+        private void RebuildFullSections()
         {
-            var text = new StringBuilder();
+            fullSections.Clear();
+            fullLayoutDirty = true;
+            if (view != DevView.Full) return;
             foreach (var section in DevInfo.Sections)
             {
                 string body = DevInfo.SafeContent(section.Content);
                 if (body.Length == 0) continue;
-                if (text.Length > 0) text.Append("\n\n");
-                text.Append(DevInfo.SectionText(section.Title, body));
+                fullSections.Add(new GUIContent(DevInfo.SectionText(section.Title, body)));
             }
-            return text.ToString();
+        }
+
+        // OnGUI에서는 글 갱신 직후 또는 화면 크기가 바뀐 때만 높이를 잰다.
+        private void RebuildFullLayout()
+        {
+            fullLayoutDirty = false;
+            layoutWidth = Screen.width;
+            layoutHeight = Screen.height;
+            fullColumns.Clear();
+            float availableWidth = Mathf.Max(0f, layoutWidth - PanelMargin * 2f);
+            float availableHeight = Mathf.Max(0f, layoutHeight - PanelMargin * 2f);
+            if (availableWidth <= 0f || availableHeight <= 0f) return;
+            float width = Mathf.Min(availableWidth, Mathf.Max(320f, layoutWidth * 0.3f));
+            float pad = textStyle.fontSize * 0.6f;
+            float textWidth = Mathf.Max(1f, width - pad * 2f);
+            float textHeight = Mathf.Max(0f, availableHeight - pad * 2f);
+            float gap = textStyle.lineHeight;
+            float footerHeight = footerStyle.CalcHeight(new GUIContent("… 구역 0개 더 (화면이 좁음)"), textWidth);
+            int maxColumns = Mathf.FloorToInt((availableWidth + ColumnGap) / (width + ColumnGap));
+            var heights = new float[fullSections.Count];
+            for (int i = 0; i < heights.Length; i++)
+                heights[i] = textStyle.CalcHeight(fullSections[i], textWidth);
+            var assigned = DevInfo.SectionColumns(heights, textHeight, gap, maxColumns,
+                footerHeight, out int hiddenCount);
+            for (int i = 0; i < assigned.Length; i++)
+            {
+                int index = assigned[i];
+                if (index < 0) break;
+                if (index == fullColumns.Count) fullColumns.Add(new PanelColumn());
+                var column = fullColumns[index];
+                float y = column.UsedHeight + (column.Sections.Count > 0 ? gap : 0f);
+                column.Sections.Add(fullSections[i]);
+                column.Labels.Add(new Rect(0f, y, textWidth, heights[i]));
+                column.UsedHeight = y + heights[i];
+            }
+            for (int i = 0; i < fullColumns.Count; i++)
+            {
+                var column = fullColumns[i];
+                bool hasFooter = hiddenCount > 0 && i == fullColumns.Count - 1;
+                float footer = hasFooter ? Mathf.Min(footerHeight, textHeight) : 0f;
+                float shownHeight = Mathf.Min(column.UsedHeight, Mathf.Max(0f, textHeight - footer));
+                float x = PanelMargin + i * (width + ColumnGap);
+                column.Box = new Rect(x, PanelMargin, width, shownHeight + footer + pad * 2f);
+                column.ContentRect = new Rect(x + pad, PanelMargin + pad, textWidth, shownHeight);
+                if (!hasFooter) continue;
+                column.Footer = new GUIContent(DevInfo.Paint($"… 구역 {hiddenCount}개 더 (화면이 좁음)", DevInfo.DimColor));
+                column.FooterRect = new Rect(x + pad, PanelMargin + pad + shownHeight, textWidth, footer);
+            }
+        }
+
+        private void DrawFullPanel()
+        {
+            if (fullLayoutDirty || layoutWidth != Screen.width || layoutHeight != Screen.height)
+                RebuildFullLayout();
+            foreach (var column in fullColumns)
+            {
+                GUI.DrawTexture(column.Box, background);
+                GUI.BeginGroup(column.ContentRect);
+                for (int i = 0; i < column.Sections.Count; i++)
+                    GUI.Label(column.Labels[i], column.Sections[i], textStyle);
+                GUI.EndGroup();
+                if (column.Footer != null) GUI.Label(column.FooterRect, column.Footer, footerStyle);
+            }
         }
 
         private void OnGUI()
         {
             if (view == DevView.Off) return;
             EnsureStyle();
-            var content = view == DevView.Full ? fullContent : compactContent;
+            if (view == DevView.Full)
+            {
+                DrawFullPanel();
+                // 조준 레이 위치 (HUD 조준점과 겹치는지 확인용)
+                GUI.DrawTexture(new Rect(Screen.width * 0.5f - 2f, Screen.height * 0.5f - 2f, 4f, 4f), Texture2D.whiteTexture);
+                return;
+            }
+            var content = compactContent;
             float pad = textStyle.fontSize * 0.6f;
-            float width = view == DevView.Full
-                ? Mathf.Clamp(Screen.width * 0.36f, Mathf.Min(360f, Screen.width - 24f), Screen.width - 24f)
-                : Mathf.Min(textStyle.CalcSize(content).x + pad * 2f, Screen.width - 24f);
+            float width = Mathf.Min(textStyle.CalcSize(content).x + pad * 2f, Screen.width - 24f);
             float height = textStyle.CalcHeight(content, width - pad * 2f) + pad * 2f;
             var box = new Rect(12f, 12f, width, height);
             GUI.DrawTexture(box, background);
             GUI.Label(new Rect(box.x + pad, box.y + pad, width - pad * 2f, height - pad * 2f), content, textStyle);
-            if (view == DevView.Full)   // 조준 레이 위치 (HUD 조준점과 겹치는지 확인용)
-                GUI.DrawTexture(new Rect(Screen.width * 0.5f - 2f, Screen.height * 0.5f - 2f, 4f, 4f), Texture2D.whiteTexture);
         }
 
         // 기본 IMGUI 회색 상자 대신: 어두운 반투명 바탕 + 화면 높이에 맞춘 글자 + 리치 텍스트 색
@@ -221,6 +302,8 @@ namespace NightPatrol.Debugging
             if (textStyle != null && textStyle.fontSize == size) return;
             textStyle = new GUIStyle(GUI.skin.label) { fontSize = size, richText = true, wordWrap = true };
             textStyle.normal.textColor = new Color(0.93f, 0.93f, 0.93f);
+            footerStyle = new GUIStyle(textStyle) { wordWrap = false, clipping = TextClipping.Clip };
+            fullLayoutDirty = true;
         }
 #endif
     }

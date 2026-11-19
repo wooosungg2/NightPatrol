@@ -85,6 +85,47 @@ namespace NightPatrol.Debugging
         /// <summary>화면 높이에 맞춘 글자 크기 (1080p에서 19, 12~28)</summary>
         public static int FontSize(int screenHeight) => Mathf.Clamp(Mathf.RoundToInt(screenHeight * 0.018f), 12, 28);
 
+        /// <summary>
+        /// 구역 높이 → 0부터 시작하는 칸 번호 (못 그리는 구역은 -1). Screen·GUI 없이 호출 가능.
+        /// availableHeight는 여백을 뺀 글 영역 높이. 큰 구역은 혼자 한 칸을 쓰며 그 안에서 잘린다.
+        /// 마지막 칸이 모자라면 footerHeight만큼 안내 자리를 확보한다. hiddenCount는 숨긴 구역 수.
+        /// </summary>
+        public static int[] SectionColumns(IReadOnlyList<float> heights, float availableHeight,
+            float spacing, int maxColumns, float footerHeight, out int hiddenCount)
+        {
+            int count = heights?.Count ?? 0;
+            var columns = new int[count];
+            for (int i = 0; i < count; i++) columns[i] = -1;
+            hiddenCount = count;
+            if (maxColumns <= 0 || availableHeight <= 0f) return columns;
+            spacing = Mathf.Max(0f, spacing);
+            int next = 0;
+            for (int column = 0; column < maxColumns && next < count; column++)
+            {
+                float capacity = availableHeight;
+                if (column == maxColumns - 1)
+                {
+                    float remaining = 0f;
+                    for (int i = next; i < count; i++)
+                        remaining += Mathf.Max(0f, heights[i]) + (i > next ? spacing : 0f);
+                    if (remaining > capacity && count - next > 1)
+                        capacity = Mathf.Max(0f, capacity - Mathf.Max(0f, footerHeight));
+                }
+                float used = 0f;
+                int first = next;
+                while (next < count)
+                {
+                    float height = Mathf.Max(0f, heights[next]);
+                    float bottom = used + (next > first ? spacing : 0f) + height;
+                    if (next > first && bottom > capacity) break;
+                    columns[next++] = column;
+                    used = bottom;
+                }
+            }
+            hiddenCount = count - next;
+            return columns;
+        }
+
         public static string Paint(string text, string color) => $"<color={color}>{text}</color>";
 
         /// <summary>구역 하나: 굵은 색 제목 + 글</summary>
