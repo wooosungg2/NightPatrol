@@ -1,0 +1,40 @@
+newmtl Stem
+Ka 0.05 0.05 0.05
+Kd 0.46 0.68 0.24
+Ks 0.08 0.08 0.08
+Ns 12
+d 1.0
+illum 2
+
+newmtl StemLight
+Ka 0.05 0.05 0.05
+Kd 0.65 0.80 0.35
+Ks 0.08 0.08 0.08
+Ns 12
+d 1.0
+illum 2
+
+newmtl CrownDark
+Ka 0.05 0.05 0.05
+Kd 0.12 0.34 0.13
+Ks 0.08 0.08 0.08
+Ns 12
+d 1.0
+illum 2
+
+newmtl CrownMid
+Ka 0.05 0.05 0.05
+Kd 0.18 0.48 0.18
+Ks 0.08 0.08 0.08
+Ns 12
+d 1.0
+illum 2
+
+newmtl CrownLight
+Ka 0.05 0.05 0.05
+Kd 0.28 0.59 0.23
+Ks 0.08 0.08 0.08
+Ns 12
+d 1.0
+illum 2
+

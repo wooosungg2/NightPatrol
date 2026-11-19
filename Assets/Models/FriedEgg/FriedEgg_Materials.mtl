@@ -1,0 +1,17 @@
+newmtl EggWhite
+Kd 0.94 0.925 0.875
+Ka 0.15 0.15 0.14
+Ks 0.12 0.12 0.12
+Ns 35
+
+newmtl EggYolk
+Kd 0.97 0.63 0.055
+Ka 0.2 0.13 0.01
+Ks 0.55 0.43 0.12
+Ns 85
+
+newmtl YolkDrip
+Kd 0.96 0.56 0.025
+Ka 0.2 0.1 0.01
+Ks 0.65 0.5 0.14
+Ns 100
