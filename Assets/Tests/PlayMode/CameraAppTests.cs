@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using NightPatrol.Anomalies;
 using NightPatrol.Interaction;
 using NightPatrol.Journal;
+using NightPatrol.Patrol;
 using NightPatrol.Phone;
 using NightPatrol.Photo;
 using NightPatrol.Run;
@@ -15,13 +16,55 @@ using UnityEngine.TestTools;
 namespace NightPatrol.Tests
 {
     // 06_04 카메라 앱: 독 셋째 칸(전화·메시지 다음), 찍으면 이번 층 기록에 남고 화면에는 결과가 안 보임,
-    // 장수 제한, 다시 찍기 대기, 층이 바뀌면 사진·장수 처음부터, 찍은 뒤 1.5초 사진 보여 주기, 갤러리(독 넷째 칸). 키 입력 대신 앱·화면 함수를 부른다
+    // 장수 제한, 다시 찍기 대기, 층이 바뀌면 사진·장수 처음부터, 찍은 뒤 1.5초 사진 보여 주기, 갤러리(독 넷째 칸). 키 입력 대신 앱·화면 함수를 부른다.
+    // 06_04q: 셔터 직전 다시 찾기, 찍히면 Deactivate(VanishOnCapture, 기본 켬) → 걸림이 풀린 점검 사물은 그 층 업무에서 빠짐 → Captured
     public class CameraAppTests
     {
         private class FakeAnomaly : Anomaly
         {
             public override void Activate() => IsActive = true;
             public override void Deactivate() => IsActive = false;
+        }
+
+        // 점검 사물에 이상현상을 거는 것 (꺼지지 않는 모니터): 꺼질 때 걸림을 푼다
+        private class MonitorAnomaly : Anomaly
+        {
+            public PatrolObject target;
+
+            public override void Activate()
+            {
+                IsActive = true;
+                target.AddAnomaly();
+            }
+
+            public override void Deactivate()
+            {
+                if (IsActive) target.RemoveAnomaly();
+                IsActive = false;
+            }
+        }
+
+        // 바깥 물체를 칸에 들고 있는 것 (얼룩처럼)
+        private class HoldingAnomaly : Anomaly
+        {
+            public GameObject held;
+            public override void Activate() => IsActive = true;
+            public override void Deactivate() => IsActive = false;
+        }
+
+        private class BrokenAnomaly : Anomaly
+        {
+            public override void Activate() => IsActive = true;
+            public override void Deactivate() => throw new System.InvalidOperationException("되돌리기 실패 시험");
+        }
+
+        private class FakeObject : PatrolObject
+        {
+            public bool normal = true;
+            public override bool IsNormal => normal;
+            public override void ResetToDefault() => normal = true;
+            public override string Prompt => string.Empty;
+            public override void Interact(PlayerInteractor who) { }
         }
 
         private readonly List<GameObject> created = new List<GameObject>();
@@ -317,6 +360,340 @@ namespace NightPatrol.Tests
             Assert.IsTrue(gallery.Landscape);
             foreach (var each in screen.Apps)
                 if (!(each is CameraApp) && !(each is GalleryApp)) Assert.IsFalse(each.Landscape, each.Title);
+        }
+
+        // ── 06_04q 찍히면 사라짐 ──
+
+        private static void Body(Anomaly anomaly, Vector3 position)
+        {
+            var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            cube.transform.SetParent(anomaly.transform, false);
+            cube.transform.position = position;
+        }
+
+        // 찍힌 이상현상은 바로 꺼진다. 기록·끄기가 끝난 뒤 Captured, 그다음 Taken
+        [UnityTest]
+        public IEnumerator Take_TurnsThePhotographedAnomalyOff_ThenSaysWhichOnes()
+        {
+            yield return MakePhone();
+            var anomaly = AnomalyInFront();
+            IReadOnlyList<Anomaly> said = null;
+            bool offAndRecorded = false, takenAfter = false;
+            app.Captured += list =>
+            {
+                said = list;
+                offAndRecorded = !anomaly.IsActive && run.Photos.IsCaptured(anomaly);
+            };
+            app.Taken += (picture, count) => takenAfter = said != null;
+            Assert.IsTrue(app.VanishOnCapture, "기본은 켬");
+
+            Assert.IsNotNull(app.Take());
+
+            Assert.IsFalse(anomaly.IsActive, "찍히면 꺼짐");
+            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, said);
+            Assert.IsTrue(offAndRecorded, "기록·끄기 뒤에 알림");
+            Assert.IsTrue(takenAfter, "Captured 다음 Taken");
+            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, app.LastCapture.Captured);
+            Assert.IsTrue(run.Judge().Passed, "찍고 사라진 것은 찍은 것");
+        }
+
+        [UnityTest]
+        public IEnumerator VanishOff_KeepsItOn_ButStillRecords()
+        {
+            yield return MakePhone();
+            var anomaly = AnomalyInFront();
+            app.VanishOnCapture = false;
+            int said = 0;
+            app.Captured += _ => said++;
+
+            app.Take();
+
+            Assert.IsTrue(anomaly.IsActive, "끄면 그대로 남음");
+            Assert.IsTrue(run.Photos.IsCaptured(anomaly));
+            Assert.AreEqual(1, said);
+        }
+
+        [UnityTest]
+        public IEnumerator NothingInTheShot_NoCapturedEvent()
+        {
+            yield return MakePhone();
+            int said = 0, inShot = -1;
+            app.Captured += _ => said++;
+            app.Taken += (picture, count) => inShot = count;
+
+            app.Take();
+
+            Assert.AreEqual(0, said);
+            Assert.AreEqual(0, inShot);
+            Assert.IsEmpty(app.LastCapture.Captured);
+            Assert.AreEqual(1 + 8 + 12 + 16, app.LastCapture.Rays.Count, "레이 결과는 남음 (개발용 표시)");
+            run.Descend(true);
+            Assert.IsNull(app.LastCapture, "층이 바뀌면 비움");
+        }
+
+        // 찍혀서 걸림이 풀린 모니터(이상현상 때 켜진 채)는 그 층 업무에서 빠진다. 다음 층에서는 다시 업무
+        [UnityTest]
+        public IEnumerator APhotoThatReleasesAPatrolObject_KeepsItOutOfTheChoresThisFloor()
+        {
+            yield return MakePhone();
+            var monitor = New("Monitor").AddComponent<FakeObject>();
+            monitor.Id = "R21.Monitor.01";
+            var anomaly = New("RedMonitorAnomaly_01").AddComponent<MonitorAnomaly>();
+            Body(anomaly, new Vector3(0f, 1.6f, 4f));
+            anomaly.target = monitor;
+            anomaly.Activate();
+            monitor.normal = false;
+            Physics.SyncTransforms();
+
+            app.Take();
+
+            Assert.IsFalse(monitor.HasAnomaly);
+            Assert.IsTrue(monitor.ClearedByPhoto);
+            Assert.IsTrue(run.Judge().Passed, "찍혀서 풀린 모니터는 이번 층 업무에서 빠짐");
+            run.Descend(true);
+            Assert.IsFalse(monitor.ClearedByPhoto, "다음 층에서는 다시 업무");
+        }
+
+        // 하나의 Deactivate가 오류를 내도 로그만 남기고 나머지는 끈다 (기록은 둘 다)
+        [UnityTest]
+        public IEnumerator ADeactivateThatThrows_IsLogged_AndTheOthersStillVanish()
+        {
+            yield return MakePhone();
+            var broken = New("A_BrokenAnomaly").AddComponent<BrokenAnomaly>();
+            Body(broken, new Vector3(-0.6f, 1.6f, 4f));
+            broken.Activate();
+            var fine = New("B_FineAnomaly").AddComponent<FakeAnomaly>();
+            Body(fine, new Vector3(0.6f, 1.6f, 4f));
+            fine.Activate();
+            Physics.SyncTransforms();
+            LogAssert.Expect(LogType.Error, "[Photo] A_BrokenAnomaly 끄기 실패");
+            LogAssert.Expect(LogType.Exception, new Regex("되돌리기 실패 시험"));
+            IReadOnlyList<Anomaly> said = null;
+            app.Captured += list => said = list;
+
+            Assert.IsNotNull(app.Take());
+
+            Assert.IsFalse(fine.IsActive);
+            Assert.IsTrue(run.Photos.IsCaptured(broken));
+            Assert.IsTrue(run.Photos.IsCaptured(fine));
+            Assert.AreEqual(2, said.Count);
+        }
+
+        // ── 06_04r F8 찍힘 표시 ──
+
+        private static void DebugViewOff()
+        {
+            PhotoDebugView.SetVisible(false);
+            PhotoDebugView.SetRaysVisible(false);
+            var view = Object.FindAnyObjectByType<PhotoDebugView>(FindObjectsInactive.Include);
+            if (view != null) Object.DestroyImmediate(view.gameObject);
+        }
+
+        private static RenderTexture LensMask()
+        {
+            var field = typeof(PhotoDebugView).GetField("lensMask", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(field, "PhotoDebugView.lensMask");
+            return (RenderTexture)field.GetValue(Object.FindAnyObjectByType<PhotoDebugView>());
+        }
+
+        // 마스크에 칠해진 칸 수와 그 칸들의 평균 높이 (0 = 아래, 1 = 위)
+        private static (int count, float meanY) Painted(RenderTexture mask)
+        {
+            Assert.IsNotNull(mask, "마스크를 아직 안 그림");
+            var previous = RenderTexture.active;
+            RenderTexture.active = mask;
+            var read = new Texture2D(mask.width, mask.height, TextureFormat.RGBA32, false);
+            read.ReadPixels(new Rect(0, 0, mask.width, mask.height), 0, 0);
+            read.Apply();
+            RenderTexture.active = previous;
+            var pixels = read.GetPixels32();
+            Object.DestroyImmediate(read);
+            int count = 0;
+            float sumY = 0f;
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                if (pixels[i].r <= 128) continue;
+                count++;
+                sumY += (i / mask.width + 0.5f) / mask.height;
+            }
+            return (count, count > 0 ? sumY / count : -1f);
+        }
+
+        private int ActiveDots()
+        {
+            int dots = 0;
+            foreach (Transform child in app.DebugOverlay)
+                if (child.name.StartsWith("Ray") && child.gameObject.activeSelf) dots++;
+            return dots;
+        }
+
+        private IEnumerator OpenCameraInHand()
+        {
+            var phone = app.GetComponentInParent<PhoneHolder>();
+            phone.TakeOut();
+            yield return null;
+            screen.Open(app);
+            SetField(app, "retakeSeconds", 0f);
+        }
+
+        // 표시는 0.1초마다 고른다
+        private static IEnumerator AfterRefresh()
+        {
+            Physics.SyncTransforms();
+            yield return new WaitForSecondsRealtime(PhotoSubjects.RefreshSeconds + 0.05f);
+            yield return null;
+        }
+
+        // 06_04rc F8: 뷰파인더에서 지금 셔터를 누르면 찍힐 이상현상에만 외곽선 (마스크, 위아래 그대로). 조준 밖·벽 뒤면 없음.
+        // F8만 켜면 셔터 뒤 레이 점은 없음 (06_04rd: 점은 F10). 끄면 숨김
+        [UnityTest]
+        public IEnumerator DebugView_OutlinesOnlyWhatTheAimWouldCapture()
+        {
+            yield return MakePhone();
+            var anomaly = New("FixedImageAnomaly_01").AddComponent<FakeAnomaly>();
+            Body(anomaly, new Vector3(0f, 2f, 4f));   // 가운데에 걸치고 조금 위
+            anomaly.Activate();
+            var body = anomaly.transform.GetChild(0);
+            Physics.SyncTransforms();
+            yield return OpenCameraInHand();
+            try
+            {
+                PhotoDebugView.SetVisible(true);
+                yield return null;
+                yield return null;
+                Assert.IsTrue(PhotoDebugView.IsVisible);
+                Assert.IsTrue(app.DebugOverlay.gameObject.activeInHierarchy, "뷰파인더 위에 겹침");
+                var outline = app.DebugOverlay.Find("LensOutline");
+                Assert.IsNotNull(outline);
+                Assert.IsTrue(outline.gameObject.activeSelf);
+                var (painted, meanY) = Painted(LensMask());
+                Assert.Greater(painted, 50, "조준에 걸린 이상현상이 칠해짐");
+                Assert.Greater(meanY, 0.5f, "가운데보다 위인 물체는 마스크에서도 위쪽");
+
+                body.position = new Vector3(2.5f, 1.6f, 4f);   // 뷰파인더 안, 조준 박스 밖
+                yield return AfterRefresh();
+                Assert.AreEqual(0, Painted(LensMask()).count, "조준 밖이면 외곽선 없음");
+
+                body.position = new Vector3(0f, 2f, 4f);
+                var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                created.Add(wall);
+                wall.transform.position = new Vector3(0f, 1.6f, 2f);
+                wall.transform.localScale = new Vector3(6f, 4f, 0.2f);
+                yield return AfterRefresh();
+                Assert.AreEqual(0, Painted(LensMask()).count, "벽 뒤면 외곽선 없음");
+                Object.DestroyImmediate(wall);
+                yield return AfterRefresh();
+                Assert.Greater(Painted(LensMask()).count, 50, "다시 보이면 외곽선");
+
+                Assert.IsNotNull(app.Take());
+                yield return null;
+                Assert.IsTrue(app.IsReviewing);
+                Assert.AreEqual(0, ActiveDots(), "F8만 켜면 레이 점 없음");
+
+                PhotoDebugView.SetVisible(false);
+                yield return null;
+                Assert.IsFalse(app.DebugOverlay.gameObject.activeSelf, "끄면 숨김");
+            }
+            finally { DebugViewOff(); }
+        }
+
+        // 06_04rd: 레이 점은 F10으로 따로. F10만 켜면 외곽선 없이 사진 보기 동안 점 37개, 보기가 끝나면 점도 끝. 끄면 다음 사진부터 없음
+        [UnityTest]
+        public IEnumerator RayDots_HaveTheirOwnSwitch()
+        {
+            yield return MakePhone();
+            AnomalyInFront();
+            app.VanishOnCapture = false;
+            yield return OpenCameraInHand();
+            try
+            {
+                PhotoDebugView.SetRaysVisible(true);
+                yield return null;
+                Assert.IsTrue(PhotoDebugView.RaysVisible);
+                Assert.IsFalse(PhotoDebugView.IsVisible, "F10은 F8을 켜지 않음");
+                var outline = app.DebugOverlay.Find("LensOutline");
+                Assert.IsTrue(outline == null || !outline.gameObject.activeSelf, "외곽선 없음");
+
+                Assert.IsNotNull(app.Take());
+                yield return null;
+                Assert.IsTrue(app.IsReviewing);
+                Assert.AreEqual(1 + 8 + 12 + 16, ActiveDots(), "사진 보기 동안 레이 점");
+                app.EndReview();
+                yield return null;
+                Assert.AreEqual(0, ActiveDots(), "사진 보기가 끝나면 점도 끝");
+
+                PhotoDebugView.SetRaysVisible(false);
+                Assert.IsNotNull(app.Take());
+                yield return null;
+                Assert.AreEqual(0, ActiveDots(), "끄면 점 없음");
+            }
+            finally { DebugViewOff(); }
+        }
+
+        // 06_04rc: 눈 화면에는 아무것도 그리지 않는다 (화면 위 캔버스 없음). 카메라를 열기 전에는 뷰파인더 표시도 없음
+        [UnityTest]
+        public IEnumerator DebugView_DrawsNothingOnTheEyeView()
+        {
+            yield return MakePhone();
+            AnomalyInFront();
+            app.GetComponentInParent<Camera>().enabled = true;   // 눈이 화면에 그림
+            try
+            {
+                PhotoDebugView.SetVisible(true);
+                yield return null;
+                yield return null;
+                var view = Object.FindAnyObjectByType<PhotoDebugView>();
+                Assert.IsNotNull(view);
+                Assert.IsEmpty(view.GetComponentsInChildren<Canvas>(true), "화면 위에 겹치는 캔버스 없음");
+                Assert.IsTrue(app.DebugOverlay == null || !app.DebugOverlay.gameObject.activeInHierarchy,
+                    "카메라를 안 열었으면 뷰파인더 표시도 없음");
+            }
+            finally { DebugViewOff(); }
+        }
+
+        // 표시를 켜고 찍은 사진과 끄고 찍은 사진이 같다 (외곽선·점은 사진·갤러리에 안 남음)
+        [UnityTest]
+        public IEnumerator DebugView_NeverShowsUpInPhotos()
+        {
+            yield return MakePhone();
+            AnomalyInFront();
+            app.VanishOnCapture = false;
+            yield return OpenCameraInHand();
+            try
+            {
+                PhotoDebugView.SetVisible(true);
+                yield return null;
+                yield return null;
+                Assert.IsTrue(app.DebugOverlay.gameObject.activeInHierarchy);
+                Assert.Greater(Painted(LensMask()).count, 50, "외곽선이 그려지는 중");
+                var withView = app.Take().Image.GetPixels32();
+                PhotoDebugView.SetVisible(false);
+                yield return null;
+                var without = app.Take().Image.GetPixels32();
+                int different = 0;
+                for (int i = 0; i < without.Length; i++)
+                    if (!withView[i].Equals(without[i])) different++;
+                Assert.AreEqual(0, different);
+            }
+            finally { DebugViewOff(); }
+        }
+
+        // 0.1초 갱신 사이에 나타난 바깥 물체도 셔터 직전에 다시 찾아 찍힌다
+        [UnityTest]
+        public IEnumerator Take_LooksAgainRightBeforeTheShutter()
+        {
+            yield return MakePhone();
+            var anomaly = New("StainAnomaly_01").AddComponent<HoldingAnomaly>();
+            var stain = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            created.Add(stain);
+            stain.transform.position = new Vector3(0f, 1.6f, 4f);
+            anomaly.held = stain;
+            anomaly.Activate();
+            Physics.SyncTransforms();
+
+            app.Take();
+
+            Assert.IsTrue(run.Photos.IsCaptured(anomaly));
         }
     }
 }

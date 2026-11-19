@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using NightPatrol.Anomalies;
 using NightPatrol.Patrol;
 using NightPatrol.Photo;
 using NightPatrol.Player;
@@ -27,6 +28,7 @@ namespace NightPatrol.Run
         private readonly List<int> failedFloors = new List<int>();
         private int step;
         private Pose? spawn;
+        private float nextPhotoRefresh;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private bool checkedEmptyIds;
 #endif
@@ -123,6 +125,7 @@ namespace NightPatrol.Run
                 PhotoSubjects.Forget();   // 씬을 떠날 때 적어 둔 모습을 붙잡고 있지 않게
             }
             Schedule.Reset();
+            Photos.Clear();
         }
 
         // ESC 메뉴(시간 정지)·층 이동 연출(조작 잠금)·창 밖이면 예약 시간이 안 간다. 근무 시간은 연출 중에도 간다
@@ -130,8 +133,31 @@ namespace NightPatrol.Run
         {
             if (!IsCleared) PlaySeconds += Time.deltaTime;
             Schedule.Tick(Time.deltaTime, CanAct);
-            // 층 시작 뒤 몇 초: 늦게 달라지는 이상현상을 찾았으면 찍어야 할 수를 다시 센다
-            if (PhotoSubjects.Watch()) Photos.SetRequired(PhotoSubjects.Active().Count);
+            if (Current == this && !IsCleared && Time.time >= nextPhotoRefresh)
+            {
+                RefreshPhotos();
+                nextPhotoRefresh = Time.time + PhotoSubjects.RefreshSeconds;
+            }
+        }
+
+        /// <summary>셔터 직전 또는 주기 갱신. 현재 부품과 이번 층에 나타난 수를 갱신한다.</summary>
+        public List<PhotoSubject> RefreshPhotos()
+        {
+            if (IsCleared) return new List<PhotoSubject>();
+            var subjects = PhotoSubjects.Refresh();
+            var seen = new HashSet<Anomaly>(PhotoSubjects.Appeared);
+            seen.UnionWith(Photos.Captured);
+            Photos.SetRequired(seen.Count);
+            return subjects;
+        }
+
+        /// <summary>요구 = 아직 켜져 있고 나타났던 것 ∪ 이번 층에 찍힌 것. 사라진 촬영 대상도 남는다.</summary>
+        public IReadOnlyCollection<Anomaly> RequiredPhotos()
+        {
+            var required = new HashSet<Anomaly>(Photos.Captured);
+            foreach (var anomaly in PhotoSubjects.ActiveAnomalies())
+                if (PhotoSubjects.HasAppeared(anomaly)) required.Add(anomaly);
+            return required;
         }
 
         /// <summary>근무 시간(초)과 회차로 시각(분): 흐른 분 + 실패한 회차마다 30분</summary>
@@ -166,10 +192,11 @@ namespace NightPatrol.Run
         {
             var judgment = new FloorJudgment { Floor = CurrentFloor, Attempt = Attempt };
             foreach (var obj in PatrolInspection.FindUnfinished()) judgment.Unfinished.Add(obj.Id);
-            var subjects = PhotoSubjects.Active();
-            judgment.Required = subjects.Count;
-            foreach (var subject in subjects)
-                if (!Photos.IsCaptured(subject.Source)) judgment.Unphotographed.Add(subject.Name);
+            RefreshPhotos();
+            judgment.Required = RequiredPhotos().Count;
+            foreach (var anomaly in PhotoSubjects.ActiveAnomalies())
+                if (PhotoSubjects.HasAppeared(anomaly) && !Photos.IsCaptured(anomaly)) judgment.Unphotographed.Add(anomaly.name);
+            PhotoSubjects.WarnUnseen();
             judgment.Shots = Photos.Shots;
             judgment.EmptyShots = Photos.EmptyShots;
             judgment.RepeatShots = Photos.RepeatShots;
@@ -265,6 +292,7 @@ namespace NightPatrol.Run
 
         private void StartFloorSteps()
         {
+            PhotoSubjects.Forget();
             Schedule.Reset();   // 이벤트 전에 비워야 구독자가 FloorStarted에서 한 예약이 남는다 (구독 순서와 상관없이)
             Photos.Begin(PlaySeconds);   // 앞 층 사진 통계는 판정(Judge) 때 이미 넘겼다
             PatrolInspection.ResetErrorLog();
@@ -283,8 +311,9 @@ namespace NightPatrol.Run
             PhotoSubjects.FindChanged();   // 점검 항목이 사물을 바꾸기 전에
             if (tasks == null) tasks = UnityEngine.Object.FindAnyObjectByType<FloorTasks>();
             if (tasks != null) tasks.Generate(CurrentFloor, Attempt);
-            PhotoSubjects.Settle();   // 깜빡임처럼 조금 뒤에 달라지는 것은 잠깐 더 지켜본다 (Update)
-            Photos.SetRequired(PhotoSubjects.Active().Count);   // 이상현상이 다 켜진 뒤 (촬영 장수·일지용)
+            PhotoSubjects.Settle();   // 표시 안 된 부품만 점검 항목 적용 후 모습으로 다시 기록
+            Photos.SetRequired(PhotoSubjects.Appeared.Count);
+            nextPhotoRefresh = Time.time + PhotoSubjects.RefreshSeconds;
         }
 
         private void Clear()
