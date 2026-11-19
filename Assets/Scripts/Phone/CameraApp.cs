@@ -20,7 +20,7 @@ namespace NightPatrol.Phone
     public sealed class CameraApp : PhoneApp
     {
         /// <summary>촬영 장수를 정하는 방식 (기획서 v3 M01 — 팀이 정하면 고르기만)</summary>
-        public enum ShotLimit { PerFloor, CountPlusSlack, Fixed }
+        public enum ShotLimit { PerFloor, CountPlusSlack, Fixed, Unlimited }
 
         [Serializable]
         public struct FloorShots
@@ -44,8 +44,8 @@ namespace NightPatrol.Phone
         [SerializeField] private PhotoRules rules = new PhotoRules();
         [Tooltip("찍힌 이상현상을 바로 끈다. 끄면 예전처럼 엘리베이터에서만 판정")]
         [SerializeField] private bool vanishOnCapture = true;
-        [Tooltip("층마다 찍을 수 있는 장수를 정하는 방식")]
-        [SerializeField] private ShotLimit limit = ShotLimit.PerFloor;
+        [Tooltip("층마다 찍을 수 있는 장수를 정하는 방식. Unlimited = 제한 없음 (11/19 기본값)")]
+        [SerializeField] private ShotLimit limit = ShotLimit.Unlimited;
         [Tooltip("PerFloor: 층별 장수. 표에 없는 층은 Default Shots")]
         [SerializeField] private FloorShots[] perFloor = new FloorShots[0];
         [Tooltip("PerFloor에서 표에 없는 층, Fixed에서는 모든 층의 장수. 임시값 12 = 한 층 이상현상 최대 10개 + 여유 2 (못 깨는 층이 없게, 플레이테스트 뒤 팀이 정함)")]
@@ -117,6 +117,7 @@ namespace NightPatrol.Phone
             {
                 case ShotLimit.CountPlusSlack: return Mathf.Max(0, required) + slack;
                 case ShotLimit.Fixed: return defaultShots;
+                case ShotLimit.Unlimited: return int.MaxValue;
                 default:
                     foreach (var row in perFloor)
                         if (row.floor == floor) return row.shots;
@@ -434,7 +435,9 @@ namespace NightPatrol.Phone
             if (footer == null) return;   // 아직 한 번도 안 열어 봄
             string interact = "좌클릭", back = "우클릭";
             title.text = Title;
-            count.text = $"남은 촬영 {ShotsLeft}장";
+            count.text = limit == ShotLimit.Unlimited
+                ? $"촬영 {(run != null ? run.Photos.Shots : pictures.Count)}장"
+                : $"남은 촬영 {ShotsLeft}장";
             viewfinder.gameObject.SetActive(reviewed == null);
             review.gameObject.SetActive(reviewed != null);
             review.texture = reviewed != null ? reviewed.Image : null;

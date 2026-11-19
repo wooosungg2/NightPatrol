@@ -235,6 +235,16 @@ namespace NightPatrol.Tests
             Assert.AreEqual(6, app.ShotsFor(CameraApp.ShotLimit.PerFloor, 5, 9), "표에 없는 층은 기본값");
             Assert.AreEqual(11, app.ShotsFor(CameraApp.ShotLimit.CountPlusSlack, 5, 9), "이상현상 수 + 여유 2");
             Assert.AreEqual(6, app.ShotsFor(CameraApp.ShotLimit.Fixed, 2, 9));
+            Assert.AreEqual(int.MaxValue, app.ShotsFor(CameraApp.ShotLimit.Unlimited, 2, 9), "제한 없음");
+        }
+
+        // 11/19 사용자 "사진 한계 풀어": 기본은 제한 없음
+        [Test]
+        public void ShotLimit_IsUnlimitedByDefault()
+        {
+            var app = New("Camera").AddComponent<CameraApp>();
+            Assert.AreEqual(int.MaxValue, app.ShotsAllowed);
+            Assert.Greater(app.ShotsLeft, 1000000);
         }
 
         [Test]
