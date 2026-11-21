@@ -1,4 +1,5 @@
 
+using System.Collections;
 using UnityEngine;
 using NightPatrol.Patrol;
 
@@ -14,11 +15,26 @@ namespace NightPatrol.Anomalies
         [SerializeField]
         private Material anomalyMaterial;
 
-        private MonitorDevice monitor;
+        [Header("방송 노이즈 설정")]
+        [SerializeField]
+        private bool enableBroadcastGlitch = false;
 
-        // ========================================
-        // 이상현상 활성화
-        // ========================================
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float noiseStrength = 0.3f;
+
+        [SerializeField]
+        private float noiseInterval = 4f;
+
+        [SerializeField]
+        private float noiseDuration = 0.2f;
+
+        private MonitorDevice monitor;
+        private Material runtimeMaterial;
+        private Coroutine noiseCoroutine;
+
+        private static readonly int NoiseId =
+            Shader.PropertyToID("_NoiseStrength");
 
         public override void Activate()
         {
@@ -38,47 +54,117 @@ namespace NightPatrol.Anomalies
                 return;
             }
 
-            // 모니터 화면 변경
-            monitor.OverrideScreen(anomalyMaterial);
+            Material materialToApply = anomalyMaterial;
+
+            if (enableBroadcastGlitch)
+            {
+                runtimeMaterial = new Material(anomalyMaterial);
+
+                if (runtimeMaterial.HasProperty(NoiseId))
+                {
+                    runtimeMaterial.SetFloat(NoiseId, 0f);
+                    materialToApply = runtimeMaterial;
+                }
+                else
+                {
+                    Debug.LogWarning(
+                        "[MonitorAnomaly] Noise property not found.",
+                        this
+                    );
+
+                    Destroy(runtimeMaterial);
+                    runtimeMaterial = null;
+                }
+            }
+
+            monitor.OverrideScreen(materialToApply);
 
             IsActive = true;
-
-            // 모니터를 점검 대상에 등록
             RegisterAnomaly(monitor);
+
+            if (runtimeMaterial != null)
+            {
+                noiseCoroutine = StartCoroutine(NoiseLoop());
+            }
         }
 
-        // ========================================
-        // 이상현상 비활성화
-        // ========================================
+        private IEnumerator NoiseLoop()
+        {
+            while (true)
+            {
+                float wait = Random.Range(
+                    noiseInterval * 0.85f,
+                    noiseInterval * 1.15f
+                );
+
+                yield return new WaitForSeconds(
+                    Mathf.Max(0.1f, wait)
+                );
+
+                runtimeMaterial.SetFloat(
+                    NoiseId,
+                    noiseStrength
+                );
+
+                yield return new WaitForSeconds(
+                    Mathf.Max(0.01f, noiseDuration)
+                );
+
+                runtimeMaterial.SetFloat(NoiseId, 0f);
+            }
+        }
 
         public override void Deactivate()
         {
+            StopNoise();
+
             if (monitor != null)
-            {
                 monitor.ClearScreenOverride();
-            }
 
             IsActive = false;
-
             UnregisterAnomaly();
             monitor = null;
-        }
 
-        // ========================================
-        // 층 초기화
-        // ========================================
+            ReleaseMaterial();
+        }
 
         public override void ResetAfterFloorReset()
         {
+            StopNoise();
+
             if (monitor != null)
-            {
                 monitor.ClearScreenOverride();
-            }
 
             monitor = null;
             IsActive = false;
 
             ForgetRegistrationAfterFloorReset();
+
+            ReleaseMaterial();
+        }
+
+        private void StopNoise()
+        {
+            if (noiseCoroutine != null)
+            {
+                StopCoroutine(noiseCoroutine);
+                noiseCoroutine = null;
+            }
+
+            if (runtimeMaterial != null &&
+                runtimeMaterial.HasProperty(NoiseId))
+            {
+                runtimeMaterial.SetFloat(NoiseId, 0f);
+            }
+        }
+
+        private void ReleaseMaterial()
+        {
+            if (runtimeMaterial != null)
+            {
+                Destroy(runtimeMaterial);
+                runtimeMaterial = null;
+            }
         }
 
         private void OnDisable()
