@@ -35,6 +35,7 @@ namespace NightPatrol.Menu
             Sensitivity, Volume, ScreenMode, Resolution, FrameLimit, Keys, Back,
             KeyBinding, ResetKeys,
             Start,
+            HeadBob,
         }
 
         /// <summary>메뉴 장에 보이는 값</summary>
@@ -45,6 +46,8 @@ namespace NightPatrol.Menu
             public bool FullScreen;
             public Vector2Int Resolution;
             public int FrameLimit;
+            /// <summary>걸을 때 화면 흔들림</summary>
+            public bool HeadBob;
             /// <summary>"처음으로"를 한 번 눌러 확인을 기다리는 중</summary>
             public bool RestartArmed;
             /// <summary>"게임 종료"를 한 번 눌러 확인을 기다리는 중</summary>
@@ -315,6 +318,9 @@ namespace NightPatrol.Menu
                 case Row.FrameLimit:
                     GameSettings.FrameLimit = GameSettings.StepFrameLimit(GameSettings.FrameLimit, direction);
                     break;
+                case Row.HeadBob:
+                    GameSettings.HeadBob = !GameSettings.HeadBob;   // 켬·끔 둘뿐이라 어느 쪽이든 바꿈
+                    break;
                 case Row.ScreenMode:
                     fullScreen = !fullScreen;
                     if (!fullScreen)
@@ -578,6 +584,7 @@ namespace NightPatrol.Menu
                 FullScreen = fullScreen,
                 Resolution = screenSize,
                 FrameLimit = GameSettings.FrameLimit,
+                HeadBob = GameSettings.HeadBob,
                 RestartArmed = restartArmed,
                 QuitArmed = quitArmed,
                 KeyLabels = labels,
@@ -610,6 +617,7 @@ namespace NightPatrol.Menu
             if (look != null) look.SensitivityScale = GameSettings.Sensitivity;
             AudioListener.volume = GameSettings.Volume;
             GameSettings.ApplyFrameLimit(GameSettings.FrameLimit);
+            NightPatrol.Player.PlayerFeel.HeadBobEnabled = GameSettings.HeadBob;
         }
 
         private void Render()

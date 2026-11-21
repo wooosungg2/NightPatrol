@@ -23,6 +23,8 @@ namespace NightPatrol.Player
         /// <summary>현재 잠근 주체들 (진단용)</summary>
         public IReadOnlyCollection<object> Blockers => blockers;
         /// <summary>마우스 감도 배율 (설정 메뉴). PlayerSettings의 감도에 곱한다. 에셋은 바꾸지 않음</summary>
+        /// <summary>시점 카메라 (걷는 느낌 PlayerFeel이 흔든다)</summary>
+        public Transform CameraTransform => cameraTransform;
         public float SensitivityScale { get; set; } = 1f;
         /// <summary>ESC로 커서를 풀지. 일시정지 메뉴가 있으면 메뉴가 ESC를 맡으므로 false</summary>
         public bool EscapeReleasesCursor { get; set; } = true;

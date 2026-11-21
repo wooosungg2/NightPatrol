@@ -143,5 +143,37 @@ namespace NightPatrol.Tests
 
         private static object GetField(object target, string name) =>
             target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(target);
+
+        // 11/21 달리기 키 (왼쪽 Shift): 누른 동안 달리는 속도, 달리는 속도는 걷는 속도보다 느려지지 않음
+        [Test]
+        public void Running_UsesRunSpeed_NeverSlowerThanWalking()
+        {
+            var settings = ScriptableObject.CreateInstance<PlayerSettings>();
+            try
+            {
+                Assert.AreEqual(4.5f, settings.RunSpeed, 1e-4f, "기본 달리는 속도");
+                Assert.AreEqual(settings.WalkSpeed, PlayerMovement.SpeedFor(settings, false));
+                Assert.AreEqual(settings.RunSpeed, PlayerMovement.SpeedFor(settings, true));
+                Assert.Greater(settings.RunSpeed, settings.WalkSpeed);
+
+                typeof(PlayerSettings).GetField("runSpeed", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(settings, 1f);
+                Assert.AreEqual(settings.WalkSpeed, settings.RunSpeed, "걷는 속도보다 작게 적으면 걷는 속도");
+                Assert.AreEqual(0f, PlayerMovement.SpeedFor(null, true));
+            }
+            finally { Object.DestroyImmediate(settings); }
+        }
+
+        // 걷다가 Shift를 누르면 가속 시간 안에 달리는 속도까지, 떼면 다시 걷는 속도로
+        [Test]
+        public void SwitchingBetweenWalkAndRun_TakesAboutTheAccelerationTime()
+        {
+            var walking = new Vector2(0f, 2.6f);
+            var running = new Vector2(0f, 4.5f);
+            var v = walking;
+            for (int i = 0; i < 20; i++) v = PlayerMovement.StepWalkVelocity(v, running, 4.5f, 0.15f, 0.1f, 0.01f);
+            Assert.AreEqual(4.5f, v.y, 1e-3f, "0.2초면 달리는 속도");
+            for (int i = 0; i < 20; i++) v = PlayerMovement.StepWalkVelocity(v, walking, 2.6f, 0.15f, 0.1f, 0.01f);
+            Assert.AreEqual(2.6f, v.y, 1e-3f, "떼면 걷는 속도로");
+        }
     }
 }

@@ -13,8 +13,22 @@ MonoBehaviour:
   m_Name: PlayerSettings
   m_EditorClassIdentifier: Assembly-CSharp::NightPatrol.Player.PlayerSettings
   walkSpeed: 2.6
+  runSpeed: 4.5
+  headBob: 1
+  bobHeight: 0.06
+  bobSway: 0.03
+  runBobScale: 1.4
+  walkStepLength: 1.3
+  runStepLength: 1.8
+  runFovBoost: 5
+  footstepClips: []
+  footstepVolume: 0.5
+  runFootstepVolume: 0.8
+  accelerationTime: 0.15
+  decelerationTime: 0.1
   gravity: -9.81
   groundedVelocity: -2
   mouseSensitivity: 0.1
   pitchLimit: 80
   interactionDistance: 2
+  aimAssistRadius: 0.05

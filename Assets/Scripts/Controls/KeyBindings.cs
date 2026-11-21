@@ -8,7 +8,7 @@ namespace NightPatrol.Controls
     /// <summary>
     /// 키 설정: 바꾼 키를 PlayerPrefs에 저장·불러오기, 키 하나 다시 지정, 기본값으로, 키 이름.
     /// 게임 코드는 Input Actions 에셋의 액션을 그대로 쓰므로(복제하지 않음) 바꾼 키가 바로 먹힌다.
-    /// 다시 지정할 수 있는 키: 키보드 키와 마우스 오른쪽·가운데·옆 버튼. ESC(메뉴·취소)와 개발자 키(F1~F7, PgUp/PgDn)는 받지 않는다
+    /// 다시 지정할 수 있는 키: 키보드 키와 마우스 오른쪽·가운데·옆 버튼. ESC(메뉴·취소)와 개발자 키(F1~F10, PgUp/PgDn)는 받지 않는다
     /// </summary>
     public static class KeyBindings
     {
@@ -21,6 +21,7 @@ namespace NightPatrol.Controls
         {
             "<Keyboard>/escape", "<Keyboard>/anyKey",
             "<Keyboard>/f1", "<Keyboard>/f2", "<Keyboard>/f3", "<Keyboard>/f4", "<Keyboard>/f5", "<Keyboard>/f6", "<Keyboard>/f7",
+            "<Keyboard>/f8", "<Keyboard>/f9", "<Keyboard>/f10",
             "<Keyboard>/pageUp", "<Keyboard>/pageDown",
             "<Keyboard>/upArrow", "<Keyboard>/downArrow", "<Keyboard>/leftArrow", "<Keyboard>/rightArrow",
         };

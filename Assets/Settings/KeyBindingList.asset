@@ -45,3 +45,7 @@ MonoBehaviour:
     action: {fileID: -2470428455532515359, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     compositePart: 
     group: Keyboard&Mouse
+  - label: "\uB2EC\uB9AC\uAE30"
+    action: {fileID: 5190739044734946418, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+    compositePart: 
+    group: Keyboard&Mouse

@@ -36,7 +36,8 @@ namespace NightPatrol.Tests
                 "<pos=0%>▶<pos=8%><link=\"row2\">화면 모드</link><pos=50%><link=\"dec2\"> ◀ </link>전체 화면<size=70%><color=#6E6E6E> (빌드에서 적용)</color></size><link=\"inc2\"> ▶ </link>\n" +
                 "<pos=8%><link=\"row3\">해상도</link><pos=50%><link=\"dec3\"> ◀ </link>1920×1080<size=70%><color=#6E6E6E> (빌드에서 적용)</color></size><link=\"inc3\"> ▶ </link>\n" +
                 "<pos=8%><link=\"row4\">프레임 제한</link><pos=50%><link=\"dec4\"> ◀ </link>60 FPS<link=\"inc4\"> ▶ </link>\n" +
-                "<pos=8%><link=\"row5\">조작 키</link>\n<pos=8%><link=\"row6\">뒤로</link>\n\n<size=70%>클릭 · W/S 선택 · A/D 조절 · ESC 뒤로</size>",
+                "<pos=8%><link=\"row5\">화면 흔들림</link><pos=50%><link=\"dec5\"> ◀ </link>끔<link=\"inc5\"> ▶ </link>\n" +
+                "<pos=8%><link=\"row6\">조작 키</link>\n<pos=8%><link=\"row7\">뒤로</link>\n\n<size=70%>클릭 · W/S 선택 · A/D 조절 · ESC 뒤로</size>",
                 PauseMenuText.BodyText(PauseMenu.Page.Settings, 2, values));
         }
 

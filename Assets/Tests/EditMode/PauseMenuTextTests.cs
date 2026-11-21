@@ -63,8 +63,9 @@ namespace NightPatrol.Tests
             Assert.AreEqual("화면 모드 ◀ 전체 화면 ▶ ", plain[2]);
             Assert.AreEqual("해상도 ◀ 1920×1080 ▶ ", plain[3]);
             Assert.AreEqual("프레임 제한 ◀ 60 FPS ▶ ", plain[4]);
-            Assert.AreEqual("조작 키", plain[5]);
-            Assert.AreEqual("뒤로", plain[6]);
+            Assert.AreEqual("화면 흔들림 ◀ 끔 ▶ ", plain[5]);
+            Assert.AreEqual("조작 키", plain[6]);
+            Assert.AreEqual("뒤로", plain[7]);
             StringAssert.Contains("ESC 뒤로", plain.Last());
             Assert.AreEqual("설정", PauseMenu.TitleText(PauseMenu.Page.Settings));
         }
@@ -117,10 +118,11 @@ namespace NightPatrol.Tests
         public void SettingsPage_HasClickableLinks_ForRowsAndArrows()
         {
             string body = PauseMenu.BodyText(PauseMenu.Page.Settings, 0, Sample);
-            StringAssert.Contains("<link=\"row6\">뒤로</link>", body);
+            StringAssert.Contains("<link=\"row7\">뒤로</link>", body);
             StringAssert.Contains("<link=\"dec3\"> ◀ </link>1920×1080<link=\"inc3\"> ▶ </link>", body);
-            StringAssert.DoesNotContain("dec5", body);   // 조작 키 opens a page, no value
-            StringAssert.DoesNotContain("dec6", body);   // 뒤로 has no value
+            StringAssert.Contains("<link=\"dec5\"> ◀ </link>끔<link=\"inc5\"> ▶ </link>", body);   // 화면 흔들림
+            StringAssert.DoesNotContain("dec6", body);   // 조작 키 opens a page, no value
+            StringAssert.DoesNotContain("dec7", body);   // 뒤로 has no value
         }
 
         // 01_05d: 에디터에서는 화면 모드·해상도 값 뒤에 "(빌드에서 적용)"을 흐리고 작게
@@ -171,7 +173,7 @@ namespace NightPatrol.Tests
             CollectionAssert.AreEqual(new[]
             {
                 PauseMenu.Row.Sensitivity, PauseMenu.Row.Volume, PauseMenu.Row.ScreenMode,
-                PauseMenu.Row.Resolution, PauseMenu.Row.FrameLimit, PauseMenu.Row.Keys, PauseMenu.Row.Back,
+                PauseMenu.Row.Resolution, PauseMenu.Row.FrameLimit, PauseMenu.Row.HeadBob, PauseMenu.Row.Keys, PauseMenu.Row.Back,
             }, PauseMenu.RowsOf(PauseMenu.Page.Settings));
             CollectionAssert.AreEqual(new[]
             {
