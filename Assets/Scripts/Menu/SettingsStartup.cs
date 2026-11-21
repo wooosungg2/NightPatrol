@@ -27,6 +27,7 @@ namespace NightPatrol.Menu
         {
             AudioListener.volume = GameSettings.Volume;
             GameSettings.ApplyFrameLimit(GameSettings.FrameLimit);
+            NightPatrol.Player.PlayerFeel.HeadBobEnabled = GameSettings.HeadBob;
             if (scene.IsValid() && scene.isLoaded)
                 foreach (var root in scene.GetRootGameObjects())
                     foreach (var look in root.GetComponentsInChildren<PlayerLook>(true))

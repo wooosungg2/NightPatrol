@@ -21,7 +21,7 @@ namespace NightPatrol.Menu
 
         internal static readonly Row[] MainRows = { Row.Continue, Row.Settings, Row.Restart, Row.Quit };
         internal static readonly Row[] SettingsRows =
-            { Row.Sensitivity, Row.Volume, Row.ScreenMode, Row.Resolution, Row.FrameLimit, Row.Keys, Row.Back };
+            { Row.Sensitivity, Row.Volume, Row.ScreenMode, Row.Resolution, Row.FrameLimit, Row.HeadBob, Row.Keys, Row.Back };
         internal static readonly Row[] TitleRows = { Row.Start, Row.Settings, Row.Quit };
 
         /// <summary>그 장의 줄 순서 (조작 키 장은 키 줄 keyCount개 + 기본값으로 + 뒤로)</summary>
@@ -126,6 +126,7 @@ namespace NightPatrol.Menu
                 case Row.ScreenMode: return "화면 모드";
                 case Row.Resolution: return "해상도";
                 case Row.FrameLimit: return "프레임 제한";
+                case Row.HeadBob: return "화면 흔들림";
                 case Row.Keys: return "조작 키";
                 case Row.KeyBinding: return At(values.KeyLabels, index, "?");
                 case Row.ResetKeys: return "기본값으로";
@@ -143,6 +144,7 @@ namespace NightPatrol.Menu
                 case Row.ScreenMode: return DimNote(ScreenOptions.ScreenModeLabel(values.FullScreen, values.InEditor));
                 case Row.Resolution: return DimNote(ScreenOptions.ResolutionLabel(values.Resolution, values.InEditor));
                 case Row.FrameLimit: return GameSettings.FrameLimitLabel(values.FrameLimit);
+                case Row.HeadBob: return GameSettings.HeadBobLabel(values.HeadBob);
                 default: return string.Empty;
             }
         }

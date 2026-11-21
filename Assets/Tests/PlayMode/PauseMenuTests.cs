@@ -426,7 +426,7 @@ namespace NightPatrol.Tests
         private void OpenKeys()
         {
             OpenSettings();
-            menu.Select(5);
+            menu.Select(System.Array.IndexOf(PauseMenu.RowsOf(PauseMenu.Page.Settings), PauseMenu.Row.Keys));
             Assert.AreEqual(PauseMenu.Row.Keys, menu.Selected);
             menu.Confirm();
             Assert.AreEqual(PauseMenu.Page.Keys, menu.CurrentPage);

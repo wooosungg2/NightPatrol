@@ -14,6 +14,7 @@ namespace NightPatrol.Menu
         public const string SensitivityKey = "NightPatrol.MouseSensitivity";
         public const string VolumeKey = "NightPatrol.Volume";
         public const string FrameLimitKey = "NightPatrol.FrameLimit";
+        public const string HeadBobKey = "NightPatrol.HeadBob";
         public const float MinSensitivity = 0.2f;
         public const float MaxSensitivity = 3f;
         public const float SensitivityStep = 0.1f;
@@ -46,18 +47,25 @@ namespace NightPatrol.Menu
             set => frameLimit = ValidFrameLimit(value);
         }
 
-        /// <summary>저장된 값 읽기 (없으면 기본값: 감도 1, 소리 1, 수직 동기)</summary>
+        /// <summary>걸을 때 화면 흔들림 (기본 켬). 끄면 PlayerFeel이 흔들지 않음 (멀미 나는 사람용, 발소리는 그대로)</summary>
+        public static bool HeadBob { get; set; } = true;
+
+        public static string HeadBobLabel(bool on) => on ? "켬" : "끔";
+
+        /// <summary>저장된 값 읽기 (없으면 기본값: 감도 1, 소리 1, 수직 동기, 화면 흔들림 켬)</summary>
         public static void Load()
         {
             Sensitivity = PlayerPrefs.GetFloat(SensitivityKey, 1f);
             Volume = PlayerPrefs.GetFloat(VolumeKey, 1f);
             FrameLimit = PlayerPrefs.GetInt(FrameLimitKey, 0);
+            HeadBob = PlayerPrefs.GetInt(HeadBobKey, 1) != 0;
         }
 
         public static void Save()
         {
             PlayerPrefs.SetFloat(SensitivityKey, Sensitivity);
             PlayerPrefs.SetFloat(VolumeKey, Volume);
+            PlayerPrefs.SetInt(HeadBobKey, HeadBob ? 1 : 0);
             PlayerPrefs.SetInt(FrameLimitKey, FrameLimit);
             PlayerPrefs.Save();
         }

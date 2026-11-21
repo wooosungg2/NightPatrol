@@ -7,6 +7,30 @@ namespace NightPatrol.Player
     {
         [Tooltip("걷는 속도 (m/s)")]
         [SerializeField, Min(0f)] private float walkSpeed = 2.6f;
+        [Tooltip("달리기 키(기본 왼쪽 Shift)를 누른 동안의 속도 (m/s). 걷는 속도보다 작으면 걷는 속도")]
+        [SerializeField, Min(0f)] private float runSpeed = 4.5f;
+        [Header("걷는 느낌 (PlayerFeel)")]
+        [Tooltip("걸을 때 화면을 흔들지. 끄면 흔들림 없음 (멀미 나는 사람용)")]
+        [SerializeField] private bool headBob = true;
+        [Tooltip("걸을 때 화면이 내려가는 깊이 (m, 가장 높은 곳과 낮은 곳 차이)")]
+        [SerializeField, Min(0f)] private float bobHeight = 0.06f;
+        [Tooltip("걸을 때 좌우로 흔들리는 폭 (m, 가운데에서 한쪽까지)")]
+        [SerializeField, Min(0f)] private float bobSway = 0.03f;
+        [Tooltip("달릴 때 흔들림이 걸을 때의 몇 배까지 커지는지")]
+        [SerializeField, Min(1f)] private float runBobScale = 1.4f;
+        [Tooltip("걸을 때 한 걸음 길이 (m). 걸음마다 화면이 한 번 내려가고 발소리 한 번. 길수록 느긋함 (2.6 m/s에서 1.3이면 초당 2걸음)")]
+        [SerializeField, Min(0.1f)] private float walkStepLength = 1.3f;
+        [Tooltip("달릴 때 한 걸음 길이 (m)")]
+        [SerializeField, Min(0.1f)] private float runStepLength = 1.8f;
+        [Tooltip("달리는 동안 넓어지는 시야각 (도). 0이면 그대로")]
+        [SerializeField, Min(0f)] private float runFovBoost = 5f;
+        [Tooltip("발소리 (걸음마다 하나를 골라 냄). 비우면 소리 없음")]
+        [SerializeField] private AudioClip[] footstepClips = new AudioClip[0];
+        [Tooltip("걸을 때 발소리 크기")]
+        [SerializeField, Range(0f, 1f)] private float footstepVolume = 0.5f;
+        [Tooltip("달릴 때 발소리 크기")]
+        [SerializeField, Range(0f, 1f)] private float runFootstepVolume = 0.8f;
+        [Header("이동")]
         [Tooltip("멈춰 있다가 걷는 속도가 될 때까지 걸리는 시간 (초). 0이면 바로 (딱딱하게 출발)")]
         [SerializeField, Min(0f)] private float accelerationTime = 0.15f;
         [Tooltip("걷다가 멈출 때까지 걸리는 시간 (초). 0이면 바로 멈춤")]
@@ -25,6 +49,17 @@ namespace NightPatrol.Player
         [SerializeField, Min(0f)] private float aimAssistRadius = 0.05f;
 
         public float WalkSpeed => Mathf.Max(0f, walkSpeed);
+        public float RunSpeed => Mathf.Max(WalkSpeed, runSpeed);
+        public bool HeadBob => headBob;
+        public float BobHeight => Mathf.Max(0f, bobHeight);
+        public float BobSway => Mathf.Max(0f, bobSway);
+        public float RunBobScale => Mathf.Max(1f, runBobScale);
+        public float WalkStepLength => Mathf.Max(0.1f, walkStepLength);
+        public float RunStepLength => Mathf.Max(0.1f, runStepLength);
+        public float RunFovBoost => Mathf.Max(0f, runFovBoost);
+        public AudioClip[] FootstepClips => footstepClips;
+        public float FootstepVolume => Mathf.Clamp01(footstepVolume);
+        public float RunFootstepVolume => Mathf.Clamp01(runFootstepVolume);
         public float AccelerationTime => Mathf.Max(0f, accelerationTime);
         public float DecelerationTime => Mathf.Max(0f, decelerationTime);
         public float Gravity => Mathf.Min(0f, gravity);

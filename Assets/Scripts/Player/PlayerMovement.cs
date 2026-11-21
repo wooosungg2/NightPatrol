@@ -12,10 +12,12 @@ namespace NightPatrol.Player
         [SerializeField] private PlayerSettings settings;
         [Tooltip("이동 입력 (Player/Move). 설정에서 바꾼 키가 바로 먹힌다")]
         [SerializeField] private InputActionReference moveAction;
+        [Tooltip("달리기 입력 (Player/Run). 비우면 이동 입력과 같은 에셋의 Run을 찾아 쓴다")]
+        [SerializeField] private InputActionReference runAction;
         private readonly HashSet<object> blockers = new HashSet<object>();
         private CharacterController controller;
         private PlayerLook look;
-        private InputAction move;
+        private InputAction move, run;
         private float verticalVelocity;
         private Vector2 walkVelocity;   // 몸 기준 (x 오른쪽, y 앞), m/s. 몸 기준이라 마우스로 돌아도 미끄러지지 않음
 
@@ -37,9 +39,30 @@ namespace NightPatrol.Player
             }
             // 설정에서 바꾼 키가 바로 먹히도록 공용 액션을 쓴다. 다른 소비자를 위해 끄지 않는다.
             move = moveAction.action;
+            run = runAction != null && runAction.action != null ? runAction.action : move.actionMap?.FindAction("Run");
+            // 걷는 느낌(화면 흔들림·발소리·달릴 때 시야): 프리팹에 없으면 여기서 붙인다
+            if (GetComponent<PlayerFeel>() == null) gameObject.AddComponent<PlayerFeel>();
         }
 
-        private void OnEnable() => move?.Enable();
+        /// <summary>걷는 속도·흔들림 값 (PlayerSettings 에셋)</summary>
+        public PlayerSettings Settings => settings;
+        /// <summary>지금 걷는 빠르기 (m/s, 수평)</summary>
+        public float Speed => walkVelocity.magnitude;
+        /// <summary>땅에 닿아 있는지</summary>
+        public bool IsGrounded => controller != null && controller.enabled && controller.isGrounded;
+
+        private void OnEnable()
+        {
+            move?.Enable();
+            run?.Enable();
+        }
+
+        /// <summary>지금 달리기 키를 누르고 있는지 (키가 없으면 false)</summary>
+        public bool IsRunning { get; private set; }
+
+        /// <summary>목표 속도: 달리기 키를 누르고 있으면 달리는 속도, 아니면 걷는 속도</summary>
+        internal static float SpeedFor(PlayerSettings settings, bool running) =>
+            settings == null ? 0f : running ? settings.RunSpeed : settings.WalkSpeed;
         private void OnDisable()
         {
             verticalVelocity = 0f;
@@ -69,6 +92,8 @@ namespace NightPatrol.Player
             verticalVelocity = 0f;
             walkVelocity = Vector2.zero;
             if (look != null) look.ResetPitch();
+            var feel = GetComponent<PlayerFeel>();
+            if (feel != null) feel.ResetFeel();
         }
 
         /// <summary>
@@ -88,9 +113,11 @@ namespace NightPatrol.Player
             if (!controller.enabled) return;
 
             // 막히거나 커서가 풀리면 목표가 0이 되어 감속 시간에 걸쳐 멈춘다 (순간이동은 바로 0)
-            Vector2 input = !IsBlocked && Cursor.lockState == CursorLockMode.Locked && Application.isFocused
-                ? Vector2.ClampMagnitude(move.ReadValue<Vector2>(), 1f) : Vector2.zero;
-            walkVelocity = StepWalkVelocity(walkVelocity, input * settings.WalkSpeed, settings.WalkSpeed,
+            bool canMove = !IsBlocked && Cursor.lockState == CursorLockMode.Locked && Application.isFocused;
+            Vector2 input = canMove ? Vector2.ClampMagnitude(move.ReadValue<Vector2>(), 1f) : Vector2.zero;
+            IsRunning = canMove && run != null && run.IsPressed() && input != Vector2.zero;
+            float speed = SpeedFor(settings, IsRunning);
+            walkVelocity = StepWalkVelocity(walkVelocity, input * speed, speed,
                 settings.AccelerationTime, settings.DecelerationTime, Time.deltaTime);
             Vector3 velocity = transform.right * walkVelocity.x + transform.forward * walkVelocity.y;
             if (controller.isGrounded && verticalVelocity < 0f)
