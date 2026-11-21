@@ -1,0 +1,84 @@
+# Polygon palette for low-poly whale
+newmtl charcoal
+Kd 0.15 0.2 0.24
+Ka 0.15 0.15 0.15
+Ks 0.04 0.04 0.04
+Ns 8
+illum 2
+
+newmtl slate
+Kd 0.25 0.33 0.39
+Ka 0.15 0.15 0.15
+Ks 0.04 0.04 0.04
+Ns 8
+illum 2
+
+newmtl navy
+Kd 0.1 0.23 0.38
+Ka 0.15 0.15 0.15
+Ks 0.04 0.04 0.04
+Ns 8
+illum 2
+
+newmtl blue
+Kd 0.18 0.4 0.6
+Ka 0.15 0.15 0.15
+Ks 0.04 0.04 0.04
+Ns 8
+illum 2
+
+newmtl teal
+Kd 0.11 0.64 0.51
+Ka 0.15 0.15 0.15
+Ks 0.04 0.04 0.04
+Ns 8
+illum 2
+
+newmtl mint
+Kd 0.27 0.86 0.66
+Ka 0.15 0.15 0.15
+Ks 0.04 0.04 0.04
+Ns 8
+illum 2
+
+newmtl sea
+Kd 0.09 0.43 0.44
+Ka 0.15 0.15 0.15
+Ks 0.04 0.04 0.04
+Ns 8
+illum 2
+
+newmtl pink
+Kd 0.7 0.59 0.58
+Ka 0.15 0.15 0.15
+Ks 0.04 0.04 0.04
+Ns 8
+illum 2
+
+newmtl blush
+Kd 0.83 0.7 0.68
+Ka 0.15 0.15 0.15
+Ks 0.04 0.04 0.04
+Ns 8
+illum 2
+
+newmtl belly
+Kd 0.65 0.65 0.65
+Ka 0.15 0.15 0.15
+Ks 0.04 0.04 0.04
+Ns 8
+illum 2
+
+newmtl darkline
+Kd 0.22 0.24 0.26
+Ka 0.15 0.15 0.15
+Ks 0.04 0.04 0.04
+Ns 8
+illum 2
+
+newmtl eye
+Kd 0.03 0.05 0.07
+Ka 0.15 0.15 0.15
+Ks 0.04 0.04 0.04
+Ns 8
+illum 2

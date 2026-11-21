@@ -67,6 +67,10 @@ namespace NightPatrol.Anomalies
         [SerializeField]
         private Anomaly[] friedEggAnomalies;
 
+        [Header("고래 이상현상 후보")]
+        [SerializeField]
+        private Anomaly[] whaleAnomalies;
+
 
         // ========================================
         // 2. 층별 랜덤 이상현상 개수 설정
@@ -308,6 +312,13 @@ namespace NightPatrol.Anomalies
             // 14. 벽 계란 
             AddCandidates(
                 friedEggAnomalies,
+                candidates,
+                visited
+            );
+
+            // 15. 고래 
+            AddCandidates(
+                whaleAnomalies,
                 candidates,
                 visited
             );
