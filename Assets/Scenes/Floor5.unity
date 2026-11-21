@@ -401012,6 +401012,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1305341874}
+  - component: {fileID: 1305341875}
   m_Layer: 0
   m_Name: VendingMachine
   m_TagString: Untagged
@@ -401041,6 +401042,21 @@ Transform:
   - {fileID: 1064868344}
   m_Father: {fileID: 613851172}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1305341875
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1305341873}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 78389f7849ee18a41a5ed36d0d0458d4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NightPatrol::NightPatrol.Photo.PhotoTarget
+  anomaly: {fileID: 1490541567}
+  size: 1
+  surface: 0
 --- !u!1 &1305395032
 GameObject:
   m_ObjectHideFlags: 0
