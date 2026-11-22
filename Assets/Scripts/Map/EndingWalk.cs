@@ -48,6 +48,11 @@ namespace NightPatrol
 
 		IEnumerator Play()
 		{
+			// 화면이 아직 어두울 때 첫 지점(엘리베이터 밖) 쪽을 미리 보게 한다.
+			// 엘리베이터에 타면 보통 안쪽 벽을 보고 서 있어서, 그대로 걸으면 뒤로 180° 돈 뒤 복도에서 또 90°씩 돌아 '한 바퀴' 도는 것처럼 보임
+			var early = PlayerControl.Current;
+			if (early != null) FaceToward(early.transform, transform.TransformPoint(path[0]));
+
 			// 도착 연출(밝아짐·엘리베이터 문 열림)이 끝날 때까지
 			while (transition != null && transition.IsBusy) yield return null;
 			var pc = PlayerControl.Current;
@@ -89,6 +94,13 @@ namespace NightPatrol
 			yield return new WaitForSeconds(pause);
 			if (transition != null && !transition.IsBusy) transition.EndShift();
 			routine = null;
+		}
+
+		static void FaceToward(Transform t, Vector3 target)
+		{
+			Vector3 to = target - t.position; to.y = 0f;
+			if (to.sqrMagnitude < 0.01f) return;
+			t.rotation = Quaternion.LookRotation(to.normalized, Vector3.up);
 		}
 	}
 }
