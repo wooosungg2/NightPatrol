@@ -1,0 +1,3 @@
+newmtl BannerPrint
+Kd 1 1 1
+map_Kd Birthday_Banner_Texture.png

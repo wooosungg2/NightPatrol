@@ -1,0 +1,42 @@
+# Rubber duck V3 - short beak
+newmtl DuckYellow
+Ka 0.3000 0.2100 0.0075
+Kd 1.0000 0.7000 0.0250
+Ks 0.14 0.14 0.14
+Ns 80
+illum 2
+
+newmtl DuckYellowWing
+Ka 0.2970 0.2070 0.0066
+Kd 0.9900 0.6900 0.0220
+Ks 0.14 0.14 0.14
+Ns 80
+illum 2
+
+newmtl BeakOrange
+Ka 0.3000 0.0960 0.0195
+Kd 1.0000 0.3200 0.0650
+Ks 0.14 0.14 0.14
+Ns 80
+illum 2
+
+newmtl BeakOrangeDark
+Ka 0.2580 0.0675 0.0105
+Kd 0.8600 0.2250 0.0350
+Ks 0.14 0.14 0.14
+Ns 80
+illum 2
+
+newmtl EyeBlack
+Ka 0.0036 0.0048 0.0060
+Kd 0.0120 0.0160 0.0200
+Ks 0.14 0.14 0.14
+Ns 80
+illum 2
+
+newmtl EyeHighlight
+Ka 0.3000 0.3000 0.3000
+Kd 1.0000 1.0000 1.0000
+Ks 0.14 0.14 0.14
+Ns 80
+illum 2

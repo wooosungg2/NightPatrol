@@ -1,0 +1,98 @@
+newmtl wood
+Kd 0.25 0.105 0.055
+Ka 0.12 0.12 0.12
+Ks 0.25 0.25 0.25
+Ns 65
+illum 2
+
+newmtl interior
+Kd 0.085 0.043 0.033
+Ka 0.12 0.12 0.12
+Ks 0.25 0.25 0.25
+Ns 65
+illum 2
+
+newmtl gold
+Kd 0.82 0.53 0.1
+Ka 0.12 0.12 0.12
+Ks 0.25 0.25 0.25
+Ns 65
+illum 2
+
+newmtl brightgold
+Kd 1 0.79 0.21
+Ka 0.12 0.12 0.12
+Ks 0.25 0.25 0.25
+Ns 65
+illum 2
+
+newmtl bronze
+Kd 0.4 0.27 0.12
+Ka 0.12 0.12 0.12
+Ks 0.25 0.25 0.25
+Ns 65
+illum 2
+
+newmtl ruby
+Kd 0.86 0.055 0.13
+Ka 0.12 0.12 0.12
+Ks 0.25 0.25 0.25
+Ns 65
+illum 2
+
+newmtl emerald
+Kd 0.04 0.64 0.32
+Ka 0.12 0.12 0.12
+Ks 0.25 0.25 0.25
+Ns 65
+illum 2
+
+newmtl sapphire
+Kd 0.06 0.22 0.84
+Ka 0.12 0.12 0.12
+Ks 0.25 0.25 0.25
+Ns 65
+illum 2
+
+newmtl amethyst
+Kd 0.55 0.18 0.79
+Ka 0.12 0.12 0.12
+Ks 0.25 0.25 0.25
+Ns 65
+illum 2
+
+newmtl cyan
+Kd 0.1 0.83 0.88
+Ka 0.12 0.12 0.12
+Ks 0.25 0.25 0.25
+Ns 65
+illum 2
+
+newmtl pearl
+Kd 0.92 0.91 0.8
+Ka 0.12 0.12 0.12
+Ks 0.25 0.25 0.25
+Ns 65
+illum 2
+
+newmtl shell
+Kd 0.86 0.72 0.58
+Ka 0.12 0.12 0.12
+Ks 0.25 0.25 0.25
+Ns 65
+illum 2
+
+newmtl glow
+Kd 1 0.75 0.22
+Ka 0.12 0.12 0.12
+Ks 0.25 0.25 0.25
+Ns 65
+illum 2
+
+newmtl parchment
+Kd 0.78 0.66 0.42
+Ka 0.12 0.12 0.12
+Ks 0.25 0.25 0.25
+Ns 65
+illum 2
+
