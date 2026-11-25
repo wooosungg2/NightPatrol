@@ -1,4 +1,4 @@
-
+ï»¿
 using System.Collections.Generic;
 using NightPatrol.Patrol;
 using UnityEngine;
@@ -16,12 +16,15 @@ namespace NightPatrol.Anomalies
         [SerializeField] private GameObject birthdayPartyAnomaly;
         [SerializeField] private GameObject treasureAnomaly;
 
+        [Tooltip("ì¶”ê°€ ê°•ì˜ì‹¤ ì´ìƒí˜„ìƒ (ì˜ˆ: Alice_TeaParty_Classroom). ìœ„ 4ì¢…ê³¼ ê°™ì´ ë¬´ì‘ìœ„ë¡œ ë½‘í˜")]
+        [SerializeField] private GameObject[] extraAnomalies = new GameObject[0];
+
         private GameObject activeClassroomAnomaly;
         private int activeType = -1;
 
         private readonly Dictionary<GameObject, bool> originalStates = new();
 
-        // ÇöÀç È¸Â÷¿¡¼­ ÀÌ¹Ì »ç¿ëµÈ °­ÀÇ½Ç ÀÌ»óÇö»ó Á¾·ù
+        // í˜„ì¬ íšŒì°¨ì—ì„œ ì´ë¯¸ ì‚¬ìš©ëœ ê°•ì˜ì‹¤ ì´ìƒí˜„ìƒ ì¢…ë¥˜
         private static readonly HashSet<int> usedAnomalyTypes = new();
 
         public override void Activate()
@@ -29,13 +32,16 @@ namespace NightPatrol.Anomalies
             if (IsActive)
                 return;
 
-            GameObject[] anomalies =
+            List<GameObject> anomalyList = new()
             {
                 rubberDuckAnomaly,
                 appleMeetingAnomaly,
                 birthdayPartyAnomaly,
                 treasureAnomaly
             };
+            if (extraAnomalies != null)
+                anomalyList.AddRange(extraAnomalies);
+            GameObject[] anomalies = anomalyList.ToArray();
 
             List<int> availableTypes = new();
 
@@ -51,7 +57,7 @@ namespace NightPatrol.Anomalies
             if (availableTypes.Count == 0)
             {
                 Debug.LogWarning(
-                    "[ClassroomAnomaly] »ç¿ë °¡´ÉÇÑ Á¾·ù°¡ ¾ø½À´Ï´Ù.",
+                    "[ClassroomAnomaly] ì‚¬ìš© ê°€ëŠ¥í•œ ì¢…ë¥˜ê°€ ì—†ìŠµë‹ˆë‹¤.",
                     this
                 );
                 return;
@@ -63,7 +69,7 @@ namespace NightPatrol.Anomalies
 
             GameObject selectedAnomaly = anomalies[selectedType];
 
-            // ±âÁ¸ °¡±¸ÀÇ È°¼ºÈ­ »óÅÂ ÀúÀå ÈÄ ¼û±â±â
+            // ê¸°ì¡´ ê°€êµ¬ì˜ í™œì„±í™” ìƒíƒœ ì €ì¥ í›„ ìˆ¨ê¸°ê¸°
             originalStates.Clear();
 
             if (originalContents != null)
@@ -77,7 +83,7 @@ namespace NightPatrol.Anomalies
                 }
             }
 
-            // ¹Ì¸® ¹èÄ¡ÇÑ ¸ğµ¨ È°¼ºÈ­
+            // ë¯¸ë¦¬ ë°°ì¹˜í•œ ëª¨ë¸ í™œì„±í™”
             selectedAnomaly.SetActive(true);
 
             activeClassroomAnomaly = selectedAnomaly;
@@ -87,11 +93,11 @@ namespace NightPatrol.Anomalies
 
             IsActive = true;
 
-            // ±âÁ¸ PatrolObject Á¡°Ë ÆÇÁ¤ ½Ã½ºÅÛ¿¡ µî·Ï
+            // ê¸°ì¡´ PatrolObject ì ê²€ íŒì • ì‹œìŠ¤í…œì— ë“±ë¡
             RegisterAnomaly();
 
             Debug.Log(
-                $"[ClassroomAnomaly] {name} ¡æ {selectedAnomaly.name}",
+                $"[ClassroomAnomaly] {name} â†’ {selectedAnomaly.name}",
                 this
             );
         }
@@ -110,7 +116,7 @@ namespace NightPatrol.Anomalies
 
             IsActive = false;
 
-            // PatrolRunÀÌ ÀÌ¹Ì Á¡°Ë Ä«¿îÅÍ¸¦ ÃÊ±âÈ­ÇÑ °æ¿ì
+            // PatrolRunì´ ì´ë¯¸ ì ê²€ ì¹´ìš´í„°ë¥¼ ì´ˆê¸°í™”í•œ ê²½ìš°
             ForgetRegistrationAfterFloorReset();
         }
 
