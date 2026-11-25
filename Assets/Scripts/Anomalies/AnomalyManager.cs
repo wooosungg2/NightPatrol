@@ -67,10 +67,14 @@ namespace NightPatrol.Anomalies
         [SerializeField]
         private Anomaly[] whaleAnomalies;
 
-        // 추가: 강의실 이상현상
+        // 강의실 이상현상 X 4
         [Header("강의실 이상현상 후보")]
         [SerializeField]
         private ClassroomAnomalyController[] classroomAnomalies;
+
+        [Header("안전수칙 안내판 이상현상 후보")]
+        [SerializeField]
+        private Anomaly[] safetySignAnomalies;
 
 
         // ========================================
@@ -301,6 +305,12 @@ namespace NightPatrol.Anomalies
             // 추가: 강의실 이상현상 4개
             AddCandidates(
                 classroomAnomalies,
+                candidates,
+                visited
+            );
+
+            AddCandidates(
+                safetySignAnomalies,
                 candidates,
                 visited
             );
