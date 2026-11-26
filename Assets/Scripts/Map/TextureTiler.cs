@@ -15,6 +15,9 @@ namespace NightPatrol
 		static readonly int BaseMapST = Shader.PropertyToID("_BaseMap_ST");
 		static readonly int BaseMap = Shader.PropertyToID("_BaseMap");
 
+		[Tooltip("세 축이 모두 이보다 두꺼우면(m) 벽이 아닌 덩어리로 보고 옆면 기준으로 반복")]
+		[SerializeField, Min(0.1f)] private float solidThickness = 0.8f;
+
 		void OnEnable() => Apply();
 
 		[ContextMenu("Apply Texture Tiling")]
@@ -52,7 +55,14 @@ namespace NightPatrol
 				Vector3 p = mf.transform.position;
 				bool axisAligned = Quaternion.Angle(mf.transform.rotation, Quaternion.identity) < 0.5f;
 				float su, sv, ou, ov;
-				if (ax <= ay && ax <= az) { su = az; sv = ay; ou = p.z - az * 0.5f; ov = p.y - ay * 0.5f; }      // 옆(±X) 면이 큼
+				if (Mathf.Min(ax, Mathf.Min(ay, az)) > solidThickness)
+				{
+					// 두꺼운 덩어리(1층 Building_Mass 등): 얇은 면이 없으므로 '보이는 옆면(벽)' 기준.
+					// 가장 얇은 축을 면으로 보면 높이(Y)가 얇다고 판단해 위아래 면 기준 반복이 옆면에 들어가 벽돌이 납작해짐
+					if (ax >= az) { su = ax; ou = p.x - ax * 0.5f; } else { su = az; ou = p.z - az * 0.5f; }
+					sv = ay; ov = p.y - ay * 0.5f;
+				}
+				else if (ax <= ay && ax <= az) { su = az; sv = ay; ou = p.z - az * 0.5f; ov = p.y - ay * 0.5f; } // 옆(±X) 면이 큼
 				else if (ay <= ax && ay <= az) { su = ax; sv = az; ou = p.x - ax * 0.5f; ov = p.z - az * 0.5f; } // 위아래(±Y) 면이 큼
 				else { su = ax; sv = ay; ou = p.x - ax * 0.5f; ov = p.y - ay * 0.5f; }                           // 앞뒤(±Z) 면이 큼
 				if (!axisAligned) { ou = 0f; ov = 0f; }

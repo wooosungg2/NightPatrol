@@ -11,9 +11,9 @@ namespace NightPatrol.Anomalies
         // 1. 이상현상 후보 목록
         // ========================================
 
-        //[Header("빨간 모니터 이상현상 후보")]
-        //[SerializeField]
-        //private Anomaly[] redMonitorAnomalies;
+        [Header("빨간 모니터 이상현상 후보")]
+        [SerializeField]
+        private Anomaly[] redMonitorAnomalies;
 
         [Header("Glitch 모니터 이상현상 후보")]
         [SerializeField]
@@ -26,10 +26,6 @@ namespace NightPatrol.Anomalies
         [Header("조명 색상 변경 이상현상 후보")]
         [SerializeField]
         private Anomaly[] lightColorAnomalies;
-
-        [Header("벽 페인트 이상현상 후보")]
-        [SerializeField]
-        private Anomaly[] wallStainAnomalies;
 
         [Header("천장 의자 이상현상 후보")]
         [SerializeField]
@@ -71,6 +67,15 @@ namespace NightPatrol.Anomalies
         [SerializeField]
         private Anomaly[] whaleAnomalies;
 
+        // 강의실 이상현상 X 4
+        [Header("강의실 이상현상 후보")]
+        [SerializeField]
+        private ClassroomAnomalyController[] classroomAnomalies;
+
+        [Header("안전수칙 안내판 이상현상 후보")]
+        [SerializeField]
+        private Anomaly[] safetySignAnomalies;
+
 
         // ========================================
         // 2. 층별 랜덤 이상현상 개수 설정
@@ -86,20 +91,21 @@ namespace NightPatrol.Anomalies
         [SerializeField]
         private int maxAnomalyCount = 10;
 
+
         // ========================================
         // 3. 현재 활성화된 이상현상 목록
         // ========================================
 
-        // 활성화된 이상현상을 저장한다.
-        // 층 초기화 및 게임 종료 시 복구에 사용한다.
         private readonly List<Anomaly> activeAnomalies =
             new List<Anomaly>();
+
 
         // ========================================
         // 4. PatrolRun 참조
         // ========================================
 
         private PatrolRun patrolRun;
+
 
         // ========================================
         // 5. 이벤트 등록
@@ -124,6 +130,7 @@ namespace NightPatrol.Anomalies
             patrolRun.Cleared += OnCleared;
         }
 
+
         // ========================================
         // 6. 이벤트 해제
         // ========================================
@@ -142,13 +149,13 @@ namespace NightPatrol.Anomalies
             patrolRun = null;
         }
 
+
         // ========================================
         // 7. 층 초기화 이벤트
         // ========================================
 
         private void OnFloorReset(int floor)
         {
-            // 층이 초기화되면 모든 이상현상 복구
             ResetAnomaliesAfterFloorReset();
         }
 
@@ -159,13 +166,9 @@ namespace NightPatrol.Anomalies
 
         private void OnFloorStarted(int floor)
         {
-            // ========================================
-            // 5층에서는 항상 이상현상 발생 방지
-            // ========================================
-            
+            // 첫 5층에서는 이상현상 없음
             if (floor == 5)
             {
-                // 이전 층의 이상현상도 모두 해제
                 ClearAnomalies();
 
                 Debug.Log(
@@ -175,12 +178,8 @@ namespace NightPatrol.Anomalies
 
                 return;
             }
-            
-            // ========================================
-            // 4층부터 랜덤 이상현상 발생
-            // ========================================
 
-            // 전체 후보 중 랜덤 3~15개 활성화
+            // 이후 층에서 랜덤 이상현상 활성화
             SpawnAnomalies();
         }
 
@@ -191,9 +190,9 @@ namespace NightPatrol.Anomalies
 
         private void OnCleared()
         {
-            // 게임 클리어 시 모든 이상현상 해제
             ClearAnomalies();
         }
+
 
         // ========================================
         // 10. 이상현상 랜덤 생성
@@ -201,8 +200,10 @@ namespace NightPatrol.Anomalies
 
         public void SpawnAnomalies()
         {
-            // 이전 이상현상을 모두 해제한다.
+            // 이전 이상현상 해제 및 중복 기록 초기화
             ClearAnomalies();
+
+            ClassroomAnomalyController.ResetUsedTypes();
 
             // 전체 이상현상 후보 목록
             List<Anomaly> candidates =
@@ -212,113 +213,104 @@ namespace NightPatrol.Anomalies
             HashSet<Anomaly> visited =
                 new HashSet<Anomaly>();
 
+
             // ------------------------------------
-            // 모든 유형의 후보를 하나로 통합
+            // 모든 유형의 후보 통합
             // ------------------------------------
 
-            // 1. 빨간 모니터
-            /*
             AddCandidates(
                 redMonitorAnomalies,
                 candidates,
                 visited
             );
-            */
 
-            // 2. Glitch 모니터
             AddCandidates(
                 glitchMonitorAnomalies,
                 candidates,
                 visited
             );
 
-            // 3. 조명 깜빡임
             AddCandidates(
                 lightFlickerAnomalies,
                 candidates,
                 visited
             );
 
-            // 4. 조명 색상 변경
             AddCandidates(
                 lightColorAnomalies,
                 candidates,
                 visited
             );
 
-            // 5. 벽 페인트
-            AddCandidates(
-                wallStainAnomalies,
-                candidates,
-                visited
-            );
-
-            // 6. 천장 의자
             AddCandidates(
                 ceilingChairAnomalies,
                 candidates,
                 visited
             );
 
-            // 7. 고정 PNG 이미지
             AddCandidates(
                 fixedImageAnomalies,
                 candidates,
                 visited
             );
 
-            // 8. 벨 색상 변경
             AddCandidates(
                 bellColorAnomalies,
                 candidates,
                 visited
             );
 
-            // 9. 우는 아이 
             AddCandidates(
                 cryingChildAnomalies,
                 candidates,
                 visited
             );
 
-            // 10. 자판기 
             AddCandidates(
                 vendingMachineAnomalies,
                 candidates,
                 visited
             );
 
-            // 11. 브로콜리 화분 
             AddCandidates(
                 plantReplaceAnomalies,
                 candidates,
                 visited
             );
 
-            // 12. 주전자 소화기
             AddCandidates(
                 kettleExtinguisherAnomalies,
                 candidates,
                 visited
             );
 
-            // 13. 쓰레기통 
             AddCandidates(
                 boxingGloveAnomalies,
                 candidates,
                 visited
             );
 
-            // 14. 벽 계란 
             AddCandidates(
                 friedEggAnomalies,
                 candidates,
                 visited
             );
 
-            // 15. 고래 
             AddCandidates(
                 whaleAnomalies,
+                candidates,
+                visited
+            );
+
+            // 추가: 강의실 이상현상 4개
+            AddCandidates(
+                classroomAnomalies,
+                candidates,
+                visited
+            );
+
+            AddCandidates(
+                safetySignAnomalies,
                 candidates,
                 visited
             );
@@ -338,11 +330,11 @@ namespace NightPatrol.Anomalies
                 return;
             }
 
+
             // ------------------------------------
             // 랜덤 이상현상 개수 결정
             // ------------------------------------
 
-            // 최소/최대 설정값이 뒤바뀌어도 처리
             int configuredMin = Mathf.Min(
                 minAnomalyCount,
                 maxAnomalyCount
@@ -353,7 +345,6 @@ namespace NightPatrol.Anomalies
                 maxAnomalyCount
             );
 
-            // 실제 후보 개수를 초과하지 않도록 제한
             int minCount = Mathf.Clamp(
                 configuredMin,
                 0,
@@ -366,12 +357,12 @@ namespace NightPatrol.Anomalies
                 candidates.Count
             );
 
-            // 정수형 Random.Range는 최대값이 제외되므로
-            // maxCount + 1을 사용한다.
+            // 최대값 포함
             int targetCount = Random.Range(
                 minCount,
                 maxCount + 1
             );
+
 
             // ------------------------------------
             // 후보 목록 무작위 섞기
@@ -379,17 +370,16 @@ namespace NightPatrol.Anomalies
 
             ShuffleCandidates(candidates);
 
+
             // ------------------------------------
             // 목표 개수만큼 이상현상 활성화
             // ------------------------------------
 
             foreach (Anomaly anomaly in candidates)
             {
-                // 목표 개수에 도달하면 종료
                 if (activeAnomalies.Count >= targetCount)
                     break;
 
-                // 유효하지 않은 후보 제외
                 if (anomaly == null ||
                     !anomaly.isActiveAndEnabled)
                 {
@@ -423,18 +413,33 @@ namespace NightPatrol.Anomalies
                 }
             }
 
+
             // ------------------------------------
             // 최종 결과 출력
             // ------------------------------------
+
+            int classroomCount = 0;
+
+            foreach (Anomaly anomaly in activeAnomalies)
+            {
+                if (anomaly is ClassroomAnomalyController)
+                {
+                    classroomCount++;
+                }
+            }
 
             Debug.Log(
                 "[AnomalyManager] 이상현상 랜덤 생성 완료\n" +
                 "전체 후보: " + candidates.Count + "개\n" +
                 "목표 개수: " + targetCount + "개\n" +
-                "실제 활성화: " + activeAnomalies.Count + "개",
+                "실제 활성화: " + activeAnomalies.Count + "개\n" +
+                "강의실 이상현상: " + classroomCount + "개\n" +
+                "기존 이상현상: " +
+                (activeAnomalies.Count - classroomCount) + "개",
                 this
             );
         }
+
 
         // ========================================
         // 11. 후보 목록에 추가
@@ -446,27 +451,24 @@ namespace NightPatrol.Anomalies
             HashSet<Anomaly> visited
         )
         {
-            // 배열이 없으면 실행하지 않는다.
             if (source == null)
                 return;
 
             foreach (Anomaly anomaly in source)
             {
-                // null 또는 비활성화된 컴포넌트 제외
                 if (anomaly == null ||
                     !anomaly.isActiveAndEnabled)
                 {
                     continue;
                 }
 
-                // 중복 등록된 컴포넌트 제외
                 if (!visited.Add(anomaly))
                     continue;
 
-                // 전체 후보 목록에 추가
                 candidates.Add(anomaly);
             }
         }
+
 
         // ========================================
         // 12. 후보 목록 무작위 섞기
@@ -476,17 +478,11 @@ namespace NightPatrol.Anomalies
             List<Anomaly> candidates
         )
         {
-            // Fisher-Yates Shuffle 알고리즘
-            for (int i = candidates.Count - 1;
-                 i > 0;
-                 i--)
+            // Fisher-Yates Shuffle
+            for (int i = candidates.Count - 1; i > 0; i--)
             {
-                int randomIndex = Random.Range(
-                    0,
-                    i + 1
-                );
+                int randomIndex = Random.Range(0, i + 1);
 
-                // 두 후보의 위치 교환
                 Anomaly temp = candidates[i];
 
                 candidates[i] = candidates[randomIndex];
@@ -495,13 +491,13 @@ namespace NightPatrol.Anomalies
             }
         }
 
+
         // ========================================
         // 13. 층 초기화 후 이상현상 복구
         // ========================================
 
         private void ResetAnomaliesAfterFloorReset()
         {
-            // 활성화된 모든 이상현상을 역순으로 복구
             for (int i = activeAnomalies.Count - 1;
                  i >= 0;
                  i--)
@@ -514,9 +510,12 @@ namespace NightPatrol.Anomalies
                 }
             }
 
-            // 활성화 목록 초기화
             activeAnomalies.Clear();
+
+            // 강의실 이상현상 종류 중복 기록 초기화
+            ClassroomAnomalyController.ResetUsedTypes();
         }
+
 
         // ========================================
         // 14. 모든 이상현상 해제
@@ -524,7 +523,6 @@ namespace NightPatrol.Anomalies
 
         public void ClearAnomalies()
         {
-            // 활성화된 모든 이상현상을 역순으로 해제
             for (int i = activeAnomalies.Count - 1;
                  i >= 0;
                  i--)
@@ -537,8 +535,10 @@ namespace NightPatrol.Anomalies
                 }
             }
 
-            // 활성화 목록 초기화
             activeAnomalies.Clear();
+
+            // 강의실 이상현상 종류 중복 기록 초기화
+            ClassroomAnomalyController.ResetUsedTypes();
         }
     }
 }
