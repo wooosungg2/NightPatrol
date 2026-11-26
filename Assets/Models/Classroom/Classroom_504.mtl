@@ -1,0 +1,92 @@
+# NightPatrol Alice Tea Party - MTL colors
+newmtl Class_Board
+Ka 0.2400 0.2425 0.2400
+Kd 0.9600 0.9700 0.9600
+Ks 0.12 0.12 0.12
+Ns 65
+illum 2
+
+newmtl Class_BoardFrame
+Ka 0.1550 0.1600 0.1650
+Kd 0.6200 0.6400 0.6600
+Ks 0.12 0.12 0.12
+Ns 65
+illum 2
+
+newmtl Class_Tray
+Ka 0.1125 0.1175 0.1250
+Kd 0.4500 0.4700 0.5000
+Ks 0.12 0.12 0.12
+Ns 65
+illum 2
+
+newmtl Class_TeacherDesk
+Ka 0.1375 0.1000 0.0650
+Kd 0.5500 0.4000 0.2600
+Ks 0.12 0.12 0.12
+Ns 65
+illum 2
+
+newmtl Class_Dark
+Ka 0.0375 0.0375 0.0425
+Kd 0.1500 0.1500 0.1700
+Ks 0.12 0.12 0.12
+Ns 65
+illum 2
+
+newmtl Class_Clock
+Ka 0.2375 0.2375 0.2325
+Kd 0.9500 0.9500 0.9300
+Ks 0.12 0.12 0.12
+Ns 65
+illum 2
+
+newmtl Class_Bin
+Ka 0.0750 0.1125 0.1625
+Kd 0.3000 0.4500 0.6500
+Ks 0.12 0.12 0.12
+Ns 65
+illum 2
+
+newmtl Class_Screen
+Ka 0.2300 0.2300 0.2250
+Kd 0.9200 0.9200 0.9000
+Ks 0.12 0.12 0.12
+Ns 65
+illum 2
+
+newmtl Class_Marker1
+Ka 0.0375 0.0750 0.1875
+Kd 0.1500 0.3000 0.7500
+Ks 0.12 0.12 0.12
+Ns 65
+illum 2
+
+newmtl Class_Marker2
+Ka 0.2000 0.0375 0.0375
+Kd 0.8000 0.1500 0.1500
+Ks 0.12 0.12 0.12
+Ns 65
+illum 2
+
+newmtl School_DeskTop
+Ka 0.2000 0.1750 0.1300
+Kd 0.8000 0.7000 0.5200
+Ks 0.12 0.12 0.12
+Ns 65
+illum 2
+
+newmtl School_Metal
+Ka 0.1000 0.1050 0.1125
+Kd 0.4000 0.4200 0.4500
+Ks 0.12 0.12 0.12
+Ns 65
+illum 2
+
+newmtl School_Seat
+Ka 0.0550 0.0850 0.1500
+Kd 0.2200 0.3400 0.6000
+Ks 0.12 0.12 0.12
+Ns 65
+illum 2
+
