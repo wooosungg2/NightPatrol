@@ -21,9 +21,6 @@ MonoBehaviour:
   walkStepLength: 1.3
   runStepLength: 1.8
   runFovBoost: 5
-  footstepClips: []
-  footstepVolume: 0.5
-  runFootstepVolume: 0.8
   accelerationTime: 0.15
   decelerationTime: 0.1
   gravity: -9.81

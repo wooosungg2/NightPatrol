@@ -1,6 +1,7 @@
 using NightPatrol.Interaction;
 using NightPatrol.Journal;
 using NightPatrol.Menu;
+using NightPatrol.Player;
 using NightPatrol.Run;
 using UnityEngine;
 
@@ -8,7 +9,8 @@ namespace NightPatrol.Audio
 {
     /// <summary>
     /// 플레이어 쪽 소리 연결점. 소리 파일을 비워 두면 그 소리만 안 난다 — 사운드 방향(공동 결정)이 정해지면 파일만 넣으면 된다.
-    /// 발소리(걸은 거리마다), E 조작, 일지·메뉴 들기·내리기, 깨어나기 — 플레이어 몸에서 나는 소리라 방향 없이(2D).
+    /// 발소리, E 조작, 일지·메뉴 들기·내리기, 깨어나기 — 플레이어 몸에서 나는 소리라 방향 없이(2D).
+    /// 발소리는 걷는 느낌(PlayerFeel)이 있으면 그 걸음(화면이 가장 낮아지는 순간)마다, 없으면 걸은 거리(Step Distance)마다.
     /// 엘리베이터 하행·도착처럼 사물에서 나는 소리는 그 사물의 SoundEmitter로 낸다.
     /// Player 루트에 붙인다. 전체 크기는 일시정지 메뉴의 "소리 크기"를 따른다 (AudioListener.volume)
     /// </summary>
@@ -19,10 +21,12 @@ namespace NightPatrol.Audio
         [Header("발소리")]
         [Tooltip("여러 개면 무작위로 (같은 소리가 연달아 나지 않게)")]
         [SerializeField] private AudioClip[] footsteps = new AudioClip[0];
-        [Tooltip("이만큼(m) 걸을 때마다 한 걸음")]
+        [Tooltip("이만큼(m) 걸을 때마다 한 걸음 — 걷는 느낌(PlayerFeel)이 없을 때만. 있으면 PlayerSettings의 Walk·Run Step Length를 따른다")]
         [SerializeField, Min(0.1f)] private float stepDistance = 0.9f;
         [Tooltip("발소리 음량 (0~1). 설정 메뉴의 전체 음량과 곱해진다")]
         [SerializeField, Range(0f, 1f)] private float footstepVolume = 0.5f;
+        [Tooltip("달릴 때 발소리 음량 (0~1)")]
+        [SerializeField, Range(0f, 1f)] private float runFootstepVolume = 0.8f;
         [Tooltip("걸음마다 높낮이를 이만큼 무작위로 (반복이 덜 거슬리게)")]
         [SerializeField, Range(0f, 0.3f)] private float footstepPitchJitter = 0.06f;
 
@@ -53,6 +57,10 @@ namespace NightPatrol.Audio
         private Vector3 lastPosition;
         private float walked;
         private int lastFootstep = -1;
+        private PlayerFeel feel;
+
+        /// <summary>걷는 느낌(PlayerFeel)에게서 들은 걸음 수 (확인용)</summary>
+        public int StepsHeard { get; private set; }
 
         private void Awake()
         {
@@ -88,16 +96,25 @@ namespace NightPatrol.Audio
             if (journal != null) journal.RaisedChanged -= OnRaised;
             if (menu != null) menu.OpenChanged -= OnRaised;
             if (transition != null) transition.WakeStarted -= OnWake;
+            if (feel != null) feel.Stepped -= OnStepped;
+            feel = null;
         }
 
         private void Update()
         {
+            // 걷는 느낌은 PlayerMovement가 실행 중에 붙이므로 나중에 찾는다. 있으면 걸음은 그쪽이 알려 줌
+            if (feel == null && TryGetComponent(out feel)) feel.Stepped += OnStepped;
+            if (feel != null)
+            {
+                lastPosition = transform.position;
+                return;
+            }
             Vector3 position = transform.position;
             Vector3 moved = position - lastPosition;
             lastPosition = position;
             moved.y = 0f;
             bool grounded = controller == null || controller.isGrounded;
-            if (Step(ref walked, grounded ? moved.magnitude : 0f, stepDistance, TeleportDistance)) PlayFootstep();
+            if (Step(ref walked, grounded ? moved.magnitude : 0f, stepDistance, TeleportDistance)) PlayFootstep(footstepVolume);
         }
 
         /// <summary>
@@ -127,7 +144,13 @@ namespace NightPatrol.Audio
             return index >= last ? index + 1 : index;
         }
 
-        private void PlayFootstep()
+        private void OnStepped(bool running)
+        {
+            StepsHeard++;
+            PlayFootstep(running ? runFootstepVolume : footstepVolume);
+        }
+
+        private void PlayFootstep(float volume)
         {
             if (footsteps == null || footsteps.Length == 0) return;
             int index = PickIndex(footsteps.Length, lastFootstep, Random.Range(0, int.MaxValue));
@@ -135,7 +158,7 @@ namespace NightPatrol.Audio
             var clip = footsteps[index];
             if (clip == null) return;
             stepSource.pitch = 1f + Random.Range(-footstepPitchJitter, footstepPitchJitter);
-            stepSource.PlayOneShot(clip, footstepVolume);
+            stepSource.PlayOneShot(clip, volume);
         }
 
         private void Play(AudioClip clip)
