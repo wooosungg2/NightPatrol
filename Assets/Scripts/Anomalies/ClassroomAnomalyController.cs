@@ -22,6 +22,9 @@ namespace NightPatrol.Anomalies
         private GameObject activeClassroomAnomaly;
         private int activeType = -1;
 
+        // 사진 판정 시스템에 현재 활성화된 강의실 이상현상 제공
+        public GameObject ActiveClassroomAnomaly => activeClassroomAnomaly;
+
         private readonly Dictionary<GameObject, bool> originalStates = new();
 
         // 현재 회차에서 이미 사용된 강의실 이상현상 종류

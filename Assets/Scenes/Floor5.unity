@@ -691567,11 +691567,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8324897074110834548, guid: 63222f72b668bc5439f5e240af7c40a0, type: 3}
       propertyPath: monitorId
-      value: R21.Monitor.01
+      value: R21.Monitor.27
       objectReference: {fileID: 0}
     - target: {fileID: 8415483880975314907, guid: 63222f72b668bc5439f5e240af7c40a0, type: 3}
       propertyPath: monitorId
-      value: R21.Monitor.02
+      value: R21.Monitor.05
       objectReference: {fileID: 0}
     - target: {fileID: 8415483880975314907, guid: 63222f72b668bc5439f5e240af7c40a0, type: 3}
       propertyPath: noiseDuration
