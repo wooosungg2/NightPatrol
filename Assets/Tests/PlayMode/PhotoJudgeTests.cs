@@ -16,6 +16,7 @@ namespace NightPatrol.Tests
     // 06_04q 셔터 순간 판정: 조준 박스 안 가운데 1발 + 링(8·12·16발), 가운데·안쪽 링은 1발·바깥 링만이면 3발,
     // 크기에 비례한 거리, 레이마다 가장 가까운 부품 하나, 가림(벽·유리·부품 주인의 충돌체).
     // 찍히는 물체: 자기 몸 · 칸(필드·List)에 든 물체 중 정상 모습과 달라진 것(층 내내 표시, 꺼질 때까지 유지) · PhotoTarget.
+    // 자기 몸도 층을 시작했으면 달라진 부품만 (06_04s, 강의실처럼 방 전체에 붙은 이상현상의 벽·문은 빼고 앞을 가림). 못 찾으면 몸 전부.
     // 빼는 것: 플레이어 칸·FirstPerson 레이어, 플레이어가 E·스위치로 바꾼 것(2초 뒤 그 모습이 정상).
     // 눈은 (0, 1.6, 0)에서 +Z를 본다 (세로 시야 60°, 4:3)
     public class PhotoJudgeTests
@@ -731,6 +732,123 @@ namespace NightPatrol.Tests
             CollectionAssert.AreEqual(new Anomaly[] { color }, Capture());
             LookBack();
             CollectionAssert.AreEqual(new Anomaly[] { flicker }, Capture());
+        }
+
+        // ── 방 전체에 붙은 이상현상 (강의실, 06_04s) ──
+
+        // 강의실처럼 방(벽·문 포함)에 붙고, 켜면 미리 놓아 둔 꾸밈을 보여 주는 이상현상. 문은 z=2 (4×4m), 꾸밈은 처음에 꺼져 있다
+        private ChangingAnomaly Room(out GameObject door, out GameObject set, Vector3 setPosition, Vector3 setScale)
+        {
+            var room = New("527").AddComponent<ChangingAnomaly>();
+            door = MapCube("Door", new Vector3(0f, 1.6f, 2f), room.transform);
+            door.transform.localScale = new Vector3(4f, 4f, 0.2f);
+            var shown = MapCube("BirthdayParty_Combined", setPosition, room.transform);
+            shown.transform.localScale = setScale;
+            shown.SetActive(false);
+            room.change = _ => shown.SetActive(true);
+            set = shown;
+            return room;
+        }
+
+        [Test]
+        public void ARoomWideAnomaly_OnlyTheSetItShowsCounts_AndTheRoomsOwnDoorBlocks()
+        {
+            var room = Room(out var door, out _, Front, Vector3.one);
+            StartFloor(room);
+            Assert.IsEmpty(Capture(), "원래 있던 문은 찍어도 안 되고, 문 너머 꾸밈도 가려짐");
+            Assert.AreEqual("자기 몸", PhotoSubjects.Active()[0].Where);
+            Assert.AreEqual(1, PhotoSubjects.Active()[0].Shapes.Count, "찍히는 부품은 나타난 꾸밈 하나");
+
+            door.SetActive(false);   // 문을 열고 들여다봄
+            CollectionAssert.AreEqual(new Anomaly[] { room }, Capture());
+        }
+
+        // 방을 다 덮는 큰 꾸밈 안에 서 있으면 (눈이 부품 상자 안) 어느 쪽을 찍어도 그 이상현상
+        [Test]
+        public void StandingInsideARoomWideSet_AnyShotCounts()
+        {
+            var room = Room(out var door, out var set, EyePosition, new Vector3(8f, 4f, 8f));
+            Object.DestroyImmediate(set.GetComponent<Collider>());
+            door.SetActive(false);
+            StartFloor(room);
+            CollectionAssert.AreEqual(new Anomaly[] { room }, Capture(), "앞");
+
+            eye.transform.rotation = Quaternion.LookRotation(Vector3.down + Vector3.forward * 0.2f);
+            CollectionAssert.AreEqual(new Anomaly[] { room }, Capture(), "바닥 쪽");
+        }
+
+        // 이상현상 스크립트가 칸에 자기 아래 물체(꾸밈)를 들고 있으면 그 아래만 자기 몸:
+        // 다른 코드가 방에 켠 것(문 위 유리창 불빛, RoomAnomalyAccess)은 찍히는 부품이 아니다
+        [Test]
+        public void WhenTheRoomHoldsItsSets_OnlyThoseCount_NotTheGlowOtherCodeTurnsOn()
+        {
+            var room = Room(out var door, out var set, Back, Vector3.one);   // 꾸밈은 뒤 (z −4)
+            room.holds = new[] { set };
+            door.SetActive(false);
+            var transom = MapCube("Transom", Front, room.transform);           // 앞 (z 4): 문 위 유리창
+            StartFloor(room);
+            Repaint(transom);   // 방 불이 켜지며 다른 코드가 유리창을 밝힘 (층 시작 뒤)
+
+            Assert.IsEmpty(Capture(), "유리창 불빛은 찍히는 부품이 아님");
+            LookBack();
+            CollectionAssert.AreEqual(new Anomaly[] { room }, Capture(), "꾸밈은 찍힘");
+        }
+
+        // 방을 채우는 꾸밈이 벽을 몇 cm 뚫고 나와도 (캠핑 꾸밈 15cm) 닫힌 문 밖에서는 안 찍힌다: 큰 부품은 가장자리 20cm를 빼고 본다
+        [Test]
+        public void ARoomWideSet_PokingAFewCentimetersPastTheDoor_IsStillHiddenByIt()
+        {
+            // 문 z 1.9~2.1, 꾸밈 z 1.85~5.85 (문보다 5cm 앞까지 나옴)
+            var room = Room(out var door, out _, new Vector3(0f, 1.6f, 3.85f), new Vector3(4f, 3f, 4f));
+            StartFloor(room);
+            Assert.IsEmpty(Capture(), "줄인 상자는 문 뒤에서 시작");
+
+            door.SetActive(false);
+            CollectionAssert.AreEqual(new Anomaly[] { room }, Capture(), "문을 열면 찍힘");
+        }
+
+        // 큰 꾸밈 안에서도 상자 끝보다 가까운 다른 이상현상은 그 레이가 먼저 본다
+        [Test]
+        public void InsideARoomWideSet_ANearerAnomalyInTheRoom_IsStillCaught()
+        {
+            var room = Room(out var door, out var set, EyePosition, new Vector3(10f, 4f, 10f));
+            Object.DestroyImmediate(set.GetComponent<Collider>());
+            door.SetActive(false);
+            var monitor = AnomalyWithCube(new Vector3(0f, 1.6f, 3f), active: false);
+            StartFloor(room, monitor);
+
+            var shot = Shot();
+            CollectionAssert.AreEquivalent(new Anomaly[] { room, monitor }, shot.Captured, "가운데는 모니터, 둘레는 방");
+            Assert.AreEqual(monitor, shot.Rays[0].Seen, "가운데 레이는 상자 끝(약 5m)보다 가까운 모니터(2.5m)");
+        }
+
+        // 켜도 모습이 그대로인 자기 몸은 (달라진 부품을 못 찾으면) 예전처럼 보이는 몸 전부가 찍힌다
+        [Test]
+        public void AnOwnBodyThatLooksTheSameWhenTurnedOn_StillCounts()
+        {
+            var anomaly = AnomalyWithCube(Front, active: false);
+            StartFloor(anomaly);
+            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, Capture());
+            Assert.AreEqual("자기 몸", PhotoSubjects.Active()[0].Where);
+        }
+
+        // 달라진 부품과 원래 있던 부품이 같은 부모 아래면, 그 부모의 충돌체는 달라진 부품을 가리지 않는다
+        [Test]
+        public void TheSharedParentsCollider_DoesNotHideTheChangedPart()
+        {
+            var anomaly = New("Trash can anomaly").AddComponent<ChangingAnomaly>();
+            var model = New("Model");
+            model.transform.SetParent(anomaly.transform, false);
+            model.transform.position = Front;
+            model.AddComponent<BoxCollider>().size = new Vector3(3f, 3f, 3f);   // z 2.5~5.5, 두 부품을 감쌈
+            MapCube("Can", Front + Vector3.down, model.transform);                // 원래 있던 몸 (가운데 레이 아래)
+            var glove = MapCube("Glove", Front, model.transform);
+            glove.SetActive(false);
+            anomaly.change = _ => glove.SetActive(true);
+            StartFloor(anomaly);
+
+            CollectionAssert.AreEqual(new Anomaly[] { anomaly }, Capture());
+            Assert.AreEqual(1, PhotoSubjects.Active()[0].Shapes.Count, "원래 있던 쓰레기통은 찍히는 부품이 아님");
         }
 
         // ── 그 밖 ──

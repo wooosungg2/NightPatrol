@@ -371,6 +371,8 @@ MonoBehaviour:
   loweredEuler: {x: 55, y: 12, z: 0}
   raisedPosition: {x: 0, y: 0.005, z: 0.32}
   raisedEuler: {x: 8, y: 0, z: 0}
+  hiddenPosition: {x: -0.16, y: -0.62, z: 0.2}
+  hiddenEuler: {x: 80, y: 12, z: 0}
   transitionSeconds: 0.25
   raiseAfterFailure: 0
 --- !u!114 &675496444562431686
@@ -544,6 +546,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NightPatrol.Player.PlayerMovement
   settings: {fileID: 11400000, guid: 7020b89a60476844fa54de36185ddf7d, type: 2}
   moveAction: {fileID: -1680190386980627800, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  runAction: {fileID: 0}
 --- !u!114 &843647375267998277
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -725,9 +728,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 285d0755b6e1c804c91669badacce24b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: NightPatrol::NightPatrol.Audio.PlayerSounds
-  footsteps: []
+  footsteps:
+  - {fileID: 8300000, guid: 45569803c92431641a98b2982de73493, type: 3}
+  - {fileID: 8300000, guid: ea7b0630a814a6f458486b25533284c2, type: 3}
+  - {fileID: 8300000, guid: 6943bf778d2ce614e81893254b36a57b, type: 3}
+  - {fileID: 8300000, guid: bffee44ec23373947a79d9977a20b487, type: 3}
+  - {fileID: 8300000, guid: 2a1baa19ef117974ebd17ae99dae1924, type: 3}
   stepDistance: 0.9
   footstepVolume: 0.5
+  runFootstepVolume: 0.8
   footstepPitchJitter: 0.06
   interact: {fileID: 0}
   journalRaise: {fileID: 0}
@@ -758,6 +767,13 @@ MonoBehaviour:
   shadows: 2
   handOffset: {x: 0.22, y: -0.22, z: 0.15}
   followSpeed: 14
+  useBattery: 1
+  batterySeconds: 180
+  lowBattery: 0.25
+  lowIntensityScale: 0.35
+  lowDipsPerSecond: 0.6
+  dyingSeconds: 0.8
+  refillOnRestart: 1
 --- !u!114 &1503323067852493608
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1444,7 +1460,24 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NightPatrol::NightPatrol.Phone.CameraApp
   icon: {fileID: 0}
+  rules:
+    aimBox: 0.4
+    distancePerSize: 6
+    minDistance: 2
+    maxDistance: 15
+    surfaceLift: 0.05
+    raysPerRing: 080000000c00000010000000
+    innerRings: 1
+    outerMinHits: 3
+  vanishOnCapture: 1
+  limit: 3
+  perFloor: []
   defaultShots: 12
+  slack: 2
+  flashSeconds: 0.15
+  retakeSeconds: 0.3
+  reviewSeconds: 1.5
+  eye: {fileID: 0}
 --- !u!114 &7302915846620417128
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2200,7 +2233,8 @@ MonoBehaviour:
     pitchJitter: 0
     playOn: 0
   - name: "\uC154\uD130"
-    clips: []
+    clips:
+    - {fileID: 8300000, guid: 5a6ab31abc45f9f4eafc47c1620f83d6, type: 3}
     volume: 1
     pitchJitter: 0
     playOn: 0
@@ -2232,6 +2266,11 @@ MonoBehaviour:
   heldPosition: {x: -0.095, y: -0.06, z: 0.25}
   heldEuler: {x: 12, y: -14, z: 0}
   transitionSeconds: 0.2
+  wheelRepeatSeconds: 0
+  noticeSeconds: 2
+  cameraPosition: {x: 0, y: 0, z: 0.14}
+  cameraEuler: {x: 0, y: 0, z: 90}
+  cameraTransitionSeconds: 0.25
 --- !u!114 &5792616090195755345
 MonoBehaviour:
   m_ObjectHideFlags: 0

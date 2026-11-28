@@ -32,6 +32,10 @@ namespace NightPatrol.Photo
     {
         public const float RefreshSeconds = 0.1f;
         public const float InteractionSeconds = 2f;
+        /// <summary>방 전체 이상현상의 부품 중 이 크기(가장 짧은 변, m) 이상이면 방을 채우는 꾸밈으로 본다 (TrimRoomSized)</summary>
+        public const float RoomSize = 2f;
+        /// <summary>방을 채우는 꾸밈의 상자를 가장자리에서 줄이는 거리(m)</summary>
+        public const float RoomTrim = 0.2f;
         private const int MaxRenderersPerObject = 512;
         private const BindingFlags AnyField = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
 
@@ -232,31 +236,42 @@ namespace NightPatrol.Photo
                 var namedParts = new HashSet<Transform>();
                 var ownRenderers = new HashSet<Renderer>();
                 bool own = false, explicitTarget = false;
-                foreach (var renderer in anomaly.GetComponentsInChildren<Renderer>(true))
+                spots.TryGetValue(anomaly, out var marked);
+                // 자기 몸은 달라진 부품만 찍힌다. 달라지지 않은 부품(강의실 벽·문처럼 원래 있던 것)은 맵처럼 앞을 가린다.
+                // 달라진 부품을 하나도 못 찾으면 (정상 모습을 적기 전, 켜도 모습이 그대로인 몸) 예전처럼 보이는 자기 몸 전부
+                var solid = OwnSolid(anomaly, marked);
+                if (solid == null)
                 {
-                    if (!Visible(renderer) || Excluded(renderer, anomaly)) continue;
-                    shapes.Add(new PhotoShape(renderer.bounds, anomaly.transform));
-                    ownRenderers.Add(renderer);
-                    own = true;
+                    foreach (var renderer in anomaly.GetComponentsInChildren<Renderer>(true))
+                    {
+                        if (!Visible(renderer) || Excluded(renderer, anomaly)) continue;
+                        shapes.Add(new PhotoShape(renderer.bounds, anomaly.transform));
+                        ownRenderers.Add(renderer);
+                        own = true;
+                    }
                 }
-                if (spots.TryGetValue(anomaly, out var marked))
+                if (marked != null)
                 {
                     foreach (var spot in marked)
                     {
+                        bool mine = spot.Root == anomaly.transform;
+                        var hides = mine ? solid : null;
                         bool visible = false;
                         foreach (var renderer in spot.Renderers)
                         {
                             if (!Visible(renderer) || Excluded(renderer, anomaly) || ownRenderers.Contains(renderer)) continue;
-                            shapes.Add(new PhotoShape(renderer.bounds, spot.Root));
+                            shapes.Add(new PhotoShape(hides != null ? TrimRoomSized(renderer.bounds) : renderer.bounds, spot.Root, hides));
                             visible = true;
                         }
                         foreach (var light in spot.Lights)
                         {
                             if (light == null || !light.isActiveAndEnabled || Excluded(light, anomaly)) continue;
-                            shapes.Add(new PhotoShape(new Bounds(light.transform.position, Vector3.one * 0.3f), spot.Root));
+                            shapes.Add(new PhotoShape(new Bounds(light.transform.position, Vector3.one * 0.3f), spot.Root, hides));
                             visible = true;
                         }
-                        if (visible && spot.Part != null && namedParts.Add(spot.Part)) names.Add(spot.Part.name);
+                        if (!visible) continue;
+                        if (mine) own = true;
+                        else if (spot.Part != null && namedParts.Add(spot.Part)) names.Add(spot.Part.name);
                     }
                 }
                 if (targets.TryGetValue(anomaly, out var assigned))
@@ -273,6 +288,53 @@ namespace NightPatrol.Photo
                 result.Add(new PhotoSubject(anomaly, shapes, string.Join(" / ", descriptions)));
             }
             return result;
+        }
+
+        /// <summary>
+        /// 자기 몸에 보이는 달라진 부품이 있으면, 달라지지 않고 보이는 자기 몸 부품과 그 부모들 (가림으로 친다). 없으면 null.
+        /// 달라진 부품의 부모는 넣지 않는다 (같은 부모의 충돌체가 달라진 부품을 가리지 않게). 이상현상 오브젝트 자신도 넣지 않는다.
+        /// </summary>
+        private static HashSet<Transform> OwnSolid(Anomaly anomaly, List<Spot> marked)
+        {
+            if (marked == null) return null;
+            var root = anomaly.transform;
+            var changed = new HashSet<Transform>();
+            foreach (var spot in marked)
+            {
+                if (spot.Root != root) continue;
+                foreach (var renderer in spot.Renderers)
+                    if (Visible(renderer) && !Excluded(renderer, anomaly)) AddUpTo(changed, renderer.transform, root, null);
+                foreach (var light in spot.Lights)
+                    if (light != null && light.isActiveAndEnabled && !Excluded(light, anomaly)) AddUpTo(changed, light.transform, root, null);
+            }
+            if (changed.Count == 0) return null;
+            var solid = new HashSet<Transform>();
+            foreach (var renderer in anomaly.GetComponentsInChildren<Renderer>(true))
+                if (Visible(renderer) && !Excluded(renderer, anomaly) && !changed.Contains(renderer.transform))
+                    AddUpTo(solid, renderer.transform, root, changed);
+            return solid;
+        }
+
+        /// <summary>
+        /// 방을 채우는 큰 부품(가장 짧은 변이 RoomSize 이상)은 가장자리 RoomTrim씩 빼고 본다.
+        /// 벽을 살짝 뚫고 나온 꼭짓점 몇 개(캠핑 꾸밈 15cm) 때문에 상자가 문보다 복도 쪽에서 시작해 닫힌 문 밖에서 찍히지 않게
+        /// </summary>
+        public static Bounds TrimRoomSized(Bounds bounds)
+        {
+            var size = bounds.size;
+            if (Mathf.Min(size.x, Mathf.Min(size.y, size.z)) < RoomSize) return bounds;
+            bounds.Expand(-2f * RoomTrim);
+            return bounds;
+        }
+
+        // from부터 root 바로 아래까지 (root는 빼고). stop에 든 것을 만나면 멈춘다
+        private static void AddUpTo(HashSet<Transform> set, Transform from, Transform root, HashSet<Transform> stop)
+        {
+            for (var t = from; t != null && t != root; t = t.parent)
+            {
+                if (stop != null && stop.Contains(t)) return;
+                set.Add(t);
+            }
         }
 
         private static bool Visible(Renderer renderer) => renderer != null && renderer.enabled && renderer.gameObject.activeInHierarchy;
@@ -307,20 +369,19 @@ namespace NightPatrol.Photo
         private static void MarkChanged(Anomaly anomaly, Dictionary<Anomaly, List<GameObject>> references)
         {
             if (!spots.TryGetValue(anomaly, out var marked)) spots[anomaly] = marked = new List<Spot>();
+            // 자기 몸도 달라진 부품을 표시한다 (칸의 물체보다 먼저). 자기 몸은 예전에도 전부 봤으므로 개수 제한·공용 칸 나누기는 없다
+            OwnParts(anomaly, references[anomaly], out var ownRenderers, out var ownLights);
+            foreach (var candidate in Candidates(anomaly.gameObject, ownRenderers, ownLights, anomaly))
+                AddSpot(marked, candidate);
             foreach (var root in references[anomaly])
             {
+                if (root == anomaly.gameObject) continue;
                 var renderers = root.GetComponentsInChildren<Renderer>(true);
                 if (renderers.Length > MaxRenderersPerObject) continue;
                 bool shared = false;
                 foreach (var pair in references)
                     if (pair.Key != anomaly && pair.Value.Contains(root)) { shared = true; break; }
-                var candidates = new List<Spot>();
-                foreach (var renderer in renderers)
-                    if (CanMark(renderer, anomaly) && baseline.Changed(renderer, true))
-                        SpotFor(candidates, root.transform, renderer.transform).Renderers.Add(renderer);
-                foreach (var light in root.GetComponentsInChildren<Light>(true))
-                    if (CanMark(light, anomaly) && baseline.Changed(light))
-                        SpotFor(candidates, root.transform, light.transform).Lights.Add(light);
+                var candidates = Candidates(root, renderers, root.GetComponentsInChildren<Light>(true), anomaly);
 
                 // 공용 칸은 이상현상마다 바로 아래 자식 하나만 맡는다. 기존 배정은 꺼질 때까지 유지한다.
                 Transform assigned = null;
@@ -335,11 +396,54 @@ namespace NightPatrol.Photo
                         if (assigned != null && candidate.Part != assigned) continue;
                         assigned = candidate.Part;
                     }
-                    var spot = SpotFor(marked, candidate.Root, candidate.Part);
-                    spot.Renderers.AddRange(candidate.Renderers);
-                    spot.Lights.AddRange(candidate.Lights);
+                    AddSpot(marked, candidate);
                 }
             }
+        }
+
+        // root 아래에서 정상 모습과 달라진 부품을 바로 아래 자식(부품 묶음)별로 모은다
+        private static List<Spot> Candidates(GameObject root, IEnumerable<Renderer> renderers, IEnumerable<Light> lights, Anomaly anomaly)
+        {
+            var candidates = new List<Spot>();
+            foreach (var renderer in renderers)
+                if (CanMark(renderer, anomaly) && baseline.Changed(renderer, true))
+                    SpotFor(candidates, root.transform, renderer.transform).Renderers.Add(renderer);
+            foreach (var light in lights)
+                if (CanMark(light, anomaly) && baseline.Changed(light))
+                    SpotFor(candidates, root.transform, light.transform).Lights.Add(light);
+            return candidates;
+        }
+
+        /// <summary>
+        /// 자기 몸에서 볼 부품. 이상현상 스크립트가 칸에 자기 아래 물체를 들고 있으면 그 물체들 아래와 이상현상 오브젝트 자신만
+        /// (강의실: 꾸밈 7종·원래 가구 — 방 불빛·문 위 유리창처럼 다른 코드가 방에 켠 것은 빼고), 없으면 자기 아래 전부
+        /// </summary>
+        private static void OwnParts(Anomaly anomaly, List<GameObject> references, out HashSet<Renderer> renderers, out HashSet<Light> lights)
+        {
+            var root = anomaly.transform;
+            var held = new List<GameObject>();
+            foreach (var go in references)
+                if (go != anomaly.gameObject && go.transform.IsChildOf(root)) held.Add(go);
+            if (held.Count == 0)
+            {
+                renderers = new HashSet<Renderer>(anomaly.GetComponentsInChildren<Renderer>(true));
+                lights = new HashSet<Light>(anomaly.GetComponentsInChildren<Light>(true));
+                return;
+            }
+            renderers = new HashSet<Renderer>(anomaly.GetComponents<Renderer>());
+            lights = new HashSet<Light>(anomaly.GetComponents<Light>());
+            foreach (var go in held)
+            {
+                renderers.UnionWith(go.GetComponentsInChildren<Renderer>(true));
+                lights.UnionWith(go.GetComponentsInChildren<Light>(true));
+            }
+        }
+
+        private static void AddSpot(List<Spot> marked, Spot candidate)
+        {
+            var spot = SpotFor(marked, candidate.Root, candidate.Part);
+            spot.Renderers.AddRange(candidate.Renderers);
+            spot.Lights.AddRange(candidate.Lights);
         }
 
         private static bool CanMark(Component component, Anomaly anomaly) =>

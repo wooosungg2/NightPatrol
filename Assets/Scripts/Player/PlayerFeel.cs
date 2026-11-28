@@ -4,8 +4,9 @@ using UnityEngine;
 namespace NightPatrol.Player
 {
     /// <summary>
-    /// 걷는 느낌: 걸을 때 화면이 살짝 흔들리고(걸음마다 아래로, 두 걸음에 한 번 좌우) 발을 디딜 때마다 발소리.
-    /// 달리면 흔들림이 커지고 시야가 조금 넓어진다. 값은 PlayerSettings (Head Bob·Footstep·Run Fov Boost).
+    /// 걷는 느낌: 걸을 때 화면이 살짝 흔들리고(걸음마다 아래로, 두 걸음에 한 번 좌우) 발을 디딜 때마다 Stepped를 알린다
+    /// (발소리는 PlayerSounds가 이걸 듣고 낸다 — 소리 파일은 PlayerSounds 한 곳).
+    /// 달리면 흔들림이 커지고 시야가 조금 넓어진다. 값은 PlayerSettings (Head Bob·Step Length·Run Fov Boost).
     /// PlayerMovement가 실행 중에 붙인다 — 프리팹에 따로 붙일 필요 없음
     /// </summary>
     [DisallowMultipleComponent]
@@ -15,7 +16,6 @@ namespace NightPatrol.Player
         private PlayerMovement movement;
         private Transform cameraTransform;
         private Camera eye;
-        private AudioSource feet;
         private NightPatrol.Phone.PhoneHolder phone;
         private Vector3 basePosition;
         private float phase, amplitude, fovKick, fovVelocity;
@@ -33,7 +33,7 @@ namespace NightPatrol.Player
         public float FovKick { get; private set; }
         /// <summary>지금까지 디딘 걸음 수</summary>
         public int Steps { get; private set; }
-        /// <summary>발을 디딜 때 (달리는 중이면 true). 발소리 말고 다른 소리·연출도 여기에 붙인다</summary>
+        /// <summary>발을 디딜 때 (달리는 중이면 true). PlayerSounds가 발소리를 내고, 다른 소리·연출도 여기에 붙인다</summary>
         public event Action<bool> Stepped;
 
         private void Awake()
@@ -89,7 +89,7 @@ namespace NightPatrol.Player
                 int before = Mathf.FloorToInt(phase / Mathf.PI);
                 phase += speed / Mathf.Max(0.1f, stepLength) * Mathf.PI * dt;
                 int crossed = Mathf.FloorToInt(phase / Mathf.PI) - before;
-                for (int i = 0; i < crossed; i++) Step(settings, running);
+                for (int i = 0; i < crossed; i++) Step(running);
             }
 
             var offset = BobOffset(phase, settings.BobHeight * amplitude, settings.BobSway * amplitude);
@@ -120,25 +120,9 @@ namespace NightPatrol.Player
             return Mathf.Lerp(1f, Mathf.Max(1f, runScale), Mathf.InverseLerp(walkSpeed, runSpeed, speed));
         }
 
-        private void Step(PlayerSettings settings, bool running)
+        private void Step(bool running)
         {
             Steps++;
-            var clips = settings.FootstepClips;
-            if (clips != null && clips.Length > 0)
-            {
-                var clip = clips[UnityEngine.Random.Range(0, clips.Length)];
-                if (clip != null)
-                {
-                    if (feet == null)
-                    {
-                        feet = gameObject.AddComponent<AudioSource>();
-                        feet.playOnAwake = false;
-                        feet.spatialBlend = 0f;
-                    }
-                    feet.pitch = UnityEngine.Random.Range(0.92f, 1.08f);
-                    feet.PlayOneShot(clip, running ? settings.RunFootstepVolume : settings.FootstepVolume);
-                }
-            }
             SafeEvent.Raise(Stepped, running, this);
         }
 

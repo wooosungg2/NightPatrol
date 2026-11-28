@@ -60,5 +60,25 @@ namespace NightPatrol.Tests
             float expected = settings.WalkSpeed * settings.DecelerationTime / 2f;
             Assert.That(forward, Is.GreaterThan(expected * 0.5f).And.LessThan(expected * 1.2f), $"미끄러진 거리 {forward:0.000}m");
         }
+
+        // 11/27: 발소리는 PlayerSounds 한 곳에서 낸다. 걷는 느낌(PlayerFeel)이 있으면 그 걸음마다 (화면 흔들림과 같은 박자),
+        // 걸은 거리로 따로 세지 않는다 (둘 다 세면 발소리가 두 번 남)
+        [UnityTest]
+        public IEnumerator Footsteps_FollowTheWalkingFeelSteps_NotTheirOwnDistance()
+        {
+            settings = ScriptableObject.CreateInstance<PlayerSettings>();
+            body = new GameObject("Player");
+            var sounds = body.AddComponent<NightPatrol.Audio.PlayerSounds>();
+            var feel = body.AddComponent<PlayerFeel>();
+            yield return null;   // PlayerSounds.Update가 걷는 느낌을 찾음
+
+            for (int i = 0; i < 100; i++) feel.Tick(settings, settings.WalkSpeed, false, true, true, 0.01f);
+            Assert.Greater(feel.Steps, 0);
+            Assert.AreEqual(feel.Steps, sounds.StepsHeard, "걸음마다 한 번");
+
+            body.transform.position += Vector3.forward * 5f * 0.18f;   // 걸은 거리만으로는 세지 않음
+            yield return null;
+            Assert.AreEqual(feel.Steps, sounds.StepsHeard);
+        }
     }
 }

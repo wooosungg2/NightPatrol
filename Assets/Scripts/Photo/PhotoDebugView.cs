@@ -182,7 +182,8 @@ namespace NightPatrol.Photo
                         foreach (var renderer in candidates)
                         {
                             if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
-                            if (!explicitTarget && !SameBounds(renderer.bounds, shape.Bounds)) continue;
+                            if (!explicitTarget && !SameBounds(renderer.bounds, shape.Bounds) &&
+                                !SameBounds(PhotoSubjects.TrimRoomSized(renderer.bounds), shape.Bounds)) continue;   // 방을 채우는 꾸밈은 줄인 상자
                             found = true;
                             if (added.Add(renderer)) renderers.Add(renderer);
                         }

@@ -24,12 +24,6 @@ namespace NightPatrol.Player
         [SerializeField, Min(0.1f)] private float runStepLength = 1.8f;
         [Tooltip("달리는 동안 넓어지는 시야각 (도). 0이면 그대로")]
         [SerializeField, Min(0f)] private float runFovBoost = 5f;
-        [Tooltip("발소리 (걸음마다 하나를 골라 냄). 비우면 소리 없음")]
-        [SerializeField] private AudioClip[] footstepClips = new AudioClip[0];
-        [Tooltip("걸을 때 발소리 크기")]
-        [SerializeField, Range(0f, 1f)] private float footstepVolume = 0.5f;
-        [Tooltip("달릴 때 발소리 크기")]
-        [SerializeField, Range(0f, 1f)] private float runFootstepVolume = 0.8f;
         [Header("이동")]
         [Tooltip("멈춰 있다가 걷는 속도가 될 때까지 걸리는 시간 (초). 0이면 바로 (딱딱하게 출발)")]
         [SerializeField, Min(0f)] private float accelerationTime = 0.15f;
@@ -57,9 +51,6 @@ namespace NightPatrol.Player
         public float WalkStepLength => Mathf.Max(0.1f, walkStepLength);
         public float RunStepLength => Mathf.Max(0.1f, runStepLength);
         public float RunFovBoost => Mathf.Max(0f, runFovBoost);
-        public AudioClip[] FootstepClips => footstepClips;
-        public float FootstepVolume => Mathf.Clamp01(footstepVolume);
-        public float RunFootstepVolume => Mathf.Clamp01(runFootstepVolume);
         public float AccelerationTime => Mathf.Max(0f, accelerationTime);
         public float DecelerationTime => Mathf.Max(0f, decelerationTime);
         public float Gravity => Mathf.Min(0f, gravity);
