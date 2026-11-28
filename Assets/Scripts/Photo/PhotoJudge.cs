@@ -168,16 +168,31 @@ namespace NightPatrol.Photo
         {
             distance = 0f;
             if (shape.IsSurface && Vector3.Dot(ray.origin - shape.Center, shape.Normal) <= 0f) return false;
+            // 눈이 부품 상자 안 (방 전체를 꾸민 이상현상 안에 서 있음): 어느 쪽을 찍어도 보인다.
+            // 다른 부품과는 상자를 나가는 거리로 앞뒤를 가린다 (방 안의 다른 이상현상이 가까우면 그쪽이 먼저)
+            if (!shape.IsSurface && shape.Bounds.Contains(ray.origin))
+            {
+                distance = Mathf.Min(ExitDistance(shape.Bounds, ray), Mathf.Max(0f, rules.maxDistance));
+                return true;
+            }
             if (!shape.Bounds.IntersectRay(ray, out distance) || distance < 0f ||
                 distance > rules.maxDistance) return false;
             foreach (var hit in blockers)
             {
                 if (hit.distance >= distance - Mathf.Max(0f, rules.surfaceLift)) continue;
-                if (shape.Owner != null && hit.collider.transform.IsChildOf(shape.Owner)) continue;
+                if (!shape.Hides(hit.collider)) continue;   // 대상 자신의 충돌체 (달라지지 않은 자기 몸 부품은 가림)
                 if (PhotoOcclusion.AllowsPhotos(hit.collider)) continue;
                 return false;
             }
             return true;
+        }
+
+        // 상자 안에서 출발한 레이가 상자를 나가는 거리: 상자 너머 먼 점에서 거꾸로 쏴 들어오는 점을 찾는다
+        private static float ExitDistance(Bounds bounds, Ray ray)
+        {
+            float far = bounds.size.magnitude + 1f;
+            var back = new Ray(ray.origin + ray.direction * far, -ray.direction);
+            return bounds.IntersectRay(back, out float entry) ? Mathf.Max(0f, far - entry) : 0f;
         }
 
         private static int Occluders()
