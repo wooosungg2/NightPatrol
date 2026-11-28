@@ -94,10 +94,22 @@ namespace NightPatrol.Tests
             interact.ApplyBindingOverride(Index(interact), "<Keyboard>/g");
             KeyBindings.Save(asset, TestPrefsKey);
 
-            UnityEngine.TestTools.LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(@"\[Keys\] 개발자 키라 기본값으로: Journal F6"));
+            UnityEngine.TestTools.LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(@"\[Keys\] 다시 지정할 수 없는 키라 기본값으로: Journal F6"));
             KeyBindings.Load(asset, TestPrefsKey);
             Assert.AreEqual("<Keyboard>/tab", journal.bindings[Index(journal)].effectivePath);
             Assert.AreEqual("<Keyboard>/g", interact.bindings[Index(interact)].effectivePath, "다른 줄의 설정은 그대로");
+        }
+
+        // 01_06d: 마우스 오른쪽은 휴대폰이 늘 뒤로·넣기·끊기로 받는다. 예전에 그 버튼으로 저장한 설정은 불러올 때 기본 키로
+        [Test]
+        public void Load_DropsASavedRightMouseButton_TheOneThePhoneUses()
+        {
+            interact.ApplyBindingOverride(Index(interact), "<Mouse>/rightButton");
+            KeyBindings.Save(asset, TestPrefsKey);
+
+            UnityEngine.TestTools.LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(@"\[Keys\] 다시 지정할 수 없는 키라 기본값으로: Interact 마우스 오른쪽"));
+            KeyBindings.Load(asset, TestPrefsKey);
+            Assert.AreEqual("<Keyboard>/e", interact.bindings[Index(interact)].effectivePath);
         }
 
         [Test]

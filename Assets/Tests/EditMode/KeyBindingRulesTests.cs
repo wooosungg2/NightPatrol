@@ -102,6 +102,17 @@ namespace NightPatrol.Tests
             Assert.IsTrue(reserved.Contains("<Keyboard>/upArrow"), "방향키는 이동의 고정 보조 키");
         }
 
+        // 01_06d: 휴대폰은 마우스 오른쪽을 늘 뒤로·넣기·끊기로 받는다 (PhoneHolder). 다른 동작에 주면 같이 눌리므로 다시 지정할 때 받지 않는다
+        [Test]
+        public void TheRightMouseButton_UsedByThePhone_CannotBeChosenWhenRebinding()
+        {
+            var reserved = (string[])typeof(KeyBindings).GetField("Reserved", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            var mouse = (string[])typeof(KeyBindings).GetField("MouseButtons", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Assert.IsTrue(reserved.Contains("<Mouse>/rightButton"), "받지 않는 키에 마우스 오른쪽");
+            Assert.IsFalse(mouse.Contains("<Mouse>/rightButton"), "받는 마우스 버튼에서 오른쪽은 뺌");
+            CollectionAssert.IsSubsetOf(new[] { "<Mouse>/middleButton", "<Mouse>/forwardButton", "<Mouse>/backButton" }, mouse, "가운데·옆 버튼은 그대로");
+        }
+
         // 목록 에셋을 탐색기에서 옮기거나 복사하면 GUID가 바뀌어 메뉴 연결이 끊긴다 (10/11 실제로 있었음)
         [Test]
         public void EveryPauseMenuPrefab_UsesTheKeyList()

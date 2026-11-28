@@ -8,7 +8,8 @@ namespace NightPatrol.Controls
     /// <summary>
     /// 키 설정: 바꾼 키를 PlayerPrefs에 저장·불러오기, 키 하나 다시 지정, 기본값으로, 키 이름.
     /// 게임 코드는 Input Actions 에셋의 액션을 그대로 쓰므로(복제하지 않음) 바꾼 키가 바로 먹힌다.
-    /// 다시 지정할 수 있는 키: 키보드 키와 마우스 오른쪽·가운데·옆 버튼. ESC(메뉴·취소)와 개발자 키(F1~F10, PgUp/PgDn)는 받지 않는다
+    /// 다시 지정할 수 있는 키: 키보드 키와 마우스 가운데·옆 버튼. ESC(메뉴·취소), 개발자 키(F1~F10, PgUp/PgDn),
+    /// 마우스 오른쪽(휴대폰 뒤로·넣기·끊기)은 받지 않는다
     /// </summary>
     public static class KeyBindings
     {
@@ -16,7 +17,8 @@ namespace NightPatrol.Controls
         public const string KeyboardMouse = "Keyboard&Mouse";
 
         // 다시 지정할 때 받지 않는 키: 메뉴·취소, 개발자 키, 실제 키가 아닌 것,
-        // 이동의 고정 보조 키(방향키 — 목록에 없어서 다른 줄에 주면 겹침 맞바꿈에 안 잡히고 이동과 같이 눌림)
+        // 이동의 고정 보조 키(방향키 — 목록에 없어서 다른 줄에 주면 겹침 맞바꿈에 안 잡히고 이동과 같이 눌림),
+        // 마우스 오른쪽(휴대폰이 늘 뒤로·넣기·끊기로 받음 — 다른 동작에 주면 같이 눌림, 06_04e에서 남긴 문제)
         private static readonly string[] Reserved =
         {
             "<Keyboard>/escape", "<Keyboard>/anyKey",
@@ -24,11 +26,12 @@ namespace NightPatrol.Controls
             "<Keyboard>/f8", "<Keyboard>/f9", "<Keyboard>/f10",
             "<Keyboard>/pageUp", "<Keyboard>/pageDown",
             "<Keyboard>/upArrow", "<Keyboard>/downArrow", "<Keyboard>/leftArrow", "<Keyboard>/rightArrow",
+            "<Mouse>/rightButton",
         };
 
-        // 마우스는 이 버튼만 (왼쪽 버튼은 메뉴를 누르는 버튼이라 받으면 누르자마자 지정돼 버림)
+        // 마우스는 이 버튼만 (왼쪽 버튼은 메뉴를 누르는 버튼이라 받으면 누르자마자 지정돼 버림, 오른쪽은 휴대폰이 씀)
         private static readonly string[] MouseButtons =
-            { "<Mouse>/rightButton", "<Mouse>/middleButton", "<Mouse>/forwardButton", "<Mouse>/backButton" };
+            { "<Mouse>/middleButton", "<Mouse>/forwardButton", "<Mouse>/backButton" };
 
         private static InputActionRebindingExtensions.RebindingOperation operation;
 
@@ -94,7 +97,7 @@ namespace NightPatrol.Controls
             SafeEvent.Raise(Changed, null);
         }
 
-        // 받지 않는 키(Reserved)가 늘면 예전에 그 키로 저장한 설정이 개발자 키·메뉴 키와 같이 눌린다 → 그 덮어쓰기만 지워 기본 키로
+        // 받지 않는 키(Reserved)가 늘면 예전에 그 키로 저장한 설정이 개발자 키·메뉴 키·휴대폰 우클릭과 같이 눌린다 → 그 덮어쓰기만 지워 기본 키로
         private static void DropReservedOverrides(InputActionAsset asset)
         {
             foreach (var action in asset)
@@ -105,7 +108,7 @@ namespace NightPatrol.Controls
                     string overridePath = bindings[i].overridePath;
                     if (string.IsNullOrEmpty(overridePath) || !IsReserved(overridePath)) continue;
                     action.RemoveBindingOverride(i);
-                    Debug.LogWarning($"[Keys] 개발자 키라 기본값으로: {action.name} {KeyName(overridePath)}");
+                    Debug.LogWarning($"[Keys] 다시 지정할 수 없는 키라 기본값으로: {action.name} {KeyName(overridePath)}");
                 }
             }
         }
@@ -134,7 +137,7 @@ namespace NightPatrol.Controls
         }
 
         /// <summary>
-        /// 키 하나를 다시 지정: 다음에 누르는 키(키보드, 마우스 오른쪽·가운데·옆)로. ESC = 취소.
+        /// 키 하나를 다시 지정: 다음에 누르는 키(키보드, 마우스 가운데·옆)로. ESC = 취소.
         /// 지정하는 동안 그 동작은 잠시 끄고 끝나면 원래대로. done(true) = 바뀜, done(false) = 취소
         /// </summary>
         public static void StartRebind(InputAction action, int bindingIndex, Action<bool> done)
